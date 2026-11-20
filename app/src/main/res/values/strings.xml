@@ -1,0 +1,452 @@
+<resources>
+    <string name="app_name">ShareFlow</string>
+    <string name="app_tagline">High-Speed Offline Sharing &amp; Device Utility</string>
+
+    <!-- Navigation Destinations -->
+    <string name="nav_home">Home</string>
+    <string name="nav_files">Files</string>
+    <string name="nav_media">Media</string>
+    <string name="nav_tools">Tools</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="cd_navigate_back">Navigate back</string>
+    <string name="cd_hero_banner">ShareFlow high-speed offline transfer visual banner</string>
+    <string name="cd_app_logo">ShareFlow logo</string>
+    <string name="cd_open_settings">Open Settings</string>
+
+    <!-- Home Dashboard -->
+    <string name="home_ready_offline">Offline-First Ready</string>
+    <string name="home_status_idle">Ready • Offline</string>
+    <string name="home_status_wifi_ready">Wi-Fi Ready</string>
+    <string name="home_status_receiving">Receiving on :%1$s</string>
+    <string name="home_status_discovering">Discovering…</string>
+    <string name="home_status_connected">Connected to %1$s</string>
+    <string name="home_device_identity_format">Device: %1$s</string>
+    <string name="home_action_send">Send</string>
+    <string name="home_action_send_sub">Pick &amp; share files</string>
+    <string name="home_action_receive">Receive</string>
+    <string name="home_action_receive_sub">Accept nearby items</string>
+    <string name="home_section_overview">Device &amp; Foundation Status</string>
+    <string name="home_section_nearby_devices">Nearby Devices</string>
+    <string name="home_section_nearby_empty_title">No Nearby Devices Detected</string>
+    <string name="home_section_nearby_empty_body">Start Receive or open Device Discovery to locate nearby Android devices on your local link. ShareFlow never lists simulated devices.</string>
+    <string name="home_section_nearby_action">Open Receive</string>
+    <string name="home_section_recent_transfers">Recent Transfers</string>
+    <string name="home_section_recent_files">Recent Files</string>
+    <string name="home_section_recent_files_empty_title">No Recent Files Yet</string>
+    <string name="home_section_recent_files_empty_body">Files you select in Send or browse via Storage Access Framework appear here for quick reuse.</string>
+    <string name="home_section_recent_files_action">Browse Files</string>
+    <string name="home_section_storage">Storage Overview</string>
+    <string name="home_section_quick_tools">Quick Tools</string>
+    <string name="home_view_all">View All</string>
+    <string name="home_metric_transfers">Recorded Transfers</string>
+    <string name="home_metric_trusted">Trusted Devices</string>
+    <string name="home_metric_port">Transfer Port</string>
+    <string name="home_section_modules">Application Modules</string>
+    <string name="home_section_modules_sub">Modular Clean Architecture</string>
+    <string name="home_foundation_banner_title">ShareFlow Core Foundation</string>
+    <string name="home_foundation_banner_body">Room database, Keystore crypto engine, DataStore settings, and independent networking contracts are initialized. Feature modules will be implemented incrementally without simulated data.</string>
+
+    <!-- Send Screen -->
+    <string name="send_title">Send Files</string>
+    <string name="send_category_all">All</string>
+    <string name="send_category_images">Images</string>
+    <string name="send_category_videos">Videos</string>
+    <string name="send_category_audio">Audio</string>
+    <string name="send_category_documents">Documents</string>
+    <string name="send_category_apks">APKs</string>
+    <string name="send_category_archives">Archives</string>
+    <string name="send_category_other">Other</string>
+    <string name="send_selected_count_label">Selected Files</string>
+    <string name="send_total_size_label">Total Size</string>
+    <string name="send_add_files_action">Select Files (SAF)</string>
+    <string name="send_clear_selection">Clear</string>
+    <string name="send_continue_action">Continue</string>
+    <string name="send_empty_title">No Files Selected</string>
+    <string name="send_empty_body">Choose a category and tap Select Files to pick real documents, photos, or APKs using Android Storage Access Framework.</string>
+    <string name="send_confirm_title">Ready to Transfer</string>
+    <string name="send_confirm_summary_title">Transfer Package Summary</string>
+    <string name="send_confirm_sha256_note">SHA-256 checksum verification will run before any transfer is marked complete.</string>
+    <string name="send_confirm_peers_title">Trusted &amp; Discovered Receivers</string>
+    <string name="send_confirm_no_peers_title">No Receiver Connected</string>
+    <string name="send_confirm_no_peers_body">Ask the receiving device to open ShareFlow Receive or scan a QR pairing code to pair over your local network.</string>
+    <string name="send_open_qr_action">Open QR Pairing</string>
+
+    <!-- Receive Screen -->
+    <string name="receive_title">Receive Files</string>
+    <string name="receive_start_action">Start Receiving</string>
+    <string name="receive_stop_action">Stop Receiving</string>
+    <string name="receive_connection_status_title">Connection Status</string>
+    <string name="receive_discovery_status_title">Device Discovery Status</string>
+    <string name="receive_status_listening">Listening on TCP port %1$s</string>
+    <string name="receive_status_not_listening">Receiver is idle</string>
+    <string name="receive_discovery_advertising">Advertising \"%1$s\" on local network</string>
+    <string name="receive_discovery_inactive">Discovery advertising is paused</string>
+    <string name="receive_wifi_connected">Wi-Fi link active (%1$s)</string>
+    <string name="receive_wifi_disconnected">Wi-Fi not connected</string>
+    <string name="receive_qr_card_title">QR Pairing</string>
+    <string name="receive_qr_card_desc">Generate an ephemeral 6-digit PIN and local pairing URI for fast device handshake.</string>
+    <string name="receive_qr_open_action">Open QR Pairing</string>
+
+    <!-- QR Pairing Screen -->
+    <string name="qr_pairing_title">QR Pairing</string>
+    <string name="qr_pairing_pin_label">Session Pairing PIN</string>
+    <string name="qr_pairing_uri_label">Local Pairing URI</string>
+    <string name="qr_pairing_copy_action">Copy Pairing URI</string>
+    <string name="qr_pairing_regenerate_action">Regenerate PIN</string>
+    <string name="qr_pairing_copied_toast">Pairing URI copied to clipboard</string>
+    <string name="qr_pairing_security_note">Generated locally using SecureRandom. Share only with a trusted nearby device.</string>
+
+    <!-- Files Screen & File Manager -->
+    <string name="files_title">Files</string>
+    <string name="files_subtitle">Browse selected folders via SAF and scan accessible media securely.</string>
+    <string name="files_category_images">Images</string>
+    <string name="files_category_videos">Videos</string>
+    <string name="files_category_audio">Audio</string>
+    <string name="files_category_documents">Documents</string>
+    <string name="files_category_archives">Archives</string>
+    <string name="files_category_apks">APK</string>
+    <string name="files_category_downloads">Downloads</string>
+    <string name="files_category_other">Other</string>
+    <string name="files_pick_saf_action">Pick Files (SAF)</string>
+    <string name="files_pick_media_action">Pick Media</string>
+    <string name="files_browse_folder_action">Select Folder</string>
+    <string name="files_scan_media_action">Scan Media</string>
+    <string name="files_category_empty_title">No Accessible Files in %1$s</string>
+    <string name="files_category_empty_body">Use Android Storage Access Framework, Photo Picker, or select a folder to browse files here without broad storage permissions.</string>
+    <string name="files_directory_empty_title">Folder Is Empty</string>
+    <string name="files_directory_empty_body">No files or subfolders match your current filter in this directory.</string>
+    <string name="files_send_selected_action">Send Selected</string>
+    <string name="files_section_categories">Categories</string>
+    <string name="files_section_directories">Selected Folders</string>
+    <string name="files_section_accessible">Accessible Files</string>
+    <string name="files_directories_empty">No folders selected yet. Tap Select Folder to browse any directory with SAF.</string>
+    <string name="files_search_placeholder">Search files by name or type…</string>
+    <string name="files_cd_search">Search files</string>
+    <string name="files_cd_clear_search">Clear search</string>
+    <string name="files_cd_sort">Sort files</string>
+    <string name="files_cd_view_grid">Switch to grid view</string>
+    <string name="files_cd_view_list">Switch to list view</string>
+    <string name="files_cd_more_options">More file options</string>
+    <string name="files_cd_close_selection">Exit selection mode</string>
+    <string name="files_cd_select_all">Select all visible files</string>
+    <string name="files_selected_count_format">%1$s selected</string>
+    <string name="files_action_preview">Preview</string>
+    <string name="files_action_details">Details</string>
+    <string name="files_action_rename">Rename</string>
+    <string name="files_action_copy">Copy</string>
+    <string name="files_action_move">Move</string>
+    <string name="files_action_delete">Delete</string>
+    <string name="files_action_share">Share</string>
+    <string name="files_action_send">Send via ShareFlow</string>
+    <string name="files_action_create_folder">New Folder</string>
+    <string name="files_action_open_external">Open Externally</string>
+    <string name="files_action_select">Select</string>
+    <string name="files_action_regrant">Re-grant Access</string>
+    <string name="files_action_remove_folder">Remove Folder</string>
+    <string name="files_sort_title">Sort Files</string>
+    <string name="files_sort_name">Name</string>
+    <string name="files_sort_date">Date Modified</string>
+    <string name="files_sort_size">Size</string>
+    <string name="files_sort_type">Type</string>
+    <string name="files_sort_asc">Ascending</string>
+    <string name="files_sort_desc">Descending</string>
+    <string name="files_details_title">File Details</string>
+    <string name="files_details_name">Name</string>
+    <string name="files_details_type">MIME Type</string>
+    <string name="files_details_size">Size</string>
+    <string name="files_details_modified">Modified</string>
+    <string name="files_details_source">Source</string>
+    <string name="files_details_uri">Content URI</string>
+    <string name="files_details_permissions">Permissions</string>
+    <string name="files_details_perm_read">Read</string>
+    <string name="files_details_perm_write">Write</string>
+    <string name="files_details_perm_rename">Rename</string>
+    <string name="files_details_perm_delete">Delete</string>
+    <string name="files_details_sha256_action">Compute SHA-256</string>
+    <string name="files_details_sha256_label">SHA-256 Digest</string>
+    <string name="files_source_saf_tree">SAF Folder</string>
+    <string name="files_source_saf_doc">SAF Document</string>
+    <string name="files_source_media_store">MediaStore</string>
+    <string name="files_source_photo_picker">Photo Picker</string>
+    <string name="files_preview_title">Preview</string>
+    <string name="files_preview_unsupported">Inline preview is not available for this file format.</string>
+    <string name="files_preview_truncated_note">Showing up to the first 16 KB to keep memory usage low.</string>
+    <string name="files_rename_title">Rename File</string>
+    <string name="files_rename_label">New name</string>
+    <string name="files_rename_error">Enter a valid name without slashes or control characters.</string>
+    <string name="files_create_folder_title">Create Folder</string>
+    <string name="files_create_folder_label">Folder name</string>
+    <string name="files_delete_title">Delete %1$s item(s)?</string>
+    <string name="files_delete_body">This permanently removes the selected file(s) from storage where permitted by Android.</string>
+    <string name="files_target_copy_title">Copy to Folder</string>
+    <string name="files_target_move_title">Move to Folder</string>
+    <string name="files_target_choose_new">Choose Another Folder (SAF)</string>
+    <string name="files_target_empty">Select a writable folder via SAF to complete this operation.</string>
+    <string name="files_permission_revoked_title">Folder Access Revoked</string>
+    <string name="files_permission_revoked_body">Android revoked persisted access for this folder or it is no longer mounted. Re-select the folder to restore access.</string>
+    <string name="files_permission_dialog_title">Scoped Storage Access</string>
+    <string name="files_permission_dialog_body">ShareFlow uses Android Storage Access Framework and Photo Picker instead of unrestricted storage permissions. Grant folder access only for directories you choose to browse.</string>
+    <string name="files_inaccessible_badge">Inaccessible</string>
+    <string name="files_readonly_badge">Read-only</string>
+    <string name="files_share_chooser_title">Share via</string>
+    <string name="files_feedback_copied">Copied %1$s file(s)</string>
+    <string name="files_feedback_moved">Moved %1$s file(s)</string>
+    <string name="files_feedback_deleted">Deleted %1$s item(s)</string>
+    <string name="files_feedback_partial_failure">%1$s succeeded, %2$s failed</string>
+    <string name="files_feedback_renamed">Renamed successfully</string>
+    <string name="files_feedback_folder_created">Folder created</string>
+    <string name="files_feedback_folder_added">Folder access granted</string>
+    <string name="files_feedback_scan_done">Scanned %1$s accessible media file(s)</string>
+    <string name="files_feedback_share_error">No app available to handle sharing these files.</string>
+    <string name="action_close">Close</string>
+
+    <!-- Media Screen -->
+    <string name="media_title">Media</string>
+    <string name="media_subtitle">Offline Photos, Videos, and Music modules powered by Coil &amp; Media3.</string>
+    <string name="media_photos_title">Photos</string>
+    <string name="media_photos_desc">Browse local photos privately via Android Photo Picker and Coil.</string>
+    <string name="media_videos_title">Videos</string>
+    <string name="media_videos_desc">Play local videos with hardware acceleration via AndroidX Media3.</string>
+    <string name="media_music_title">Music</string>
+    <string name="media_music_desc">Manage offline audio playlists and Media3 playback controls.</string>
+
+    <!-- Tools Screen -->
+    <string name="tools_title">Tools</string>
+    <string name="tools_subtitle">Privacy vault, storage insights, compression, cleanup, and migration utilities.</string>
+    <string name="module_duplicate_finder_title">Duplicate Finder</string>
+    <string name="module_duplicate_finder_desc">Detect identical local files safely via SHA-256 content digests.</string>
+
+    <!-- Storage Analyzer Screen -->
+    <string name="storage_analyzer_title">Storage Analyzer</string>
+    <string name="storage_analyzer_refresh">Refresh Storage</string>
+    <string name="storage_analyzer_total">Total Capacity</string>
+    <string name="storage_analyzer_used">Used Space</string>
+    <string name="storage_analyzer_available">Available Space</string>
+    <string name="storage_analyzer_note">Read directly from Android StatFs without requiring broad storage permissions.</string>
+
+    <!-- Module Status Badges -->
+    <string name="status_ready">Ready</string>
+    <string name="status_scaffolded">Planned</string>
+    <string name="status_foundation">Foundation</string>
+
+    <!-- Module Names & Descriptions -->
+    <string name="module_send_title">Send Files</string>
+    <string name="module_send_desc">Select local files via SAF and transmit over direct peer sockets.</string>
+    <string name="module_receive_title">Receive Files</string>
+    <string name="module_receive_desc">Listen for incoming sessions with SHA-256 integrity checks.</string>
+    <string name="module_discovery_title">Device Discovery</string>
+    <string name="module_discovery_desc">Discover nearby Android devices over Wi-Fi Direct and local NSD.</string>
+    <string name="module_connection_title">Connection Manager</string>
+    <string name="module_connection_desc">Manage peer handshakes, active sockets, and trusted device pairing.</string>
+    <string name="module_transfer_engine_title">File Transfer Engine</string>
+    <string name="module_transfer_engine_desc">Stream chunked payloads with real byte progress and verification.</string>
+    <string name="module_file_manager_title">File Manager</string>
+    <string name="module_file_manager_desc">Browse, organize, and inspect directories using Storage Access Framework.</string>
+    <string name="module_app_sharing_title">Application Sharing</string>
+    <string name="module_app_sharing_desc">Inspect and share user-installed APK packages offline.</string>
+    <string name="module_image_gallery_title">Image Gallery</string>
+    <string name="module_image_gallery_desc">Fast local photo browsing powered by Coil and Android Photo Picker.</string>
+    <string name="module_video_player_title">Video Player</string>
+    <string name="module_video_player_desc">Hardware-accelerated local playback built on AndroidX Media3.</string>
+    <string name="module_music_player_title">Music Player</string>
+    <string name="module_music_player_desc">Offline audio library and playback controls using Media3.</string>
+    <string name="module_private_vault_title">Private Vault</string>
+    <string name="module_private_vault_desc">AES-256-GCM encrypted local storage backed by Android Keystore.</string>
+    <string name="module_phone_migration_title">Phone Migration</string>
+    <string name="module_phone_migration_desc">Batch migrate user media, apps, and documents between devices.</string>
+    <string name="module_storage_analyzer_title">Storage Analyzer</string>
+    <string name="module_storage_analyzer_desc">Inspect real local storage capacity via StatFs and locate large files.</string>
+    <string name="module_file_compression_title">File Compression</string>
+    <string name="module_file_compression_desc">Create and extract local ZIP archives offline.</string>
+    <string name="module_transfer_history_title">Transfer History</string>
+    <string name="module_transfer_history_desc">Persistent Room log of verified sent and received transfers.</string>
+    <string name="module_settings_title">Settings</string>
+    <string name="module_settings_desc">Configure device identity, theme, port, and security preferences.</string>
+
+    <!-- Files & Media Hubs -->
+    <string name="hub_files_title">Files &amp; Utilities</string>
+    <string name="hub_files_subtitle">Local storage, compression, app packages, and encrypted vault modules.</string>
+    <string name="hub_media_title">Media Suite</string>
+    <string name="hub_media_subtitle">Offline gallery, video player, and music player built on Media3 &amp; Coil.</string>
+
+    <!-- Module Foundation Detail -->
+    <string name="module_detail_architecture_title">Architectural Readiness</string>
+    <string name="module_detail_layer_domain">Domain contracts &amp; immutable models defined</string>
+    <string name="module_detail_layer_data">Repository interfaces &amp; Room schema configured</string>
+    <string name="module_detail_layer_security">Zero fake progress &amp; least-privilege permission policy enforced</string>
+    <string name="module_detail_notice_title">Scheduled for Feature Implementation</string>
+    <string name="module_detail_notice_body">This module is registered in ShareFlow\'s Clean Architecture foundation. Real hardware, socket, or storage implementation will be added in its dedicated phase without simulated data.</string>
+
+    <!-- Transfer History -->
+    <string name="history_title">Transfer History</string>
+    <string name="history_empty_title">No Transfers Recorded</string>
+    <string name="history_empty_body">Verified sent and received file transfers will appear here once transfer sessions complete. ShareFlow never displays simulated records.</string>
+    <string name="history_clear_action">Clear History</string>
+    <string name="history_clear_dialog_title">Clear transfer history?</string>
+    <string name="history_clear_dialog_body">This permanently removes all saved transfer history records from the local Room database.</string>
+    <string name="history_status_verified">SHA-256 Verified</string>
+    <string name="history_direction_sent">Sent</string>
+    <string name="history_direction_received">Received</string>
+
+    <!-- Design System Components -->
+    <string name="ds_status_queued">Queued</string>
+    <string name="ds_status_in_progress">Transferring</string>
+    <string name="ds_status_verifying">Verifying</string>
+    <string name="ds_status_completed">Verified</string>
+    <string name="ds_status_failed">Failed</string>
+    <string name="ds_status_cancelled">Cancelled</string>
+    <string name="ds_device_trusted">Trusted</string>
+    <string name="ds_connection_wifi_direct">Wi-Fi Direct</string>
+    <string name="ds_connection_lan">Local LAN</string>
+    <string name="ds_connection_hotspot">Hotspot</string>
+    <string name="ds_file_folder">Folder</string>
+    <string name="ds_storage_used_format">%1$s used of %2$s</string>
+    <string name="ds_storage_available_format">%1$s available</string>
+    <string name="ds_category_items_format">%1$s items</string>
+    <string name="ds_loading_default">Loading…</string>
+    <string name="ds_error_default_title">Something went wrong</string>
+    <string name="ds_permission_grant">Continue</string>
+    <string name="ds_permission_not_now">Not now</string>
+    <string name="ds_transfer_progress_format">%1$s of %2$s</string>
+    <string name="ds_cd_delete_record">Delete transfer record</string>
+    <string name="ds_cd_cancel_transfer">Cancel transfer</string>
+    <string name="ds_cd_select_file">Select file</string>
+    <string name="ds_cd_accent_color_format">Accent color %1$s</string>
+    <string name="ds_state_selected">Selected</string>
+    <string name="ds_state_not_selected">Not selected</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_language">Language</string>
+    <string name="settings_section_identity">Device Information</string>
+    <string name="settings_device_name_label">Visible Device Name</string>
+    <string name="settings_device_name_placeholder">Enter device name</string>
+    <string name="settings_device_model_label">Model</string>
+    <string name="settings_device_android_label">Android Version</string>
+    <string name="settings_save_action">Save</string>
+    <string name="settings_device_name_saved">Device name updated</string>
+    <string name="settings_device_name_error">Device name must be 2 to 32 characters without control characters.</string>
+
+    <string name="settings_theme_label">Theme Mode</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color_title">Dynamic Material You Color</string>
+    <string name="settings_dynamic_color_desc">Adapt colors from system wallpaper on Android 12+</string>
+    <string name="settings_accent_color_label">Accent Color</string>
+    <string name="settings_accent_cobalt">Cobalt</string>
+    <string name="settings_accent_cyan">Cyan</string>
+    <string name="settings_accent_emerald">Emerald</string>
+    <string name="settings_accent_coral">Coral</string>
+    <string name="settings_accent_violet">Violet</string>
+    <string name="settings_language_label">App Language</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_arabic">العربية</string>
+
+    <string name="settings_section_transfer">Transfer Preferences</string>
+    <string name="settings_port_label">Local Transfer Port (1024–65535)</string>
+    <string name="settings_port_saved">Transfer port updated</string>
+    <string name="settings_port_error">Port must be a valid number between 1024 and 65535.</string>
+    <string name="settings_wifi_direct_title">Prefer Wi-Fi Direct</string>
+    <string name="settings_wifi_direct_desc">Prioritize direct peer-to-peer Wi-Fi links when available</string>
+    <string name="settings_sha256_title">Strict SHA-256 Verification</string>
+    <string name="settings_sha256_desc">Verify cryptographic file digest before marking transfers complete</string>
+    <string name="settings_auto_accept_title">Auto-Accept Trusted Devices</string>
+    <string name="settings_auto_accept_desc">Skip manual prompt only for explicitly paired devices</string>
+
+    <string name="settings_section_security">Privacy</string>
+    <string name="settings_vault_pin_title">Require Vault Authentication</string>
+    <string name="settings_vault_pin_desc">Protect encrypted Private Vault access with device lock or PIN</string>
+    <string name="settings_keystore_status">Android Keystore AES-256-GCM Ready</string>
+
+    <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_permissions_summary">ShareFlow enforces least-privilege permissions: file browsing uses Android Storage Access Framework and Photo Picker with zero broad storage permissions.</string>
+    <string name="settings_permissions_system_action">Open System App Permissions</string>
+
+    <string name="settings_section_about">About</string>
+    <string name="settings_about_version_format">Version %1$s (%2$s)</string>
+    <string name="settings_about_architecture">Native Kotlin • Jetpack Compose Material 3 • Offline-First Room &amp; Keystore</string>
+
+    <string name="settings_reset_action">Reset Settings to Defaults</string>
+    <string name="settings_reset_dialog_title">Reset all settings?</string>
+    <string name="settings_reset_dialog_body">This restores device name, theme, accent color, language, network port, and security preferences to their default values.</string>
+    <string name="settings_reset_done">Settings restored to defaults</string>
+
+    <!-- Common Dialogs -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- Device Discovery & P2P Connection Engine -->
+    <string name="discovery_title">Nearby Devices &amp; Pairing</string>
+    <string name="discovery_start_action">Scan Nearby</string>
+    <string name="discovery_stop_action">Stop Scan</string>
+    <string name="discovery_advertise_start">Make Discoverable</string>
+    <string name="discovery_advertise_stop">Stop Advertising</string>
+    <string name="discovery_hotspot_toggle">Enable Local-Only Hotspot</string>
+    <string name="discovery_hotspot_active">Local Hotspot Active</string>
+    <string name="discovery_hotspot_ssid_label">Hotspot SSID: %1$s</string>
+    <string name="discovery_local_identity_title">This Device Identity</string>
+    <string name="discovery_device_id_format">ID: %1$s</string>
+    <string name="discovery_fingerprint_format">Key Fingerprint: %1$s</string>
+    <string name="discovery_transports_title">Connection Methods</string>
+    <string name="discovery_peers_section_title">Nearby ShareFlow Devices</string>
+    <string name="discovery_empty_title">No ShareFlow devices found yet</string>
+    <string name="discovery_empty_body">Ensure the other Android phone has ShareFlow open in Receive or Discoverable mode on Wi-Fi Direct, the same Wi-Fi network, or scan its QR code.</string>
+    <string name="discovery_scanning_banner">Scanning for nearby ShareFlow devices…</string>
+    <string name="discovery_timeout_title">Discovery timed out</string>
+    <string name="discovery_timeout_body">No new ShareFlow devices responded before the scan window ended. Tap Retry to scan again or pair directly with a QR code.</string>
+    <string name="discovery_permission_required">Permission required for Wi-Fi Direct / Hotspot</string>
+    <string name="discovery_permission_grant_action">Grant Permission</string>
+    <string name="discovery_wifi_disabled">Wi-Fi is turned off — enable Wi-Fi in Android Settings</string>
+    <string name="discovery_location_disabled">Location Services required on Android 12 and lower — open Android Settings</string>
+    <string name="discovery_open_settings_action">Open Settings</string>
+    <string name="discovery_strategy_ready">Ready</string>
+    <string name="discovery_strategy_active">Active</string>
+    <string name="discovery_strategy_unsupported">Unsupported</string>
+    <string name="discovery_strategy_permission">Needs Permission</string>
+    <string name="discovery_strategy_wifi_off">Wi-Fi Off</string>
+    <string name="discovery_strategy_location_off">Location Off</string>
+
+    <string name="peer_status_available">Available</string>
+    <string name="peer_status_connecting">Connecting…</string>
+    <string name="peer_status_awaiting_approval">Awaiting Approval</string>
+    <string name="peer_status_connected">Connected</string>
+    <string name="peer_status_rejected">Declined</string>
+    <string name="peer_status_unavailable">Unavailable</string>
+
+    <string name="connection_active_title">Encrypted Peer Connection</string>
+    <string name="connection_active_encrypted_badge">AES-256-GCM Verified</string>
+    <string name="connection_sas_label">Verification Code: %1$s</string>
+    <string name="connection_session_id_label">Session: %1$s</string>
+    <string name="connection_disconnect_action">Disconnect</string>
+
+    <string name="approval_dialog_title">Incoming Connection Request</string>
+    <string name="approval_dialog_body">Verify that the device identifier and 6-digit code match the sender before approving this encrypted session.</string>
+    <string name="approval_peer_name_label">Device Name</string>
+    <string name="approval_peer_id_label">Device Identifier</string>
+    <string name="approval_fingerprint_label">Cryptographic Fingerprint</string>
+    <string name="approval_sas_code_label">Verification Code (SAS)</string>
+    <string name="approval_qr_verified_badge">Short-Lived QR Token Verified</string>
+    <string name="approval_remember_trusted">Remember verified fingerprint as trusted device</string>
+    <string name="approval_approve_action">Approve Connection</string>
+    <string name="approval_reject_action">Reject</string>
+
+    <string name="qr_tab_show">My QR Code</string>
+    <string name="qr_tab_scan">Scan Peer QR</string>
+    <string name="qr_expires_in_format">Token expires in %1$ds</string>
+    <string name="qr_token_expired">Token expired — regenerate QR code</string>
+    <string name="qr_scanner_permission_title">Camera Permission Needed</string>
+    <string name="qr_scanner_permission_body">Grant camera access to scan a peer\'s ShareFlow QR code directly, or paste the pairing link manually below.</string>
+    <string name="qr_scanner_grant_camera">Allow Camera</string>
+    <string name="qr_scanner_no_camera">No camera detected on this device. Paste the pairing link manually below.</string>
+    <string name="qr_scanner_hint">Point your camera at the receiver\'s ShareFlow QR code</string>
+    <string name="qr_manual_uri_label">Or paste ShareFlow pairing URI</string>
+    <string name="qr_manual_connect_action">Connect Securely</string>
+    <string name="qr_hotspot_included_badge">Includes Local Hotspot Credentials</string>
+</resources>
