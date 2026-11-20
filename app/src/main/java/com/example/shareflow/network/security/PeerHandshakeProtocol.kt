@@ -54,6 +54,10 @@ class EncryptedPeerChannel(
     val isOpen: Boolean
         get() = !socket.isClosed && socket.isConnected
 
+    fun setReadTimeout(timeoutMillis: Int) {
+        runCatching { socket.soTimeout = timeoutMillis.coerceAtLeast(0) }
+    }
+
     fun sendEncryptedFrame(frameType: Byte, plaintext: ByteArray): AppResult<Unit> = runCatching {
         synchronized(sendLock) {
             val seq = sendSequence.getAndIncrement()
@@ -135,6 +139,14 @@ class EncryptedPeerChannel(
         const val FRAME_PING: Byte = 0x02
         const val FRAME_PONG: Byte = 0x03
         const val FRAME_APP_DATA: Byte = 0x10
+        const val FRAME_TRANSFER_OFFER: Byte = 0x20
+        const val FRAME_TRANSFER_OFFER_RESPONSE: Byte = 0x21
+        const val FRAME_TRANSFER_CHUNK: Byte = 0x22
+        const val FRAME_TRANSFER_CHUNK_ACK: Byte = 0x23
+        const val FRAME_TRANSFER_FILE_DONE: Byte = 0x24
+        const val FRAME_TRANSFER_FILE_VERIFIED: Byte = 0x25
+        const val FRAME_TRANSFER_CONTROL: Byte = 0x26
+        const val FRAME_TRANSFER_SESSION_DONE: Byte = 0x27
         const val FRAME_DISCONNECT: Byte = 0x7F
     }
 }

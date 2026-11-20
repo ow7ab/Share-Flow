@@ -20,6 +20,7 @@ import com.example.shareflow.data.repository.ConnectionRepositoryImpl
 import com.example.shareflow.data.repository.DeviceDiscoveryRepositoryImpl
 import com.example.shareflow.data.repository.SettingsRepositoryImpl
 import com.example.shareflow.data.repository.TransferHistoryRepositoryImpl
+import com.example.shareflow.data.repository.TransferRepositoryImpl
 import com.example.shareflow.data.repository.TrustedDeviceRepositoryImpl
 import com.example.shareflow.data.repository.VaultRepositoryImpl
 import com.example.shareflow.domain.model.ConnectionType
@@ -29,6 +30,7 @@ import com.example.shareflow.domain.repository.FileManagerRepository
 import com.example.shareflow.domain.repository.SettingsRepository
 import com.example.shareflow.domain.repository.StorageAnalyzerRepository
 import com.example.shareflow.domain.repository.TransferHistoryRepository
+import com.example.shareflow.domain.repository.TransferRepository
 import com.example.shareflow.domain.repository.TrustedDeviceRepository
 import com.example.shareflow.domain.repository.VaultRepository
 import com.example.shareflow.network.LocalSessionController
@@ -42,6 +44,17 @@ import com.example.shareflow.network.strategy.LocalHotspotStrategy
 import com.example.shareflow.network.strategy.LocalNetworkStrategy
 import com.example.shareflow.network.strategy.NetworkPermissionHelper
 import com.example.shareflow.network.strategy.WiFiDirectStrategy
+import com.example.shareflow.network.transfer.AndroidTransferDataSource
+import com.example.shareflow.network.transfer.ChunkProcessor
+import com.example.shareflow.network.transfer.StatFsStorageSpaceChecker
+import com.example.shareflow.network.transfer.TransferDataSource
+import com.example.shareflow.network.transfer.TransferManager
+import com.example.shareflow.network.transfer.TransferQueue
+import com.example.shareflow.network.transfer.TransferReceiver
+import com.example.shareflow.network.transfer.TransferRecoveryManager
+import com.example.shareflow.network.transfer.TransferScheduler
+import com.example.shareflow.network.transfer.TransferSender
+import com.example.shareflow.network.transfer.TransferVerifier
 
 /**
  * Constructor-injected Dependency Injection graph for ShareFlow.
@@ -55,6 +68,7 @@ interface AppContainer {
     val database: ShareFlowDatabase
     val settingsRepository: SettingsRepository
     val transferHistoryRepository: TransferHistoryRepository
+    val transferRepository: TransferRepository
     val trustedDeviceRepository: TrustedDeviceRepository
     val vaultRepository: VaultRepository
     val storageAnalyzerRepository: StorageAnalyzerRepository
@@ -65,6 +79,11 @@ interface AppContainer {
     val connectionCoordinator: ConnectionCoordinator
     val deviceDiscoveryRepository: DeviceDiscoveryRepository
     val connectionRepository: ConnectionRepository
+    val transferDataSource: TransferDataSource
+    val chunkProcessor: ChunkProcessor
+    val transferVerifier: TransferVerifier
+    val transferRecoveryManager: TransferRecoveryManager
+    val transferManager: TransferManager
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -89,6 +108,13 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val transferHistoryRepository: TransferHistoryRepository by lazy {
         TransferHistoryRepositoryImpl(
             dao = database.transferHistoryDao(),
+            dispatchers = dispatchers
+        )
+    }
+
+    override val transferRepository: TransferRepository by lazy {
+        TransferRepositoryImpl(
+            dao = database.transferSessionDao(),
             dispatchers = dispatchers
         )
     }
@@ -169,6 +195,60 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val connectionRepository: ConnectionRepository by lazy {
         ConnectionRepositoryImpl(coordinator = connectionCoordinator)
+    }
+
+    override val transferDataSource: TransferDataSource by lazy {
+        AndroidTransferDataSource(context = appContext)
+    }
+
+    override val chunkProcessor: ChunkProcessor by lazy {
+        ChunkProcessor(
+            dataSource = transferDataSource,
+            storageSpaceChecker = StatFsStorageSpaceChecker()
+        )
+    }
+
+    override val transferVerifier: TransferVerifier by lazy {
+        TransferVerifier(
+            checksumVerifier = checksumVerifier,
+            dataSource = transferDataSource
+        )
+    }
+
+    override val transferRecoveryManager: TransferRecoveryManager by lazy {
+        TransferRecoveryManager(
+            transferRepository = transferRepository,
+            dataSource = transferDataSource,
+            verifier = transferVerifier,
+            chunkProcessor = chunkProcessor,
+            clock = clock
+        )
+    }
+
+    override val transferManager: TransferManager by lazy {
+        TransferManager(
+            connectionCoordinator = connectionCoordinator,
+            transferRepository = transferRepository,
+            transferQueue = TransferQueue(),
+            transferScheduler = TransferScheduler(dispatchers = dispatchers),
+            transferSender = TransferSender(
+                chunkProcessor = chunkProcessor,
+                verifier = transferVerifier,
+                transferRepository = transferRepository,
+                clock = clock
+            ),
+            transferReceiver = TransferReceiver(
+                chunkProcessor = chunkProcessor,
+                verifier = transferVerifier,
+                recoveryManager = transferRecoveryManager,
+                transferRepository = transferRepository,
+                clock = clock
+            ),
+            recoveryManager = transferRecoveryManager,
+            destinationRootProvider = { ChunkProcessor.defaultReceiveRoot(appContext) },
+            dispatchers = dispatchers,
+            clock = clock
+        )
     }
 }
 

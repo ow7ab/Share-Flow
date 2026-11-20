@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.FilterChip
@@ -83,6 +84,7 @@ import kotlinx.coroutines.launch
 fun ReceiveScreen(
     onNavigateBack: () -> Unit,
     onOpenQrPairing: () -> Unit,
+    onOpenTransferProgress: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -97,6 +99,7 @@ fun ReceiveScreen(
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val activeTransferSessions by container.transferManager.activeSessions.collectAsStateWithLifecycle()
     val spacing = ShareFlowDesign.spacing
     val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
@@ -171,6 +174,19 @@ fun ReceiveScreen(
                         ActiveEncryptedConnectionCard(
                             connected = connState,
                             onDisconnect = viewModel::disconnect
+                        )
+                    }
+                }
+                if (connState is ConnectionState.Connected || uiState.isReceiving || activeTransferSessions.isNotEmpty()) {
+                    item(key = "active_transfers_entry") {
+                        SecondaryActionButton(
+                            text = stringResource(R.string.transfer_open_progress_action),
+                            onClick = onOpenTransferProgress,
+                            outlined = false,
+                            leadingIcon = Icons.Filled.SwapVert,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_open_transfer_progress_button")
                         )
                     }
                 }

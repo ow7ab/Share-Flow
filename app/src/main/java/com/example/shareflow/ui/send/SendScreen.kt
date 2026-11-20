@@ -20,23 +20,31 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +68,10 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.FileCategory
+import com.example.shareflow.network.transfer.TransferQueue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SendScreen(
@@ -79,12 +91,27 @@ fun SendScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val scope = rememberCoroutineScope()
+
     val safPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
             val inspected = SafDocumentInspector.inspectUris(context, uris)
             viewModel.addSelectedFiles(inspected)
+        }
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri != null) {
+            scope.launch {
+                val expanded = withContext(Dispatchers.IO) {
+                    TransferQueue.expandSafDirectoryTree(context, treeUri)
+                }
+                viewModel.addSelectedDirectorySources(expanded)
+            }
         }
     }
 
@@ -202,21 +229,35 @@ fun SendScreen(
                     }
                 }
 
-                // Real Zero-Permission SAF Picker Trigger
+                // Real Zero-Permission SAF File & Folder Pickers
                 item(key = "pick_files_cta") {
-                    SecondaryActionButton(
-                        text = stringResource(R.string.send_add_files_action),
-                        onClick = {
-                            safPickerLauncher.launch(
-                                SafDocumentInspector.mimeTypesForCategory(uiState.activeCategory)
-                            )
-                        },
-                        outlined = false,
-                        leadingIcon = Icons.Filled.Add,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("send_pick_files_button")
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        SecondaryActionButton(
+                            text = stringResource(R.string.send_add_files_action),
+                            onClick = {
+                                safPickerLauncher.launch(
+                                    SafDocumentInspector.mimeTypesForCategory(uiState.activeCategory)
+                                )
+                            },
+                            outlined = false,
+                            leadingIcon = Icons.Filled.Add,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_pick_files_button")
+                        )
+                        SecondaryActionButton(
+                            text = stringResource(R.string.transfer_pick_folder_action),
+                            onClick = { folderPickerLauncher.launch(null) },
+                            outlined = true,
+                            leadingIcon = Icons.Filled.CreateNewFolder,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_pick_folder_button")
+                        )
+                    }
                 }
 
                 if (uiState.filteredFiles.isEmpty()) {
@@ -265,6 +306,7 @@ fun SendScreen(
 fun SendConfirmScreen(
     onNavigateBack: () -> Unit,
     onOpenQrPairing: () -> Unit,
+    onOpenTransferProgress: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -275,7 +317,8 @@ fun SendConfirmScreen(
                 trustedDeviceRepository = container.trustedDeviceRepository,
                 settingsRepository = container.settingsRepository,
                 discoveryRepository = container.deviceDiscoveryRepository,
-                connectionRepository = container.connectionRepository
+                connectionRepository = container.connectionRepository,
+                transferManager = container.transferManager
             )
         }
     )
@@ -284,6 +327,15 @@ fun SendConfirmScreen(
     val locale = ShareFlowDesign.locale
     val semantic = ShareFlowDesign.semanticColors
     val peers = (uiState.discoveredDevices + uiState.trustedDevices).distinctBy { it.deviceId }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.feedbackMessage) {
+        val msg = uiState.feedbackMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumeFeedback()
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -292,7 +344,8 @@ fun SendConfirmScreen(
                 title = stringResource(R.string.send_confirm_title),
                 onNavigateBack = onNavigateBack
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -317,6 +370,45 @@ fun SendConfirmScreen(
                         com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard(
                             connected = connState,
                             onDisconnect = viewModel::disconnect
+                        )
+                    }
+                    if (uiState.selectedCount > 0) {
+                        item(key = "start_encrypted_transfer") {
+                            PrimaryActionButton(
+                                text = stringResource(R.string.transfer_start_encrypted_action),
+                                onClick = {
+                                    viewModel.startEncryptedTransfer(
+                                        onStarted = onOpenTransferProgress
+                                    )
+                                },
+                                enabled = !uiState.isStartingTransfer,
+                                leadingIcon = Icons.AutoMirrored.Filled.Send,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("send_confirm_start_transfer_button")
+                            )
+                        }
+                    }
+                } else if (uiState.selectedCount > 0) {
+                    item(key = "connect_first_hint") {
+                        Text(
+                            text = stringResource(R.string.transfer_connect_first_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (uiState.activeTransferCount > 0) {
+                    item(key = "open_active_transfers") {
+                        SecondaryActionButton(
+                            text = stringResource(R.string.transfer_open_progress_action),
+                            onClick = onOpenTransferProgress,
+                            outlined = false,
+                            leadingIcon = Icons.Filled.SwapVert,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_confirm_open_progress_button")
                         )
                     }
                 }

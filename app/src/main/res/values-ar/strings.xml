@@ -449,4 +449,36 @@
     <string name="qr_manual_uri_label">أو الصق رابط اقتران ShareFlow</string>
     <string name="qr_manual_connect_action">اتصال آمن</string>
     <string name="qr_hotspot_included_badge">يتضمن بيانات نقطة الاتصال المحلية</string>
+
+    <!-- File Transfer Engine UI -->
+    <string name="transfer_progress_title">عمليات النقل النشطة</string>
+    <string name="transfer_start_encrypted_action">بدء النقل المشفر</string>
+    <string name="transfer_open_progress_action">عرض تقدّم النقل</string>
+    <string name="transfer_pick_folder_action">إضافة مجلد (مع حفظ البنية)</string>
+    <string name="transfer_empty_title">لا توجد عمليات نقل نشطة</string>
+    <string name="transfer_empty_body">اختر ملفات أو مجلدات من شاشة الإرسال، أو اتصل بجهاز ShareFlow قريب لبدء نقل مشفر موثّق ببصمة SHA-256.</string>
+    <string name="transfer_section_active">الجلسات المباشرة والقابلة للاستئناف</string>
+    <string name="transfer_section_recent">الجلسات الأخيرة</string>
+    <string name="transfer_state_pending">قيد الانتظار</string>
+    <string name="transfer_state_connecting">جارٍ الاتصال</string>
+    <string name="transfer_state_waiting_approval">بانتظار الموافقة</string>
+    <string name="transfer_state_transferring">جارٍ النقل</string>
+    <string name="transfer_state_paused">متوقف مؤقتاً</string>
+    <string name="transfer_state_verifying">جارٍ التحقق بـ SHA-256</string>
+    <string name="transfer_state_completed">مكتمل وموثّق</string>
+    <string name="transfer_state_failed">فشل النقل</string>
+    <string name="transfer_state_cancelled">ملغى</string>
+    <string name="transfer_metric_speed">السرعة</string>
+    <string name="transfer_metric_remaining">الوقت المتبقي</string>
+    <string name="transfer_metric_device">الجهاز</string>
+    <string name="transfer_metric_files_format">%1$s / %2$s ملفات</string>
+    <string name="transfer_action_pause">إيقاف مؤقت</string>
+    <string name="transfer_action_resume">استئناف</string>
+    <string name="transfer_action_cancel">إلغاء</string>
+    <string name="transfer_action_retry">إعادة المحاولة</string>
+    <string name="transfer_sha256_verified_badge">تم التحقق بـ SHA-256</string>
+    <string name="transfer_resumable_badge">قابل للاستئناف الموثّق</string>
+    <string name="transfer_connect_first_hint">اتصل بجهاز قريب أدناه لبدء إرسال الملفات.</string>
+    <string name="transfer_cancel_confirm_title">إلغاء عملية النقل؟</string>
+    <string name="transfer_cancel_confirm_body">سيتم إيقاف الملفات غير المكتملة في هذه الجلسة وحذف الملفات المؤقتة بأمان.</string>
 </resources>

@@ -87,3 +87,54 @@ Use this checklist to validate ShareFlow's peer-to-peer Device Discovery and Con
 - [ ] **Name Spoofing Resistance**:
   - [ ] Change an untrusted third device's name in Settings to match a previously trusted device's name → attempt connection → confirm it is **NOT** marked Trusted and still requires explicit user approval because its public key fingerprint does not match.
 - [ ] **Clean Disconnect**: Tap **Disconnect** on either device → confirm socket closes cleanly and status returns to **Idle** / **Listening**.
+
+---
+
+## Part 2 — Real Two-Device File Transfer Engine Verification
+
+After completing **Section 6** (both devices show **Encrypted Peer Connection** with matching 6-digit SAS code), execute the following transfer verification tests between **Device B (Sender)** and **Device A (Receiver)**:
+
+### 7. Small File & Bit-Exact Integrity Verification
+- [ ] On **Device B**, open **Send** → pick a small photo or PDF (< 1 MB) → tap **Continue** → tap **Start Encrypted Transfer**.
+- [ ] On BOTH devices, open **Active Transfers** and verify live UI fields:
+  - [ ] File name and exact byte size
+  - [ ] Live progress bar & percentage
+  - [ ] Measured transfer speed (`B/s`, `KB/s`, or `MB/s`) and remaining time (ETA)
+  - [ ] Connected peer device name and state transition (`Pending` → `Transferring` → `Verifying SHA-256` → `Completed`)
+- [ ] Verify the **SHA-256 Verified** badge appears ONLY after transfer reaches 100%.
+- [ ] Open **Transfer History** on both devices and confirm a new `Completed` record is persisted (kill and relaunch the app to confirm Room persistence).
+- [ ] Compare original file bytes/checksum on Device B against the received file in `Android/data/<package>/files/Download/ShareFlowReceived/` on Device A → confirm **identical SHA-256** and **zero compression**.
+
+### 8. Large File Streaming (Memory & Backpressure Test)
+- [ ] Select a large video or archive (> 100 MB) on **Device B** and send to **Device A**.
+- [ ] Monitor Android Studio Profiler / Device Memory during transfer → confirm RAM usage stays flat (chunked streaming I/O; entire file is never loaded into heap).
+- [ ] Confirm smooth speed & ETA updates and exact SHA-256 match on completion.
+
+### 9. Multiple Files & Relative Folder Structure Preservation
+- [ ] On **Device B**, open **Send** → tap **Add Folder (Preserve Structure)** and choose a folder containing nested subfolders (e.g., `Project/Docs/spec.pdf`, `Project/Media/clip.mp4`).
+- [ ] Send to **Device A** → confirm all files appear in the batch card and the exact relative subfolder hierarchy is recreated under `ShareFlowReceived/Project/Docs/spec.pdf` and `ShareFlowReceived/Project/Media/clip.mp4`.
+
+### 10. Pause & Resume Mid-Transfer
+- [ ] Start sending a large file (> 50 MB) from **Device B** to **Device A**.
+- [ ] Mid-transfer (~30–60%), tap **Pause** on **Device B**.
+  - [ ] Confirm state transitions to **Paused**, speed drops to `0 B/s`, and progress freezes without losing transferred bytes.
+- [ ] Tap **Resume** → confirm transfer continues smoothly from the verified chunk offset and finishes with **SHA-256 Verified**.
+
+### 11. Network Interruption & Verified Reconnection Recovery
+- [ ] Start sending a large file (> 50 MB) from **Device B** to **Device A**.
+- [ ] Mid-transfer, toggle Wi-Fi OFF on **Device A** (or walk out of range) until the connection drops.
+  - [ ] Confirm the transfer is **NOT** marked `Completed` and transitions to `Paused` / `Failed` (recoverable) while preserving the `.part` staging file.
+- [ ] Re-enable Wi-Fi, reconnect Device B to Device A via **Nearby Devices & Pairing**, open **Active Transfers**, and tap **Resume / Retry**.
+  - [ ] Confirm `TransferRecoveryManager` verifies peer fingerprint and on-disk `.part` integrity, skips already-verified chunks, and completes with full-file **SHA-256 Verified**.
+
+### 12. Duplicate Filename Protection (Zero Silent Overwrite)
+- [ ] Send the **same file** (`report.pdf`) a second time from **Device B** to **Device A**.
+- [ ] Verify the original `report.pdf` on Device A is completely untouched and the second transfer is saved as `report (1).pdf`.
+
+### 13. Cancellation & Staging Cleanup
+- [ ] Start a large file transfer and tap **Cancel** → confirm the destructive confirmation dialog appears.
+- [ ] Confirm cancellation → verify state transitions to **Cancelled** (never `Completed`) and no orphaned `.part` file remains in `ShareFlowReceived/.shareflow_staging/`.
+
+### 14. Low Storage Protection
+- [ ] When available storage on **Device A** is below the incoming batch size + safety headroom (4 MB), confirm **Device A** rejects the transfer offer cleanly before writing partial data and reports an explicit storage error.
+

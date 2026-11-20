@@ -46,6 +46,7 @@ import com.example.shareflow.ui.send.SendScreen
 import com.example.shareflow.ui.settings.SettingsScreen
 import com.example.shareflow.ui.tools.StorageAnalyzerScreen
 import com.example.shareflow.ui.tools.ToolsScreen
+import com.example.shareflow.ui.transfer.TransferProgressScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -218,13 +219,15 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.SEND_CONFIRM) {
             SendConfirmScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) }
+                onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) },
+                onOpenTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) }
             )
         }
         composable(route = ShareFlowRoutes.RECEIVE) {
             ReceiveScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) }
+                onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) },
+                onOpenTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) }
             )
         }
         composable(route = ShareFlowRoutes.QR_PAIRING) {
@@ -268,6 +271,13 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.TRANSFER_HISTORY) {
             TransferHistoryScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.TRANSFER_PROGRESS) {
+            TransferProgressScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenHistory = { navigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) }
             )
         }
 

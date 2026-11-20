@@ -186,7 +186,8 @@ sealed interface ConnectionState {
         val sessionId: String,
         val sasVerificationCode: String = "",
         val isEncrypted: Boolean = true,
-        val transport: ConnectionType = peer.connectionType
+        val transport: ConnectionType = peer.connectionType,
+        val isInitiator: Boolean = true
     ) : ConnectionState
     data class Error(val reason: String, val recoverable: Boolean = true) : ConnectionState
 }

@@ -68,4 +68,29 @@ object ShareFlowFormatters {
         )
         return formatter.format(java.util.Date(epochMillis))
     }
+
+    fun formatRemainingTime(remainingSeconds: Long?, locale: Locale = Locale.US): String {
+        if (remainingSeconds == null || remainingSeconds < 0L) return "—"
+        val isArabic = locale.language == "ar"
+        val hours = remainingSeconds / 3600L
+        val minutes = (remainingSeconds % 3600L) / 60L
+        val seconds = remainingSeconds % 60L
+        return when {
+            hours > 0L -> if (isArabic) {
+                "${formatInteger(hours, locale)} س ${formatInteger(minutes, locale)} د"
+            } else {
+                "${formatInteger(hours, locale)}h ${formatInteger(minutes, locale)}m"
+            }
+            minutes > 0L -> if (isArabic) {
+                "${formatInteger(minutes, locale)} د ${formatInteger(seconds, locale)} ث"
+            } else {
+                "${formatInteger(minutes, locale)}m ${formatInteger(seconds, locale)}s"
+            }
+            else -> if (isArabic) {
+                "${formatInteger(seconds, locale)} ث"
+            } else {
+                "${formatInteger(seconds, locale)}s"
+            }
+        }
+    }
 }

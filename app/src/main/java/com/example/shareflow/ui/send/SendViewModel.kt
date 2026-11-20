@@ -8,11 +8,14 @@ import com.example.shareflow.domain.model.DiscoveryStatus
 import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.LocalFileEntry
 import com.example.shareflow.domain.model.PeerDevice
+import com.example.shareflow.domain.model.TransferFileType
+import com.example.shareflow.domain.model.TransferSourceItem
 import com.example.shareflow.domain.repository.ConnectionRepository
 import com.example.shareflow.domain.repository.DeviceDiscoveryRepository
 import com.example.shareflow.domain.repository.SettingsRepository
 import com.example.shareflow.domain.repository.TrustedDeviceRepository
 import com.example.shareflow.network.LocalSessionController
+import com.example.shareflow.network.transfer.TransferManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,8 @@ data class SendUiState(
     val discoveredDevices: List<PeerDevice> = emptyList(),
     val discoveryStatus: DiscoveryStatus = DiscoveryStatus.Idle,
     val connectionState: ConnectionState = ConnectionState.Idle,
+    val activeTransferCount: Int = 0,
+    val isStartingTransfer: Boolean = false,
     val feedbackMessage: String? = null
 )
 
@@ -39,11 +44,13 @@ class SendViewModel(
     trustedDeviceRepository: TrustedDeviceRepository,
     private val settingsRepository: SettingsRepository? = null,
     private val discoveryRepository: DeviceDiscoveryRepository? = null,
-    private val connectionRepository: ConnectionRepository? = null
+    private val connectionRepository: ConnectionRepository? = null,
+    private val transferManager: TransferManager? = null
 ) : ViewModel() {
 
     private val activeCategoryState = MutableStateFlow<FileCategory?>(null)
     private val feedbackState = MutableStateFlow<String?>(null)
+    private val startingTransferState = MutableStateFlow(false)
 
     private val selectionFlow = combine(
         activeCategoryState,
@@ -62,6 +69,13 @@ class SendViewModel(
         SendNetworkSnapshot(discovered, discStatus, connState, feedback)
     }
 
+    private val transferFlow = combine(
+        transferManager?.activeSessions ?: MutableStateFlow(emptyList()),
+        startingTransferState
+    ) { active, starting ->
+        active.size to starting
+    }
+
     private data class SendNetworkSnapshot(
         val discovered: List<PeerDevice>,
         val discoveryStatus: DiscoveryStatus,
@@ -71,8 +85,9 @@ class SendViewModel(
 
     val uiState: StateFlow<SendUiState> = combine(
         selectionFlow,
-        networkFlow
-    ) { (category, files, trusted), net ->
+        networkFlow,
+        transferFlow
+    ) { (category, files, trusted), net, (activeTransfers, starting) ->
         val filtered = if (category == null) {
             files
         } else {
@@ -88,6 +103,8 @@ class SendViewModel(
             discoveredDevices = net.discovered,
             discoveryStatus = net.discoveryStatus,
             connectionState = net.connectionState,
+            activeTransferCount = activeTransfers,
+            isStartingTransfer = starting,
             feedbackMessage = net.feedback
         )
     }.stateIn(
@@ -102,6 +119,24 @@ class SendViewModel(
 
     fun addSelectedFiles(entries: List<LocalFileEntry>) {
         sessionController.addSelectedFiles(entries)
+    }
+
+    fun addSelectedDirectorySources(sources: List<TransferSourceItem>) {
+        if (sources.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val entries = sources.map { src ->
+            LocalFileEntry(
+                uriString = src.uriString,
+                displayName = if (src.relativePath.isBlank()) src.fileName else "${src.relativePath}/${src.fileName}",
+                mimeType = src.mimeType,
+                sizeBytes = src.fileSizeBytes,
+                lastModifiedEpochMillis = now,
+                category = fileCategoryFromTransferType(src.fileType),
+                isDirectory = false
+            )
+        }
+        val relMap = sources.associate { it.uriString to it.relativePath }
+        sessionController.addSelectedFiles(entries, relMap)
     }
 
     fun removeSelectedFile(uriString: String) {
@@ -134,6 +169,45 @@ class SendViewModel(
         }
     }
 
+    fun startEncryptedTransfer(onStarted: () -> Unit) {
+        val manager = transferManager ?: return
+        val selectedFiles = sessionController.selectedSendFiles.value
+        if (selectedFiles.isEmpty()) {
+            feedbackState.value = "Select at least one file to send"
+            return
+        }
+        val relativePaths = sessionController.selectedRelativePaths.value
+        val sources = selectedFiles.map { entry ->
+            val relPath = relativePaths[entry.uriString].orEmpty()
+            val cleanFileName = entry.displayName.substringAfterLast('/')
+            TransferSourceItem(
+                uriString = entry.uriString,
+                fileName = cleanFileName,
+                relativePath = relPath,
+                mimeType = entry.mimeType,
+                fileType = transferTypeFromFileCategory(entry.category),
+                fileSizeBytes = entry.sizeBytes
+            )
+        }
+
+        viewModelScope.launch {
+            startingTransferState.value = true
+            try {
+                when (val result = manager.startSendingOnActiveConnection(sources)) {
+                    is AppResult.Success -> {
+                        sessionController.clearSelectedFiles()
+                        onStarted()
+                    }
+                    is AppResult.Failure -> {
+                        feedbackState.value = result.error.message
+                    }
+                }
+            } finally {
+                startingTransferState.value = false
+            }
+        }
+    }
+
     fun disconnect() {
         val connRepo = connectionRepository ?: return
         viewModelScope.launch {
@@ -143,5 +217,25 @@ class SendViewModel(
 
     fun consumeFeedback() {
         feedbackState.value = null
+    }
+
+    private fun transferTypeFromFileCategory(category: FileCategory): TransferFileType = when (category) {
+        FileCategory.IMAGES -> TransferFileType.IMAGE
+        FileCategory.VIDEOS -> TransferFileType.VIDEO
+        FileCategory.AUDIO -> TransferFileType.AUDIO
+        FileCategory.DOCUMENTS -> TransferFileType.DOCUMENT
+        FileCategory.APKS -> TransferFileType.APK
+        FileCategory.ARCHIVES -> TransferFileType.ARCHIVE
+        FileCategory.DOWNLOADS, FileCategory.OTHER -> TransferFileType.OTHER
+    }
+
+    private fun fileCategoryFromTransferType(type: TransferFileType): FileCategory = when (type) {
+        TransferFileType.IMAGE -> FileCategory.IMAGES
+        TransferFileType.VIDEO -> FileCategory.VIDEOS
+        TransferFileType.AUDIO -> FileCategory.AUDIO
+        TransferFileType.DOCUMENT -> FileCategory.DOCUMENTS
+        TransferFileType.APK -> FileCategory.APKS
+        TransferFileType.ARCHIVE -> FileCategory.ARCHIVES
+        TransferFileType.OTHER -> FileCategory.OTHER
     }
 }

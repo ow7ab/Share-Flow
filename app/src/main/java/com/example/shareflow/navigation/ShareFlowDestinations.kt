@@ -52,6 +52,7 @@ object ShareFlowRoutes {
     const val DISCOVERY = "device_discovery"
     const val STORAGE_ANALYZER = "storage_analyzer"
     const val TRANSFER_HISTORY = "transfer_history"
+    const val TRANSFER_PROGRESS = "transfer_progress"
 
     const val FILE_CATEGORY_PATTERN = "file_category/{category}"
     const val MODULE_DETAIL_PATTERN = "module_foundation/{moduleId}"
@@ -164,8 +165,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.FILE_TRANSFER_ENGINE,
                 category = ModuleCategory.TRANSFER,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.FILE_TRANSFER_ENGINE)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.TRANSFER_PROGRESS
             ),
             titleRes = R.string.module_transfer_engine_title,
             descriptionRes = R.string.module_transfer_engine_desc,

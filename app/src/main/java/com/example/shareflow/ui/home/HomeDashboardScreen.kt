@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -97,6 +98,7 @@ fun HomeDashboardScreen(
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val activeTransfers by container.transferManager.activeSessions.collectAsStateWithLifecycle()
 
     HomeDashboardContent(
         uiState = uiState,
@@ -105,6 +107,7 @@ fun HomeDashboardScreen(
             viewModel.selectFileForSend(file)
             onNavigateToRoute(ShareFlowRoutes.SEND)
         },
+        activeTransferCount = activeTransfers.size,
         modifier = modifier
     )
 }
@@ -114,6 +117,7 @@ fun HomeDashboardContent(
     uiState: HomeUiState,
     onNavigateToRoute: (String) -> Unit,
     onSelectRecentFile: (LocalFileEntry) -> Unit = {},
+    activeTransferCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -182,6 +186,49 @@ fun HomeDashboardContent(
                                 onClick = { onNavigateToRoute(ShareFlowRoutes.RECEIVE) },
                                 modifier = Modifier.weight(1f)
                             )
+                        }
+                    }
+
+                    if (activeTransferCount > 0) {
+                        item(key = "active_transfers_banner") {
+                            Surface(
+                                onClick = { onNavigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) },
+                                shape = ShareFlowDesign.shapes.card,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("home_active_transfers_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(spacing.cardPadding),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.SwapVert,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(R.string.transfer_progress_title),
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.transfer_open_progress_action),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    StatusPill(
+                                        label = ShareFlowFormatters.formatCount(activeTransferCount, ShareFlowDesign.locale),
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            }
                         }
                     }
 

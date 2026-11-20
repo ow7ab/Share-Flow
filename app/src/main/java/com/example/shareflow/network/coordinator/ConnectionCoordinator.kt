@@ -586,7 +586,8 @@ class DefaultConnectionCoordinator(
                         sessionId = channel.sessionId,
                         sasVerificationCode = channel.sasVerificationCode,
                         isEncrypted = true,
-                        transport = endpoint.connectionType
+                        transport = endpoint.connectionType,
+                        isInitiator = true
                     )
                     _connectionState.value = connectedState
                     AppResult.Success(connectedState)
@@ -668,7 +669,8 @@ class DefaultConnectionCoordinator(
                     sessionId = channel.sessionId,
                     sasVerificationCode = channel.sasVerificationCode,
                     isEncrypted = true,
-                    transport = connectedPeer.connectionType
+                    transport = connectedPeer.connectionType,
+                    isInitiator = false
                 )
             }
 

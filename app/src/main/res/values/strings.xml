@@ -449,4 +449,36 @@
     <string name="qr_manual_uri_label">Or paste ShareFlow pairing URI</string>
     <string name="qr_manual_connect_action">Connect Securely</string>
     <string name="qr_hotspot_included_badge">Includes Local Hotspot Credentials</string>
+
+    <!-- File Transfer Engine UI -->
+    <string name="transfer_progress_title">Active Transfers</string>
+    <string name="transfer_start_encrypted_action">Start Encrypted Transfer</string>
+    <string name="transfer_open_progress_action">View Transfer Progress</string>
+    <string name="transfer_pick_folder_action">Add Folder (Preserve Structure)</string>
+    <string name="transfer_empty_title">No active transfers</string>
+    <string name="transfer_empty_body">Select files or folders from Send, or connect with a nearby ShareFlow device to begin an encrypted SHA-256 verified transfer.</string>
+    <string name="transfer_section_active">Live &amp; Resumable Sessions</string>
+    <string name="transfer_section_recent">Recent Sessions</string>
+    <string name="transfer_state_pending">Pending</string>
+    <string name="transfer_state_connecting">Connecting</string>
+    <string name="transfer_state_waiting_approval">Waiting Approval</string>
+    <string name="transfer_state_transferring">Transferring</string>
+    <string name="transfer_state_paused">Paused</string>
+    <string name="transfer_state_verifying">Verifying SHA-256</string>
+    <string name="transfer_state_completed">Completed</string>
+    <string name="transfer_state_failed">Failed</string>
+    <string name="transfer_state_cancelled">Cancelled</string>
+    <string name="transfer_metric_speed">Speed</string>
+    <string name="transfer_metric_remaining">Remaining</string>
+    <string name="transfer_metric_device">Device</string>
+    <string name="transfer_metric_files_format">%1$s / %2$s files</string>
+    <string name="transfer_action_pause">Pause</string>
+    <string name="transfer_action_resume">Resume</string>
+    <string name="transfer_action_cancel">Cancel</string>
+    <string name="transfer_action_retry">Retry</string>
+    <string name="transfer_sha256_verified_badge">SHA-256 Verified</string>
+    <string name="transfer_resumable_badge">Verified Resumable</string>
+    <string name="transfer_connect_first_hint">Connect to a nearby device below to start sending.</string>
+    <string name="transfer_cancel_confirm_title">Cancel transfer?</string>
+    <string name="transfer_cancel_confirm_body">Incomplete files in this session will be stopped and temporary staging files will be cleaned up.</string>
 </resources>

@@ -55,6 +55,9 @@ class LocalSessionController(
     private val _selectedSendFiles = MutableStateFlow<List<LocalFileEntry>>(emptyList())
     val selectedSendFiles: StateFlow<List<LocalFileEntry>> = _selectedSendFiles.asStateFlow()
 
+    private val _selectedRelativePaths = MutableStateFlow<Map<String, String>>(emptyMap())
+    val selectedRelativePaths: StateFlow<Map<String, String>> = _selectedRelativePaths.asStateFlow()
+
     private val _recentFiles = MutableStateFlow<List<LocalFileEntry>>(emptyList())
     val recentFiles: StateFlow<List<LocalFileEntry>> = _recentFiles.asStateFlow()
 
@@ -114,21 +117,29 @@ class LocalSessionController(
         )
     }
 
-    fun addSelectedFiles(entries: List<LocalFileEntry>) {
+    fun addSelectedFiles(
+        entries: List<LocalFileEntry>,
+        relativePathsByUri: Map<String, String> = emptyMap()
+    ) {
         if (entries.isEmpty()) return
         _selectedSendFiles.update { current ->
             val existingUris = current.mapTo(mutableSetOf()) { it.uriString }
             current + entries.filter { it.uriString !in existingUris }
+        }
+        if (relativePathsByUri.isNotEmpty()) {
+            _selectedRelativePaths.update { current -> current + relativePathsByUri }
         }
         recordRecentFiles(entries)
     }
 
     fun removeSelectedFile(uriString: String) {
         _selectedSendFiles.update { current -> current.filterNot { it.uriString == uriString } }
+        _selectedRelativePaths.update { current -> current - uriString }
     }
 
     fun clearSelectedFiles() {
         _selectedSendFiles.value = emptyList()
+        _selectedRelativePaths.value = emptyMap()
     }
 
     fun recordRecentFiles(entries: List<LocalFileEntry>) {

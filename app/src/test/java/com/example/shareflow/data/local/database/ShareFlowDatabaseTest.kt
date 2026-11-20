@@ -123,4 +123,120 @@ class ShareFlowDatabaseTest {
         repo.removeVaultItem("vault-1")
         assertTrue(repo.observeVaultItems().first().isEmpty())
     }
+
+    @Test
+    fun `non-destructive MIGRATION_1_2 preserves existing v1 transfer history and trusted devices`() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "shareflow_migration_test_${System.nanoTime()}.db"
+        context.deleteDatabase(dbName)
+
+        // Bootstrap an authentic v1 SQLite database matching ShareFlowDatabase v1 schema
+        val v1Helper = object : android.database.sqlite.SQLiteOpenHelper(context, dbName, null, 1) {
+            override fun onCreate(db: android.database.sqlite.SQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `transfer_history` (
+                        `id` TEXT NOT NULL,
+                        `session_id` TEXT NOT NULL,
+                        `file_name` TEXT NOT NULL,
+                        `mime_type` TEXT NOT NULL,
+                        `file_type` TEXT NOT NULL,
+                        `file_size_bytes` INTEGER NOT NULL,
+                        `bytes_transferred` INTEGER NOT NULL,
+                        `direction` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `peer_device_id` TEXT NOT NULL,
+                        `peer_device_name` TEXT NOT NULL,
+                        `local_uri` TEXT,
+                        `sha256_checksum` TEXT,
+                        `is_checksum_verified` INTEGER NOT NULL,
+                        `started_at_epoch_millis` INTEGER NOT NULL,
+                        `completed_at_epoch_millis` INTEGER,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transfer_history_started_at_epoch_millis` ON `transfer_history` (`started_at_epoch_millis`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transfer_history_session_id` ON `transfer_history` (`session_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transfer_history_direction` ON `transfer_history` (`direction`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `trusted_devices` (
+                        `device_id` TEXT NOT NULL,
+                        `display_name` TEXT NOT NULL,
+                        `device_type` TEXT NOT NULL,
+                        `connection_type` TEXT NOT NULL,
+                        `public_key_fingerprint` TEXT,
+                        `last_seen_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`device_id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trusted_devices_last_seen_epoch_millis` ON `trusted_devices` (`last_seen_epoch_millis`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `vault_items` (
+                        `id` TEXT NOT NULL,
+                        `display_name` TEXT NOT NULL,
+                        `encrypted_file_name` TEXT NOT NULL,
+                        `original_mime_type` TEXT NOT NULL,
+                        `original_size_bytes` INTEGER NOT NULL,
+                        `sha256_checksum` TEXT NOT NULL,
+                        `key_alias` TEXT NOT NULL,
+                        `created_at_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vault_items_created_at_epoch_millis` ON `vault_items` (`created_at_epoch_millis`)")
+
+                db.execSQL(
+                    """
+                    INSERT INTO `transfer_history` VALUES (
+                        'legacy-tx-1', 'legacy-sess-1', 'family_photo.jpg', 'image/jpeg', 'IMAGE',
+                        4096, 4096, 'RECEIVED', 'COMPLETED_VERIFIED', 'peer-legacy', 'Old Phone',
+                        NULL, '${"a".repeat(64)}', 1, 1700000000000, 1700000001000
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `trusted_devices` VALUES (
+                        'peer-legacy', 'Old Phone', 'PHONE', 'LOCAL_LAN_NSD', '${"b".repeat(64)}',
+                        1700000001000
+                    )
+                    """.trimIndent()
+                )
+            }
+
+            override fun onUpgrade(db: android.database.sqlite.SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        }
+        v1Helper.writableDatabase.close()
+        v1Helper.close()
+
+        // Open with Room v2 + MIGRATION_1_2 (without destructive migration)
+        val migratedDb = Room.databaseBuilder(context, ShareFlowDatabase::class.java, dbName)
+            .addMigrations(ShareFlowDatabase.MIGRATION_1_2)
+            .allowMainThreadQueries()
+            .build()
+
+        try {
+            val historyRepo = TransferHistoryRepositoryImpl(migratedDb.transferHistoryDao(), dispatchers)
+            val trustedRepo = TrustedDeviceRepositoryImpl(migratedDb.trustedDeviceDao(), dispatchers)
+
+            val preservedRecords = historyRepo.observeAllRecords().first()
+            assertEquals(1, preservedRecords.size)
+            assertEquals("family_photo.jpg", preservedRecords.single().fileName)
+
+            val preservedPeer = trustedRepo.getTrustedDevice("peer-legacy")
+            assertEquals("Old Phone", preservedPeer?.displayName)
+
+            // Verify newly created v2 tables are operational
+            assertTrue(migratedDb.transferSessionDao().getIncompleteSessions().isEmpty())
+        } finally {
+            migratedDb.close()
+            context.deleteDatabase(dbName)
+        }
+    }
 }
+
