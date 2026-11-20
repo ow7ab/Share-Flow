@@ -63,35 +63,41 @@ jobs:
       - name: Validate Gradle Wrapper & configure Gradle caching
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Restore debug keystore for debugConfig signing
-        shell: bash
-        working-directory: ${{ steps.locate_project.outputs.project_dir }}
-        run: |
-          set -euo pipefail
-          if [ ! -f "debug.keystore" ]; then
-            if [ -f "debug.keystore.base64" ]; then
-              base64 --decode debug.keystore.base64 > debug.keystore
-              chmod 600 debug.keystore
-              echo "Restored debug.keystore from debug.keystore.base64."
-            else
-              echo "::error::Neither debug.keystore nor debug.keystore.base64 found in $(pwd)."
-              exit 1
-            fi
-          else
-            echo "Existing debug.keystore detected."
-          fi
-
       - name: Make Gradle Wrapper executable
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: chmod +x ./gradlew
 
-      - name: Build Android Debug APK
+      - name: Build Android Debug APK (AGP automatic debug signing)
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
-        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
+        run: |
+          set -euo pipefail
 
-      - name: Dynamically locate and verify generated APK
+          INIT_SCRIPT="${RUNNER_TEMP:-/tmp}/agp-auto-debug-signing.init.gradle"
+          cat > "$INIT_SCRIPT" << 'EOF'
+          gradle.beforeProject { proj ->
+              proj.plugins.withId("com.android.application") {
+                  def components = proj.extensions.findByName("androidComponents")
+                  if (components != null) {
+                      components.finalizeDsl { ext ->
+                          def defaultDebugSigning = ext.signingConfigs.findByName("debug")
+                          def debugBuildType = ext.buildTypes.findByName("debug")
+                          if (defaultDebugSigning != null && debugBuildType != null) {
+                              def currentStoreFile = debugBuildType.signingConfig?.storeFile
+                              if (currentStoreFile == null || !currentStoreFile.exists()) {
+                                  debugBuildType.signingConfig = defaultDebugSigning
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
+          ./gradlew assembleDebug --init-script "$INIT_SCRIPT" --stacktrace --no-daemon
+
+      - name: Dynamically locate and verify signed Debug APK
         id: locate_apk
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
@@ -115,6 +121,20 @@ jobs:
           echo "Generated APK: $APK_ABS_PATH"
           echo "APK size (bytes): $APK_SIZE"
           echo "APK SHA-256: $APK_SHA256"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          APKSIGNER=""
+          if [ -n "$SDK_ROOT" ] && [ -d "$SDK_ROOT/build-tools" ]; then
+            APKSIGNER=$(find "$SDK_ROOT/build-tools" -maxdepth 2 -name "apksigner" -type f | sort -V | tail -n 1 || true)
+          fi
+
+          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose --print-certs "$APK_ABS_PATH"
+          else
+            echo "::error::apksigner not found to verify Debug APK signature."
+            exit 1
+          fi
+
           echo "apk_path=$APK_ABS_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload Debug APK artifact
