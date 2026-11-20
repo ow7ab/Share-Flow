@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      Production network security policy:
+      - Disables cleartext HTTP traffic globally.
+      - Trusts only system certificate authorities (no user-installed CAs in release builds).
+      - Local P2P transfers use authenticated ECDH + AES-256-GCM encrypted TCP channels.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

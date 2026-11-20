@@ -1,21 +1,38 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ShareFlow Production R8 / ProGuard Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve stack trace line numbers while redacting original source file names
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep Manifest-referenced Android entry points
+-keep public class com.example.ShareFlowApplication { *; }
+-keep public class com.example.MainActivity { *; }
+-keep public class com.example.shareflow.media.music.ShareFlowMediaSessionService { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep Room Database implementation and generated DAOs
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
+
+# Keep Kotlin Coroutines & Metadata needed for reflection/serialization
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# Keep Media3 / ExoPlayer classes referenced via reflection
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+# Keep AndroidX Biometric and CameraX components
+-keep class androidx.biometric.** { *; }
+-keep class androidx.camera.** { *; }
+
+# Defense-in-depth: Strip verbose/debug Android log calls in release builds
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}

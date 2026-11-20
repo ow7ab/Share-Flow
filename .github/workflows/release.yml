@@ -1,0 +1,154 @@
+name: ShareFlow Production Release Build (APK + AAB)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-release:
+    name: Build Signed Release APK & Play AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify release signing secrets are configured
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PW: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PW" ] || [ -z "$KEY_PW" ]; then
+            echo "::error::Missing required GitHub Secrets: ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, and ANDROID_KEY_PASSWORD must all be configured for production release builds. Debug signing is never used for production."
+            exit 1
+          fi
+
+      - name: Locate Android Gradle project root
+        id: locate_project
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS_FILE=$(find . -maxdepth 4 \
+            \( -name ".git" -o -name ".gradle" -o -name "build" \) -prune -o \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) -print | sort | head -n 1)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "::error::Could not locate settings.gradle or settings.gradle.kts."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Configure Gradle caching
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper executable
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: chmod +x ./gradlew
+
+      - name: Decode upload keystore into ephemeral runner temp directory
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_FILE="${RUNNER_TEMP}/shareflow-upload-key.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      - name: Run unit and Robolectric test suite
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Build signed Release APK and Play App Bundle (AAB)
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace --no-daemon
+
+      - name: Verify signed Release APK and AAB artifacts
+        id: verify_outputs
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_APK=$(find . -path "*/build/outputs/apk/release/*.apk" -type f | sort | head -n 1)
+          RELEASE_AAB=$(find . -path "*/build/outputs/bundle/release/*.aab" -type f | sort | head -n 1)
+          MAPPING_TXT=$(find . -path "*/build/outputs/mapping/release/mapping.txt" -type f | sort | head -n 1 || true)
+
+          if [ -z "$RELEASE_APK" ] || [ ! -s "$RELEASE_APK" ]; then
+            echo "::error::Release APK was not produced."
+            exit 1
+          fi
+          if [ -z "$RELEASE_AAB" ] || [ ! -s "$RELEASE_AAB" ]; then
+            echo "::error::Release AAB was not produced."
+            exit 1
+          fi
+
+          APK_ABS=$(realpath "$RELEASE_APK")
+          AAB_ABS=$(realpath "$RELEASE_AAB")
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          APKSIGNER=$(find "$SDK_ROOT/build-tools" -maxdepth 2 -name "apksigner" -type f | sort -V | tail -n 1)
+          "$APKSIGNER" verify --verbose "$APK_ABS"
+          jarsigner -verify -strict "$AAB_ABS" >/dev/null
+
+          echo "Release APK SHA-256: $(sha256sum "$APK_ABS" | awk '{print $1}')"
+          echo "Release AAB SHA-256: $(sha256sum "$AAB_ABS" | awk '{print $1}')"
+
+          echo "apk_path=$APK_ABS" >> "$GITHUB_OUTPUT"
+          echo "aab_path=$AAB_ABS" >> "$GITHUB_OUTPUT"
+          if [ -n "$MAPPING_TXT" ]; then
+            echo "mapping_path=$(realpath "$MAPPING_TXT")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shareflow-release-apk
+          path: ${{ steps.verify_outputs.outputs.apk_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Google Play AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shareflow-release-aab
+          path: ${{ steps.verify_outputs.outputs.aab_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload R8 ProGuard mapping file
+        if: steps.verify_outputs.outputs.mapping_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: shareflow-release-r8-mapping
+          path: ${{ steps.verify_outputs.outputs.mapping_path }}
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Securely delete ephemeral keystore file
+        if: always()
+        shell: bash
+        run: rm -f "${RUNNER_TEMP}/shareflow-upload-key.jks"
