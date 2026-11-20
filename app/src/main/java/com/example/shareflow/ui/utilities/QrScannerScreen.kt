@@ -3,6 +3,7 @@ package com.example.shareflow.ui.utilities
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -18,8 +19,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -27,6 +32,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,18 +58,27 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.AppSettings
 import com.example.shareflow.domain.model.ConnectionState
+import com.example.shareflow.domain.model.QrScannerUiState
+import com.example.shareflow.domain.model.SmartConnectionErrorCode
+import com.example.shareflow.domain.model.SmartConnectionPhase
+import com.example.shareflow.network.qr.SmartQrPairingProtocol
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
-import com.example.shareflow.ui.discovery.QrCameraScannerView
+import com.example.shareflow.ui.discovery.AdvancedQrScannerView
+import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
+import com.example.shareflow.ui.discovery.SmartSenderProgressCard
+import com.example.shareflow.ui.discovery.decodeQrCodeFromGalleryUri
 import kotlinx.coroutines.launch
 
 /**
- * Direct QR Scanner utility screen that strictly reuses ShareFlow's existing CameraX + ZXing
- * [QrCameraScannerView] and [ConnectionRepository] — zero duplicated connection or camera services.
+ * Upgraded Direct QR Scanner utility screen powered by CameraX + ML Kit Barcode Scanning
+ * (with ZXing fallback), gallery QR import via zero-permission Photo Picker, manual SF3 code entry,
+ * and SmartConnectionCoordinator auto-join.
  */
 @Composable
 fun QrScannerScreen(
     onNavigateBack: () -> Unit,
     onOpenFullQrPairing: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -76,6 +91,9 @@ fun QrScannerScreen(
         initialValue = AppSettings()
     )
     val connectionState by container.connectionRepository.connectionState.collectAsStateWithLifecycle()
+    val smartPhase by container.smartConnectionCoordinator.phase.collectAsStateWithLifecycle()
+    val smartStrategy by container.smartConnectionCoordinator.activeStrategy.collectAsStateWithLifecycle()
+    val smartError by container.smartConnectionCoordinator.lastError.collectAsStateWithLifecycle()
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -85,9 +103,13 @@ fun QrScannerScreen(
     }
     var manualUri by rememberSaveable { mutableStateOf("") }
     var isPairing by rememberSaveable { mutableStateOf(false) }
+    var isDecodingGallery by remember { mutableStateOf(false) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var scannerState by remember { mutableStateOf(QrScannerUiState.SCANNING) }
 
     val pairedSuccessText = stringResource(R.string.qr_scanner_paired_success)
+    val galleryDecodingMsg = stringResource(R.string.smart_scanner_gallery_decoding)
+    val galleryNoQrMsg = stringResource(R.string.smart_scanner_gallery_no_qr)
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -95,24 +117,78 @@ fun QrScannerScreen(
         hasCameraPermission = granted
     }
 
-    fun submitQrUri(rawUri: String) {
-        if (isPairing || rawUri.isBlank()) return
+    fun submitQrUri(rawInput: String) {
+        val trimmed = rawInput.trim()
+        if (isPairing || trimmed.isBlank()) return
         scope.launch {
             isPairing = true
             errorMessage = null
-            when (
-                val res = container.connectionRepository.connectViaQrPayload(
-                    rawQrUri = rawUri.trim(),
+            scannerState = QrScannerUiState.LOADING
+            if (SmartQrPairingProtocol.isSmartV3Payload(trimmed)) {
+                val res = container.smartConnectionCoordinator.connectViaSmartQr(
+                    rawQrOrManualCode = trimmed,
                     localDeviceName = settings.deviceName
                 )
-            ) {
-                is AppResult.Success -> {
-                    isPairing = false
-                    snackbarHostState.showSnackbar(pairedSuccessText)
+                isPairing = false
+                when (res) {
+                    is AppResult.Success -> {
+                        scannerState = QrScannerUiState.SUCCESS
+                        snackbarHostState.showSnackbar(pairedSuccessText)
+                    }
+                    is AppResult.Failure -> {
+                        val code = container.smartConnectionCoordinator.lastError.value?.code
+                        scannerState = when (code) {
+                            SmartConnectionErrorCode.STALE_OR_EXPIRED_QR,
+                            SmartConnectionErrorCode.SESSION_EXPIRED -> QrScannerUiState.EXPIRED_QR
+                            SmartConnectionErrorCode.INVALID_QR,
+                            SmartConnectionErrorCode.TAMPERED_QR,
+                            SmartConnectionErrorCode.REPLAYED_QR,
+                            SmartConnectionErrorCode.SELF_PAIRING -> QrScannerUiState.INVALID_QR
+                            else -> QrScannerUiState.FAILURE
+                        }
+                    }
                 }
-                is AppResult.Failure -> {
-                    isPairing = false
-                    errorMessage = res.error.message
+            } else {
+                when (
+                    val res = container.connectionRepository.connectViaQrPayload(
+                        rawQrUri = trimmed,
+                        localDeviceName = settings.deviceName
+                    )
+                ) {
+                    is AppResult.Success -> {
+                        isPairing = false
+                        scannerState = QrScannerUiState.SUCCESS
+                        snackbarHostState.showSnackbar(pairedSuccessText)
+                    }
+                    is AppResult.Failure -> {
+                        isPairing = false
+                        errorMessage = res.error.message
+                        scannerState = if (res.error.message.contains("expired", ignoreCase = true)) {
+                            QrScannerUiState.EXPIRED_QR
+                        } else {
+                            QrScannerUiState.INVALID_QR
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val galleryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                isDecodingGallery = true
+                snackbarHostState.showSnackbar(galleryDecodingMsg)
+                val decoded = decodeQrCodeFromGalleryUri(context, uri)
+                isDecodingGallery = false
+                if (!decoded.isNullOrBlank()) {
+                    manualUri = decoded
+                    submitQrUri(decoded)
+                } else {
+                    scannerState = QrScannerUiState.INVALID_QR
+                    snackbarHostState.showSnackbar(galleryNoQrMsg)
                 }
             }
         }
@@ -124,7 +200,20 @@ fun QrScannerScreen(
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.qr_scanner_utility_title),
-                onNavigateBack = onNavigateBack
+                onNavigateBack = onNavigateBack,
+                actions = {
+                    IconButton(
+                        onClick = onOpenDiagnostics,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("qr_scanner_diagnostics_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.NetworkCheck,
+                            contentDescription = stringResource(R.string.smart_receive_cd_diagnostics)
+                        )
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -158,7 +247,44 @@ fun QrScannerScreen(
                         ActiveEncryptedConnectionCard(
                             connected = connectionState as ConnectionState.Connected,
                             onDisconnect = {
-                                scope.launch { container.connectionRepository.disconnect() }
+                                scope.launch {
+                                    container.smartConnectionCoordinator.cancelOrDisconnect(markCancelled = false)
+                                    container.connectionRepository.disconnect()
+                                    scannerState = QrScannerUiState.SCANNING
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (smartPhase.isInProgress || smartPhase == SmartConnectionPhase.CONNECTED) {
+                    item(key = "qr_smart_sender_progress") {
+                        SmartSenderProgressCard(
+                            phase = smartPhase,
+                            strategy = smartStrategy,
+                            onCancel = {
+                                scope.launch {
+                                    container.smartConnectionCoordinator.cancelOrDisconnect(markCancelled = true)
+                                    isPairing = false
+                                    scannerState = QrScannerUiState.SCANNING
+                                }
+                            }
+                        )
+                    }
+                }
+
+                smartError?.let { smartErr ->
+                    item(key = "qr_smart_error") {
+                        SmartConnectionErrorCard(
+                            error = smartErr,
+                            onRetry = if (manualUri.isNotBlank()) {
+                                { submitQrUri(manualUri) }
+                            } else {
+                                null
+                            },
+                            onDismiss = {
+                                container.smartConnectionCoordinator.clearError()
+                                scannerState = QrScannerUiState.SCANNING
                             }
                         )
                     }
@@ -168,15 +294,22 @@ fun QrScannerScreen(
                     item(key = "qr_error") {
                         ErrorState(
                             message = errorMessage.orEmpty(),
-                            onRetry = { errorMessage = null }
+                            onRetry = {
+                                errorMessage = null
+                                scannerState = QrScannerUiState.SCANNING
+                            }
                         )
                     }
                 }
 
                 item(key = "qr_camera_section") {
                     if (hasCameraPermission) {
-                        QrCameraScannerView(
-                            onQrDecoded = { decoded -> submitQrUri(decoded) }
+                        AdvancedQrScannerView(
+                            scannerState = scannerState,
+                            onQrDecoded = { decoded ->
+                                manualUri = decoded
+                                submitQrUri(decoded)
+                            }
                         )
                     } else {
                         Surface(
@@ -208,6 +341,23 @@ fun QrScannerScreen(
                     }
                 }
 
+                item(key = "qr_gallery_import") {
+                    SecondaryActionButton(
+                        text = stringResource(R.string.smart_scanner_import_gallery),
+                        onClick = {
+                            galleryPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isDecodingGallery && !isPairing,
+                        outlined = true,
+                        leadingIcon = Icons.Filled.PhotoLibrary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("qr_scanner_import_gallery_button")
+                    )
+                }
+
                 item(key = "qr_manual_section") {
                     Surface(
                         shape = ShareFlowDesign.shapes.card,
@@ -223,7 +373,8 @@ fun QrScannerScreen(
                             OutlinedTextField(
                                 value = manualUri,
                                 onValueChange = { manualUri = it },
-                                label = { Text(stringResource(R.string.qr_scanner_manual_uri_label)) },
+                                label = { Text(stringResource(R.string.smart_scanner_manual_code_label)) },
+                                placeholder = { Text(stringResource(R.string.smart_scanner_manual_code_placeholder)) },
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()

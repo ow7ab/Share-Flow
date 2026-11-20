@@ -37,6 +37,9 @@ class NetworkPermissionHelper(
             ContextCompat.checkSelfPermission(appContext, perm) != PackageManager.PERMISSION_GRANTED
         }
 
+    fun missingNearbyWifiPermissions(): List<String> =
+        missingPermissionsFor(ConnectionType.HOTSPOT)
+
     fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(appContext, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED

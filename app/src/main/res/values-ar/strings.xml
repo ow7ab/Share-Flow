@@ -864,4 +864,142 @@
     <string name="settings_feedback_history_pruned">تمت إزالة سجلات النقل المنتهية.</string>
     <string name="settings_feedback_favorites_cleared">تم مسح إشارات المفضلة.</string>
     <string name="settings_feedback_trusted_revoked">تم إلغاء جميع الأجهزة الموثوقة.</string>
+
+    <!-- الاتصال الذكي بنقطة الاتصال والاقتران المتقدم عبر QR (المراحل 1-10) -->
+    <!-- حالات SmartConnectionPhase الـ 18 -->
+    <string name="smart_phase_idle">جاهز</string>
+    <string name="smart_phase_starting_hotspot">جارٍ إنشاء نقطة الاتصال المحلية…</string>
+    <string name="smart_phase_hotspot_ready">نقطة الاتصال جاهزة</string>
+    <string name="smart_phase_starting_server">جارٍ تشغيل خادم النقل…</string>
+    <string name="smart_phase_server_ready">الخادم جاهز</string>
+    <string name="smart_phase_waiting_for_qr">جاهز لمسح رمز QR</string>
+    <string name="smart_phase_qr_scanned">تم التحقق من رمز QR</string>
+    <string name="smart_phase_requesting_wifi">جارٍ طلب الاتصال بشبكة Wi-Fi المحلية…</string>
+    <string name="smart_phase_waiting_for_approval">بانتظار موافقة النظام على شبكة Wi-Fi…</string>
+    <string name="smart_phase_joining_network">جارٍ الانضمام إلى شبكة المستقبِل…</string>
+    <string name="smart_phase_discovering_receiver">جارٍ اكتشاف الجهاز المستقبِل…</string>
+    <string name="smart_phase_authenticating">جارٍ مصادقة القناة المشفّرة…</string>
+    <string name="smart_phase_connected">متصل وموثّق</string>
+    <string name="smart_phase_transferring">جارٍ نقل الملفات</string>
+    <string name="smart_phase_disconnected">تم قطع الاتصال</string>
+    <string name="smart_phase_cancelled">تم الإلغاء</string>
+    <string name="smart_phase_expired">انتهت صلاحية الجلسة</string>
+    <string name="smart_phase_failed">فشل الاتصال</string>
+
+    <!-- أسماء استراتيجيات الاتصال -->
+    <string name="smart_strategy_local_hotspot">نقطة اتصال محلية مؤقتة</string>
+    <string name="smart_strategy_wifi_specifier">انضمام تلقائي لشبكة Wi-Fi مؤقتة</string>
+    <string name="smart_strategy_wifi_direct">Wi-Fi Direct مباشر</string>
+    <string name="smart_strategy_existing_wifi">شبكة Wi-Fi المحلية الحالية</string>
+    <string name="smart_strategy_none">غير نشط</string>
+
+    <!-- رسائل أخطاء SmartConnectionErrorCode الـ 20 -->
+    <string name="smart_err_permission_denied">مطلوب أذونات Wi-Fi القريب أو الموقع لإنشاء نقطة اتصال محلية. امنح الأذونات أو وصّل الجهازين بنفس شبكة Wi-Fi.</string>
+    <string name="smart_err_wifi_disabled">شبكة Wi-Fi متوقفة. فعّل Wi-Fi ثم أعد المحاولة.</string>
+    <string name="smart_err_hotspot_creation_failed">تعذّر بدء نقطة الاتصال المحلية على هذا الجهاز. جارٍ التبديل للخيار البديل أو أعد المحاولة.</string>
+    <string name="smart_err_hotspot_stopped">أوقف نظام Android نقطة الاتصال المحلية المؤقتة. اضغط بدء الاستقبال لإنشاء جلسة QR جديدة.</string>
+    <string name="smart_err_user_rejected_network">تم رفض طلب الاتصال بشبكة Wi-Fi في نافذة النظام. اضغط إعادة المحاولة عندما تكون مستعداً للموافقة.</string>
+    <string name="smart_err_wifi_join_timeout">انتهت مهلة الانضمام إلى شبكة المستقبِل. قرّب الجهازين وتأكد من أن نقطة الاتصال لا تزال نشطة.</string>
+    <string name="smart_err_wrong_network">تعذّر العثور على جهاز ShareFlow المستقبِل على هذه الشبكة. تأكد من الموافقة على شبكة المستقبِل أو الاتصال بنفس شبكة Wi-Fi.</string>
+    <string name="smart_err_server_unavailable">خادم الاستقبال غير متاح أو توقف عن الاستماع. اطلب من المستقبِل تحديث رمز QR.</string>
+    <string name="smart_err_port_conflict">المنفذ المفضل كان مشغولاً؛ اختار ShareFlow منفذاً محلياً متاحاً تلقائياً.</string>
+    <string name="smart_err_expired_qr">انتهت صلاحية رمز QR هذا. أنشئ رمز QR جديداً على الجهاز المستقبِل.</string>
+    <string name="smart_err_invalid_qr">رمز QR هذا غير صالح لاقتران ShareFlow أو يستخدم إصدار بروتوكول غير مدعوم.</string>
+    <string name="smart_err_tampered_qr">فشل التحقق من التوقيع التشفيري لرمز QR. تم رفض البيانات غير الموثوقة أو المعدّلة.</string>
+    <string name="smart_err_replayed_qr">تم استخدام جلسة QR أحادية الاستخدام هذه مسبقاً. أنشئ رمز QR جديداً على المستقبِل.</string>
+    <string name="smart_err_self_pairing">لا يمكن إقران الجهاز بنفسه. امسح رمز QR المعروض على جهاز ShareFlow آخر.</string>
+    <string name="smart_err_auth_failed">فشلت المصادقة المتبادلة بتشفير ECDSA/AES-256-GCM. تأكد من بقاء جلسة المستقبِل مفتوحة وأعد المحاولة.</string>
+    <string name="smart_err_receiver_disconnected">انقطع اتصال الجهاز المستقبِل أو أُغلقت شبكته المؤقتة.</string>
+    <string name="smart_err_app_backgrounded">توقف الاتصال مؤقتاً بسبب انتقال ShareFlow للخلفية. اضغط إعادة المحاولة للمتابعة.</string>
+    <string name="smart_err_unsupported_hardware">نقطة الاتصال المحلية أو Wi-Fi Direct غير مدعومة على عتاد هذا الجهاز. استخدم شبكة Wi-Fi مشتركة بدلاً من ذلك.</string>
+    <string name="smart_err_session_expired">انتهت مهلة جلسة الاقتران المؤقتة قبل اتصال أي جهاز. اضغط تحديث رمز QR للمتابعة.</string>
+    <string name="smart_err_unknown">حدث خطأ اتصال غير متوقع. راجع شاشة تشخيص الاتصال لمزيد من التفاصيل.</string>
+
+    <!-- المرحلة 6: ماسح QR المتقدم -->
+    <string name="smart_scanner_torch_on">إطفاء الفلاش</string>
+    <string name="smart_scanner_torch_off">تشغيل الفلاش</string>
+    <string name="smart_scanner_cd_toggle_torch">تبديل مصباح الكاميرا</string>
+    <string name="smart_scanner_tap_to_focus_hint">ضع رمز QR داخل الإطار • المس للتركيز</string>
+    <string name="smart_scanner_auto_zoom_badge">تقريب تلقائي %1$.1fx</string>
+    <string name="smart_scanner_import_gallery">استيراد QR من المعرض</string>
+    <string name="smart_scanner_gallery_decoding">جارٍ قراءة رمز QR من الصورة…</string>
+    <string name="smart_scanner_gallery_no_qr">لم يتم العثور على رمز QR صالح في الصورة المختارة.</string>
+    <string name="smart_scanner_gallery_error">تعذّرت قراءة الصورة المختارة.</string>
+    <string name="smart_scanner_state_scanning">جارٍ البحث عن رمز ShareFlow QR</string>
+    <string name="smart_scanner_state_loading">جارٍ التحقق والاتصال…</string>
+    <string name="smart_scanner_state_success">تم التحقق والاتصال بنجاح</string>
+    <string name="smart_scanner_state_invalid">رمز QR غير صالح</string>
+    <string name="smart_scanner_state_expired">رمز QR منتهي الصلاحية</string>
+    <string name="smart_scanner_state_failure">فشل الاتصال</string>
+    <string name="smart_scanner_manual_code_label">رمز الاقتران اليدوي أو رابط ShareFlow</string>
+    <string name="smart_scanner_manual_code_placeholder">SF3-… أو shareflow://pair?v=3…</string>
+
+    <!-- المرحلة 7: واجهة الاستقبال والاقتران الذكي -->
+    <string name="smart_receive_hotspot_desc">إنشاء نقطة اتصال محلية مؤقتة لينضم المُرسِل تلقائياً عبر QR دون استهلاك بيانات الهاتف.</string>
+    <string name="smart_receive_preparing_title">جارٍ تجهيز الشبكة المؤقتة والخادم</string>
+    <string name="smart_receive_preparing_body">سيعرض ShareFlow رمز QR الموقّع فور تأكيد Android لجاهزية نقطة الاتصال وخادم TCP.</string>
+    <string name="smart_receive_qr_ready_title">رمز QR الذكي الموقّع جاهز</string>
+    <string name="smart_receive_qr_ready_subtitle">امسح الرمز من الجهاز المُرسِل للانضمام التلقائي وإنشاء جلسة مشفّرة بتقنية AES-256-GCM.</string>
+    <string name="smart_receive_network_ready_badge">الشبكة جاهزة</string>
+    <string name="smart_receive_share_qr_action">مشاركة صورة QR</string>
+    <string name="smart_receive_share_qr_chooser">مشاركة رمز ShareFlow QR</string>
+    <string name="smart_receive_share_qr_error">تعذّر إنشاء صورة QR للمشاركة.</string>
+    <string name="smart_receive_copy_link_action">نسخ رابط الاقتران</string>
+    <string name="smart_receive_copy_code_action">نسخ الرمز اليدوي</string>
+    <string name="smart_receive_code_copied_toast">تم نسخ رمز الاقتران اليدوي.</string>
+    <string name="smart_receive_manual_code_label">رمز الاقتران اليدوي</string>
+    <string name="smart_receive_cancel_action">إلغاء الاستقبال</string>
+    <string name="smart_receive_regenerate_action">تحديث جلسة QR</string>
+    <string name="smart_receive_grant_wifi_permissions">منح أذونات Wi-Fi القريب</string>
+    <string name="smart_receive_diagnostics_action">التشخيص</string>
+    <string name="smart_receive_cd_diagnostics">فتح تشخيص الاتصال</string>
+    <string name="smart_receive_error_title">مشكلة في الاتصال</string>
+    <string name="smart_receive_retry_action">إعادة المحاولة</string>
+    <string name="smart_receive_dismiss_action">إغلاق</string>
+    <string name="smart_sender_progress_title">مراحل الاتصال الذكي</string>
+    <string name="smart_sender_step_qr">1. التحقق من توقيع QR</string>
+    <string name="smart_sender_step_wifi">2. الانضمام لشبكة المستقبِل</string>
+    <string name="smart_sender_step_discover">3. اكتشاف خدمة المستقبِل</string>
+    <string name="smart_sender_step_auth">4. مصادقة القناة المشفّرة</string>
+    <string name="smart_sender_cancel_action">إلغاء الاتصال</string>
+
+    <!-- المرحلة 8: تشخيص الاتصال -->
+    <string name="diag_title">تشخيص الاتصال</string>
+    <string name="diag_subtitle">حالة النقل اللاسلكي ونقطة الاتصال والاكتشاف والتشفير مباشرة. لا يتم عرض كلمات المرور أو الرموز السرية أبداً.</string>
+    <string name="diag_section_device">الجهاز والنظام</string>
+    <string name="diag_section_transport">النقل وربط الشبكة</string>
+    <string name="diag_section_session">الخادم والاكتشاف والأمان</string>
+    <string name="diag_label_android_version">إصدار Android</string>
+    <string name="diag_label_device_model">طراز الجهاز</string>
+    <string name="diag_label_strategy">استراتيجية الاتصال</string>
+    <string name="diag_label_phase">مرحلة الاتصال</string>
+    <string name="diag_label_hotspot_state">حالة نقطة الاتصال</string>
+    <string name="diag_label_ssid_status">توفر اسم الشبكة (SSID)</string>
+    <string name="diag_label_network_id">معرّف الشبكة النشطة</string>
+    <string name="diag_label_local_ip">عنوان IP المحلي</string>
+    <string name="diag_label_remote_ip">عنوان IP للطرف الآخر</string>
+    <string name="diag_label_interface">واجهة الشبكة</string>
+    <string name="diag_label_server_port">منفذ خادم TCP</string>
+    <string name="diag_label_server_listening">حالة الاستماع للخادم</string>
+    <string name="diag_label_discovery_status">اكتشاف NSD / UDP</string>
+    <string name="diag_label_qr_expiry">انتهاء صلاحية جلسة QR</string>
+    <string name="diag_label_auth_status">حالة المصادقة</string>
+    <string name="diag_label_last_error">آخر خطأ</string>
+    <string name="diag_label_test_result">نتيجة اختبار الاتصال</string>
+    <string name="diag_action_test">اختبار الاتصال</string>
+    <string name="diag_action_testing">جارٍ الاختبار…</string>
+    <string name="diag_action_refresh">تحديث البيانات</string>
+    <string name="diag_action_copy_report">نسخ التقرير المنقّح</string>
+    <string name="diag_report_copied">تم نسخ تقرير التشخيص المنقّح إلى الحافظة.</string>
+    <string name="diag_privacy_notice">تُحجب كلمات مرور نقطة الاتصال ورموز الاقتران أحادية الاستخدام والمفاتيح الخاصة تماماً من التشخيص والسجلات.</string>
+    <string name="diag_value_yes">نعم</string>
+    <string name="diag_value_no">لا</string>
+    <string name="diag_value_na">غير متوفر</string>
+    <string name="diag_value_none">لا يوجد</string>
+    <string name="diag_value_not_run">لم يُجرَ بعد</string>
+    <string name="diag_value_ssid_available">متوفر (%1$s)</string>
+    <string name="diag_value_ssid_unavailable">غير متوفر</string>
+    <string name="module_connection_diagnostics_title">تشخيص الاتصال</string>
+    <string name="module_connection_diagnostics_desc">فحص نقطة الاتصال المحلية وربط شبكة Wi-Fi واكتشاف NSD/UDP واختبار الاتصال المشفّر.</string>
 </resources>
+

@@ -38,14 +38,21 @@ import com.example.shareflow.domain.repository.VaultRepository
 import com.example.shareflow.network.LocalSessionController
 import com.example.shareflow.network.coordinator.ConnectionCoordinator
 import com.example.shareflow.network.coordinator.DefaultConnectionCoordinator
+import com.example.shareflow.network.coordinator.SmartConnectionCoordinator
+import com.example.shareflow.network.discovery.AndroidSessionServiceDiscovery
+import com.example.shareflow.network.discovery.SessionServiceDiscovery
+import com.example.shareflow.network.qr.SmartQrPairingProtocol
 import com.example.shareflow.network.security.AndroidDeviceIdentityManager
 import com.example.shareflow.network.security.DeviceIdentityManager
 import com.example.shareflow.network.security.PairingTokenManager
 import com.example.shareflow.network.security.ReplayProtectionCache
+import com.example.shareflow.network.strategy.ExistingLocalWiFiStrategy
 import com.example.shareflow.network.strategy.LocalHotspotStrategy
 import com.example.shareflow.network.strategy.LocalNetworkStrategy
+import com.example.shareflow.network.strategy.LocalOnlyHotspotStrategy
 import com.example.shareflow.network.strategy.NetworkPermissionHelper
 import com.example.shareflow.network.strategy.WiFiDirectStrategy
+import com.example.shareflow.network.strategy.WiFiNetworkSpecifierStrategy
 import com.example.shareflow.network.transfer.AndroidTransferDataSource
 import com.example.shareflow.network.transfer.ChunkProcessor
 import com.example.shareflow.network.transfer.StatFsStorageSpaceChecker
@@ -90,6 +97,12 @@ interface AppContainer {
     val networkPermissionHelper: NetworkPermissionHelper
     val deviceIdentityManager: DeviceIdentityManager
     val connectionCoordinator: ConnectionCoordinator
+    val smartQrPairingProtocol: SmartQrPairingProtocol
+    val localOnlyHotspotStrategy: LocalOnlyHotspotStrategy
+    val wifiNetworkSpecifierStrategy: WiFiNetworkSpecifierStrategy
+    val existingLocalWiFiStrategy: ExistingLocalWiFiStrategy
+    val sessionServiceDiscovery: SessionServiceDiscovery
+    val smartConnectionCoordinator: SmartConnectionCoordinator
     val deviceDiscoveryRepository: DeviceDiscoveryRepository
     val connectionRepository: ConnectionRepository
     val transferDataSource: TransferDataSource
@@ -191,13 +204,17 @@ class DefaultAppContainer(context: Context) : AppContainer {
         AndroidDeviceIdentityManager()
     }
 
-    override val connectionCoordinator: ConnectionCoordinator by lazy {
+    private val wifiDirectStrategyInstance: WiFiDirectStrategy by lazy {
+        WiFiDirectStrategy(
+            context = appContext,
+            permissionHelper = networkPermissionHelper,
+            clock = clock
+        )
+    }
+
+    private val defaultConnectionCoordinator: DefaultConnectionCoordinator by lazy {
         val strategies = mapOf(
-            ConnectionType.WIFI_DIRECT to WiFiDirectStrategy(
-                context = appContext,
-                permissionHelper = networkPermissionHelper,
-                clock = clock
-            ),
+            ConnectionType.WIFI_DIRECT to wifiDirectStrategyInstance,
             ConnectionType.LOCAL_LAN_NSD to LocalNetworkStrategy(
                 context = appContext,
                 permissionHelper = networkPermissionHelper,
@@ -215,6 +232,61 @@ class DefaultAppContainer(context: Context) : AppContainer {
             replayProtectionCache = ReplayProtectionCache(clock = clock),
             trustedDeviceRepository = trustedDeviceRepository,
             settingsRepository = settingsRepository,
+            dispatchers = dispatchers,
+            clock = clock
+        )
+    }
+
+    override val connectionCoordinator: ConnectionCoordinator
+        get() = defaultConnectionCoordinator
+
+    override val smartQrPairingProtocol: SmartQrPairingProtocol by lazy {
+        SmartQrPairingProtocol(
+            identityManager = deviceIdentityManager,
+            clock = clock
+        )
+    }
+
+    override val localOnlyHotspotStrategy: LocalOnlyHotspotStrategy by lazy {
+        LocalOnlyHotspotStrategy(
+            context = appContext,
+            permissionHelper = networkPermissionHelper,
+            clock = clock
+        )
+    }
+
+    override val wifiNetworkSpecifierStrategy: WiFiNetworkSpecifierStrategy by lazy {
+        WiFiNetworkSpecifierStrategy(
+            context = appContext,
+            permissionHelper = networkPermissionHelper
+        )
+    }
+
+    override val existingLocalWiFiStrategy: ExistingLocalWiFiStrategy by lazy {
+        ExistingLocalWiFiStrategy(
+            context = appContext,
+            permissionHelper = networkPermissionHelper
+        )
+    }
+
+    override val sessionServiceDiscovery: SessionServiceDiscovery by lazy {
+        AndroidSessionServiceDiscovery(
+            context = appContext,
+            senderWifiConnector = wifiNetworkSpecifierStrategy,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val smartConnectionCoordinator: SmartConnectionCoordinator by lazy {
+        SmartConnectionCoordinator(
+            baseCoordinator = defaultConnectionCoordinator,
+            receiverHotspotController = localOnlyHotspotStrategy,
+            senderWifiConnector = wifiNetworkSpecifierStrategy,
+            existingWifiProvider = existingLocalWiFiStrategy,
+            wifiDirectStrategy = wifiDirectStrategyInstance,
+            sessionDiscovery = sessionServiceDiscovery,
+            qrProtocol = smartQrPairingProtocol,
+            permissionHelper = networkPermissionHelper,
             dispatchers = dispatchers,
             clock = clock
         )

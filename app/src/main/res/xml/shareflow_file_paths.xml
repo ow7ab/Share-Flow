@@ -11,4 +11,7 @@
     <cache-path
         name="shareflow_apk_exports"
         path="shareflow_apk_exports/" />
+    <cache-path
+        name="shareflow_qr_shares"
+        path="shareflow_qr_shares/" />
 </paths>

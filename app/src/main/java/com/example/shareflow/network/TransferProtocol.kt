@@ -7,7 +7,9 @@ package com.example.shareflow.network
  */
 object TransferProtocol {
     const val PROTOCOL_VERSION: Int = 2
+    const val SMART_QR_PROTOCOL_VERSION: Int = 3
     const val MIN_SUPPORTED_PROTOCOL_VERSION: Int = 2
+    const val UDP_DISCOVERY_PORT: Int = 45891
     const val SERVICE_TYPE_NSD: String = "_shareflow._tcp."
     const val SERVICE_TYPE_P2P: String = "_shareflow._tcp"
     const val SERVICE_APP_ID: String = "shareflow"
@@ -28,6 +30,8 @@ object TransferProtocol {
     const val TXT_DISPLAY_NAME = "name"
     const val TXT_DEVICE_TYPE = "type"
     const val TXT_PORT = "port"
+    const val TXT_SESSION_ID = "sid"
+    const val TXT_EPHEMERAL_KEY_HASH = "epk"
 }
 
 /**

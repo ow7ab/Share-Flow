@@ -1,11 +1,14 @@
 package com.example.shareflow.network.qr
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
@@ -96,4 +99,58 @@ object QrCodeCodec {
             reader.decodeWithState(bitmap)?.text
         }.getOrNull()
     }
+
+    fun renderQrBitmap(
+        payload: String,
+        sizePx: Int = 900,
+        foregroundColor: Int = Color.rgb(11, 26, 60),
+        backgroundColor: Int = Color.WHITE
+    ): Bitmap? {
+        if (payload.isBlank() || sizePx <= 0) return null
+        return runCatching {
+            val hints = mapOf(
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                EncodeHintType.MARGIN to 2
+            )
+            val matrix = QRCodeWriter().encode(
+                payload,
+                BarcodeFormat.QR_CODE,
+                sizePx,
+                sizePx,
+                hints
+            )
+            val w = matrix.width
+            val h = matrix.height
+            val pixels = IntArray(w * h)
+            for (y in 0 until h) {
+                val offset = y * w
+                for (x in 0 until w) {
+                    pixels[offset + x] = if (matrix.get(x, y)) foregroundColor else backgroundColor
+                }
+            }
+            Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply {
+                setPixels(pixels, 0, w, 0, 0, w, h)
+            }
+        }.getOrNull()
+    }
+
+    fun decodeFromBitmap(bitmap: Bitmap): String? = runCatching {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) return@runCatching null
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val source = RGBLuminanceSource(width, height, pixels)
+        val binary = BinaryBitmap(HybridBinarizer(source))
+        val reader = MultiFormatReader().apply {
+            setHints(
+                mapOf(
+                    DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+                    DecodeHintType.TRY_HARDER to true
+                )
+            )
+        }
+        reader.decodeWithState(binary)?.text
+    }.getOrNull()
 }

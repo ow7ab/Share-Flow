@@ -122,6 +122,24 @@ class PairingTokenManager(
         }
     }
 
+    fun registerExternalPairingSession(payload: PairingPayload) {
+        val now = clock.nowEpochMillis()
+        synchronized(lock) {
+            pruneExpiredLocked(now)
+            issuedPayloads[payload.sessionId] = IssuedTokenRecord(payload = payload, consumed = false)
+            if (issuedPayloads.size > MAX_ACTIVE_TOKENS) {
+                val oldestKey = issuedPayloads.entries.firstOrNull()?.key
+                if (oldestKey != null) issuedPayloads.remove(oldestKey)
+            }
+        }
+    }
+
+    fun invalidateSession(sessionId: String) {
+        synchronized(lock) {
+            issuedPayloads.remove(sessionId)
+        }
+    }
+
     fun invalidateAll() {
         synchronized(lock) {
             issuedPayloads.clear()

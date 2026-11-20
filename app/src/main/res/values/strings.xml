@@ -864,4 +864,142 @@
     <string name="settings_feedback_history_pruned">Expired history records removed.</string>
     <string name="settings_feedback_favorites_cleared">Favorite bookmarks cleared.</string>
     <string name="settings_feedback_trusted_revoked">Trusted devices revoked.</string>
+
+    <!-- Smart Hotspot Connection & Advanced QR Pairing (Phases 1-10) -->
+    <!-- 18 SmartConnectionPhase Labels -->
+    <string name="smart_phase_idle">Idle</string>
+    <string name="smart_phase_starting_hotspot">Starting Local Hotspot…</string>
+    <string name="smart_phase_hotspot_ready">Hotspot Ready</string>
+    <string name="smart_phase_starting_server">Starting Transfer Server…</string>
+    <string name="smart_phase_server_ready">Server Ready</string>
+    <string name="smart_phase_waiting_for_qr">Ready for QR Scan</string>
+    <string name="smart_phase_qr_scanned">QR Verified</string>
+    <string name="smart_phase_requesting_wifi">Requesting Local Wi-Fi…</string>
+    <string name="smart_phase_waiting_for_approval">Waiting for System Wi-Fi Approval…</string>
+    <string name="smart_phase_joining_network">Joining Receiver Network…</string>
+    <string name="smart_phase_discovering_receiver">Discovering Receiver…</string>
+    <string name="smart_phase_authenticating">Authenticating Encrypted Channel…</string>
+    <string name="smart_phase_connected">Connected &amp; Verified</string>
+    <string name="smart_phase_transferring">Transferring Files</string>
+    <string name="smart_phase_disconnected">Disconnected</string>
+    <string name="smart_phase_cancelled">Cancelled</string>
+    <string name="smart_phase_expired">Session Expired</string>
+    <string name="smart_phase_failed">Connection Failed</string>
+
+    <!-- Connection Strategy Labels -->
+    <string name="smart_strategy_local_hotspot">Local-Only Hotspot</string>
+    <string name="smart_strategy_wifi_specifier">Temporary Wi-Fi Auto-Join</string>
+    <string name="smart_strategy_wifi_direct">Wi-Fi Direct (P2P)</string>
+    <string name="smart_strategy_existing_wifi">Existing Local Wi-Fi</string>
+    <string name="smart_strategy_none">Not Active</string>
+
+    <!-- 20 SmartConnectionErrorCode Messages -->
+    <string name="smart_err_permission_denied">Nearby Wi-Fi or location permissions are required for local hotspot pairing. Grant permissions or connect both devices to the same Wi-Fi network.</string>
+    <string name="smart_err_wifi_disabled">Wi-Fi is turned off. Turn on Wi-Fi and try again.</string>
+    <string name="smart_err_hotspot_creation_failed">Could not start Android Local-Only Hotspot on this device. Falling back or retry when Wi-Fi is free.</string>
+    <string name="smart_err_hotspot_stopped">Android stopped the temporary local hotspot. Tap Start Receiving to create a fresh QR session.</string>
+    <string name="smart_err_user_rejected_network">Wi-Fi connection request was declined in the Android system dialog. Tap Retry when you are ready to approve joining.</string>
+    <string name="smart_err_wifi_join_timeout">Timed out joining the receiver network. Keep devices close together and confirm the receiver hotspot is still active.</string>
+    <string name="smart_err_wrong_network">Could not locate the ShareFlow receiver on this network. Make sure you approved the receiver Wi-Fi network or joined the same local Wi-Fi.</string>
+    <string name="smart_err_server_unavailable">The receiver transfer server is unreachable or stopped listening. Ask the receiver to refresh its QR code.</string>
+    <string name="smart_err_port_conflict">Preferred port was busy; ShareFlow automatically selected an available local port.</string>
+    <string name="smart_err_expired_qr">This QR pairing code has expired. Generate a fresh QR code on the receiving device.</string>
+    <string name="smart_err_invalid_qr">This QR code is not a valid ShareFlow pairing code or uses an unsupported protocol version.</string>
+    <string name="smart_err_tampered_qr">QR cryptographic signature verification failed. Rejecting untrusted or modified pairing payload.</string>
+    <string name="smart_err_replayed_qr">This single-use QR pairing session was already consumed. Generate a new QR code on the receiver.</string>
+    <string name="smart_err_self_pairing">Cannot pair a device with itself. Scan the QR code displayed on a different ShareFlow device.</string>
+    <string name="smart_err_auth_failed">Mutual ECDSA/AES-256-GCM authentication failed. Verify the receiver session is still open and retry.</string>
+    <string name="smart_err_receiver_disconnected">The receiving device disconnected or closed its temporary network.</string>
+    <string name="smart_err_app_backgrounded">Connection paused because ShareFlow moved to the background. Tap Retry to resume.</string>
+    <string name="smart_err_unsupported_hardware">Local-Only Hotspot or Wi-Fi Direct is unavailable on this device hardware. Use a shared Wi-Fi network instead.</string>
+    <string name="smart_err_session_expired">The temporary pairing session timed out before a peer connected. Tap Regenerate QR to continue.</string>
+    <string name="smart_err_unknown">An unexpected connection error occurred. Check Connection Diagnostics for details.</string>
+
+    <!-- Phase 6: Advanced QR Scanner -->
+    <string name="smart_scanner_torch_on">Flash On</string>
+    <string name="smart_scanner_torch_off">Flash Off</string>
+    <string name="smart_scanner_cd_toggle_torch">Toggle camera flashlight</string>
+    <string name="smart_scanner_tap_to_focus_hint">Align QR inside frame • Tap to focus</string>
+    <string name="smart_scanner_auto_zoom_badge">Auto-Zoom %1$.1fx</string>
+    <string name="smart_scanner_import_gallery">Import QR from Gallery</string>
+    <string name="smart_scanner_gallery_decoding">Decoding QR from image…</string>
+    <string name="smart_scanner_gallery_no_qr">No valid QR code was detected in the selected image.</string>
+    <string name="smart_scanner_gallery_error">Unable to read the selected image.</string>
+    <string name="smart_scanner_state_scanning">Scanning for ShareFlow QR</string>
+    <string name="smart_scanner_state_loading">Verifying &amp; Connecting…</string>
+    <string name="smart_scanner_state_success">Verified &amp; Connected</string>
+    <string name="smart_scanner_state_invalid">Invalid QR Code</string>
+    <string name="smart_scanner_state_expired">Expired QR Code</string>
+    <string name="smart_scanner_state_failure">Connection Failed</string>
+    <string name="smart_scanner_manual_code_label">Manual Pairing Code or ShareFlow URI</string>
+    <string name="smart_scanner_manual_code_placeholder">SF3-… or shareflow://pair?v=3…</string>
+
+    <!-- Phase 7: Receive & QR Pairing UI -->
+    <string name="smart_receive_hotspot_desc">Create a temporary local hotspot so senders join automatically via QR without mobile data.</string>
+    <string name="smart_receive_preparing_title">Preparing Temporary Network &amp; Server</string>
+    <string name="smart_receive_preparing_body">ShareFlow will display the signed QR code once Android confirms the local hotspot and TCP server are listening.</string>
+    <string name="smart_receive_qr_ready_title">Signed Smart QR Ready</string>
+    <string name="smart_receive_qr_ready_subtitle">Scan from the sending device to join automatically and establish an AES-256-GCM session.</string>
+    <string name="smart_receive_network_ready_badge">Network Ready</string>
+    <string name="smart_receive_share_qr_action">Share QR Image</string>
+    <string name="smart_receive_share_qr_chooser">Share ShareFlow QR Code</string>
+    <string name="smart_receive_share_qr_error">Could not generate shareable QR image.</string>
+    <string name="smart_receive_copy_link_action">Copy Pairing Link</string>
+    <string name="smart_receive_copy_code_action">Copy Manual Code</string>
+    <string name="smart_receive_code_copied_toast">Manual pairing code copied.</string>
+    <string name="smart_receive_manual_code_label">Manual Pairing Code</string>
+    <string name="smart_receive_cancel_action">Cancel Receiving</string>
+    <string name="smart_receive_regenerate_action">Refresh QR Session</string>
+    <string name="smart_receive_grant_wifi_permissions">Grant Nearby Wi-Fi Permissions</string>
+    <string name="smart_receive_diagnostics_action">Diagnostics</string>
+    <string name="smart_receive_cd_diagnostics">Open Connection Diagnostics</string>
+    <string name="smart_receive_error_title">Connection Issue</string>
+    <string name="smart_receive_retry_action">Retry</string>
+    <string name="smart_receive_dismiss_action">Dismiss</string>
+    <string name="smart_sender_progress_title">Smart Connection Progress</string>
+    <string name="smart_sender_step_qr">1. Verify Signed QR</string>
+    <string name="smart_sender_step_wifi">2. Join Receiver Wi-Fi</string>
+    <string name="smart_sender_step_discover">3. Discover Receiver Service</string>
+    <string name="smart_sender_step_auth">4. Authenticate Encrypted Channel</string>
+    <string name="smart_sender_cancel_action">Cancel Connection</string>
+
+    <!-- Phase 8: Connection Diagnostics -->
+    <string name="diag_title">Connection Diagnostics</string>
+    <string name="diag_subtitle">Live wireless transport, hotspot, discovery, and encryption status. Passwords and tokens are never shown.</string>
+    <string name="diag_section_device">Device &amp; Runtime</string>
+    <string name="diag_section_transport">Transport &amp; Network Binding</string>
+    <string name="diag_section_session">Server, Discovery &amp; Security</string>
+    <string name="diag_label_android_version">Android Version</string>
+    <string name="diag_label_device_model">Device Model</string>
+    <string name="diag_label_strategy">Connection Strategy</string>
+    <string name="diag_label_phase">Connection Phase</string>
+    <string name="diag_label_hotspot_state">Hotspot State</string>
+    <string name="diag_label_ssid_status">SSID Availability</string>
+    <string name="diag_label_network_id">Active Network ID</string>
+    <string name="diag_label_local_ip">Local IP Address</string>
+    <string name="diag_label_remote_ip">Remote Peer IP</string>
+    <string name="diag_label_interface">Network Interface</string>
+    <string name="diag_label_server_port">TCP Server Port</string>
+    <string name="diag_label_server_listening">Server Listening</string>
+    <string name="diag_label_discovery_status">NSD / UDP Discovery</string>
+    <string name="diag_label_qr_expiry">QR Session Expiration</string>
+    <string name="diag_label_auth_status">Authentication Status</string>
+    <string name="diag_label_last_error">Last Error</string>
+    <string name="diag_label_test_result">Connection Test Result</string>
+    <string name="diag_action_test">Test Connection</string>
+    <string name="diag_action_testing">Testing…</string>
+    <string name="diag_action_refresh">Refresh Snapshot</string>
+    <string name="diag_action_copy_report">Copy Redacted Report</string>
+    <string name="diag_report_copied">Redacted diagnostics report copied to clipboard.</string>
+    <string name="diag_privacy_notice">Hotspot passphrases, single-use pairing tokens, and private keys are strictly omitted from diagnostics and logs.</string>
+    <string name="diag_value_yes">Yes</string>
+    <string name="diag_value_no">No</string>
+    <string name="diag_value_na">N/A</string>
+    <string name="diag_value_none">None</string>
+    <string name="diag_value_not_run">Not run yet</string>
+    <string name="diag_value_ssid_available">Available (%1$s)</string>
+    <string name="diag_value_ssid_unavailable">Unavailable</string>
+    <string name="module_connection_diagnostics_title">Connection Diagnostics</string>
+    <string name="module_connection_diagnostics_desc">Inspect local hotspot, bound Wi-Fi network, NSD/UDP discovery, and test encrypted connectivity.</string>
 </resources>
+

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
@@ -205,6 +206,18 @@ fun ToolsScreen(
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.QR_SCANNER) },
                     testTag = "tools_card_qr_scanner"
+                )
+            }
+
+            item(key = "tool_connection_diagnostics") {
+                ModuleDirectoryCard(
+                    title = stringResource(R.string.module_connection_diagnostics_title),
+                    description = stringResource(R.string.module_connection_diagnostics_desc),
+                    icon = Icons.Filled.NetworkCheck,
+                    statusLabel = stringResource(R.string.status_ready),
+                    isReady = true,
+                    onClick = { onNavigateToRoute(ShareFlowRoutes.CONNECTION_DIAGNOSTICS) },
+                    testTag = "tools_card_connection_diagnostics"
                 )
             }
 

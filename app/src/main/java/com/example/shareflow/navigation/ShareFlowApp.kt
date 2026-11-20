@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -36,7 +37,9 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.AppSettings
 import com.example.shareflow.domain.model.ShareFlowModuleId
+import com.example.shareflow.domain.model.TransferState
 import com.example.shareflow.ui.apps.AppSharingScreen
+import com.example.shareflow.ui.discovery.ConnectionDiagnosticsScreen
 import com.example.shareflow.ui.files.FileCategoryDetailScreen
 import com.example.shareflow.ui.files.FilesHubCategory
 import com.example.shareflow.ui.files.FilesScreen
@@ -78,11 +81,22 @@ fun ShareFlowApp(
     val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    val activeTransferSessions by container.transferManager.activeSessions
+        .collectAsStateWithLifecycle()
+
+    LaunchedEffect(activeTransferSessions) {
+        val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
+        container.smartConnectionCoordinator.notifyTransferActivity(isTransferring)
+    }
+
     DisposableEffect(lifecycleOwner, container) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    approvalScope.launch { container.vaultManager.onAppBackgrounded() }
+                    approvalScope.launch {
+                        container.vaultManager.onAppBackgrounded()
+                        container.smartConnectionCoordinator.onAppBackgrounded()
+                    }
                 }
                 Lifecycle.Event.ON_START -> {
                     approvalScope.launch { container.vaultManager.checkAutoLock() }
@@ -265,11 +279,18 @@ private fun ShareFlowNavHost(
             ReceiveScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) },
-                onOpenTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) }
+                onOpenTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) },
+                onOpenDiagnostics = { navigateToRoute(ShareFlowRoutes.CONNECTION_DIAGNOSTICS) }
             )
         }
         composable(route = ShareFlowRoutes.QR_PAIRING) {
             QrPairingScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenDiagnostics = { navigateToRoute(ShareFlowRoutes.CONNECTION_DIAGNOSTICS) }
+            )
+        }
+        composable(route = ShareFlowRoutes.CONNECTION_DIAGNOSTICS) {
+            ConnectionDiagnosticsScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -387,7 +408,8 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.QR_SCANNER) {
             QrScannerScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onOpenFullQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) }
+                onOpenFullQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) },
+                onOpenDiagnostics = { navigateToRoute(ShareFlowRoutes.CONNECTION_DIAGNOSTICS) }
             )
         }
 

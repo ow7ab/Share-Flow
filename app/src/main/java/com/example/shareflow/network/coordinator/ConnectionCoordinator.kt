@@ -15,6 +15,7 @@ import com.example.shareflow.domain.model.LocalHotspotInfo
 import com.example.shareflow.domain.model.PairingPayload
 import com.example.shareflow.domain.model.PeerConnectionStatus
 import com.example.shareflow.domain.model.PeerDevice
+import com.example.shareflow.domain.model.SmartQrPairingPayload
 import com.example.shareflow.domain.model.StrategyAvailability
 import com.example.shareflow.domain.model.StrategyStatus
 import com.example.shareflow.domain.repository.SettingsRepository
@@ -205,6 +206,12 @@ class DefaultConnectionCoordinator(
     private var serverAcceptJob: Job? = null
     private var activeServerSocket: ServerSocket? = null
     private var advertisedDeviceName: String = "ShareFlow"
+    @Volatile
+    private var smartHandshakeStartListener: (() -> Unit)? = null
+    @Volatile
+    private var smartHandshakeCompleteListener: ((AppResult<ConnectionState.Connected>) -> Unit)? = null
+    @Volatile
+    private var smartSessionAutoApproveValidQrToken: Boolean = false
 
     init {
         observeTrustedDevices()
@@ -611,6 +618,7 @@ class DefaultConnectionCoordinator(
     }
 
     private suspend fun handleIncomingSocket(socket: Socket, localDisplayName: String) {
+        smartHandshakeStartListener?.invoke()
         val currentSettings = runCatching { settingsRepository.settings.first() }.getOrNull()
         val autoAcceptTrusted = currentSettings?.autoAcceptTrustedDevices == true
         var shouldRememberTrusted = false
@@ -623,7 +631,10 @@ class DefaultConnectionCoordinator(
                 isCryptographicallyTrusted(deviceId, fingerprint)
             },
             approvalCallback = { request ->
-                if (request.isPreviouslyTrusted && autoAcceptTrusted) {
+                if (request.hasValidQrToken && smartSessionAutoApproveValidQrToken) {
+                    // Explicit receiver action ("Start Smart Receiving") + cryptographically verified single-use QR token
+                    true
+                } else if (request.isPreviouslyTrusted && autoAcceptTrusted) {
                     true
                 } else {
                     val decisionDeferred = CompletableDeferred<Pair<Boolean, Boolean>>()
@@ -664,7 +675,7 @@ class DefaultConnectionCoordinator(
                     connectionStatus = PeerConnectionStatus.CONNECTED
                 )
                 updatePeerStatus(connectedPeer.deviceId, PeerConnectionStatus.CONNECTED)
-                _connectionState.value = ConnectionState.Connected(
+                val connectedState = ConnectionState.Connected(
                     peer = connectedPeer,
                     sessionId = channel.sessionId,
                     sasVerificationCode = channel.sasVerificationCode,
@@ -672,12 +683,168 @@ class DefaultConnectionCoordinator(
                     transport = connectedPeer.connectionType,
                     isInitiator = false
                 )
+                _connectionState.value = connectedState
+                smartHandshakeCompleteListener?.invoke(AppResult.Success(connectedState))
             }
 
             is AppResult.Failure -> {
-                // Unauthorized or declined peer was rejected cleanly; keep advertising listener active
+                smartHandshakeCompleteListener?.invoke(result)
             }
         }
+    }
+
+    /**
+     * Phase 2 hook: Opens and verifies a real TCP transfer server socket for Smart Hotspot receiving.
+     * Automatically falls back to an OS-assigned ephemeral port (0) on port conflict.
+     */
+    suspend fun openTcpServerForSmartSession(
+        deviceName: String,
+        preferredPort: Int,
+        onIncomingHandshakeStart: () -> Unit,
+        onIncomingHandshakeComplete: (AppResult<ConnectionState.Connected>) -> Unit
+    ): AppResult<Pair<Int, Boolean>> = withContext(dispatchers.io) {
+        connectionMutex.withLock {
+            stopAdvertisingInternal()
+            val sanitizedName = deviceName.trim().ifBlank { "ShareFlow" }
+            advertisedDeviceName = sanitizedName
+            smartHandshakeStartListener = onIncomingHandshakeStart
+            smartHandshakeCompleteListener = onIncomingHandshakeComplete
+            smartSessionAutoApproveValidQrToken = true
+
+            var usedFallbackPort = false
+            val serverSocket = try {
+                ServerSocket().apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress(preferredPort))
+                }
+            } catch (_: Throwable) {
+                usedFallbackPort = true
+                try {
+                    ServerSocket().apply {
+                        reuseAddress = true
+                        bind(InetSocketAddress(0))
+                    }
+                } catch (t: Throwable) {
+                    return@withLock AppResult.Failure(
+                        AppError.Network("Failed to bind ShareFlow TCP server socket: ${t.message ?: "unknown"}", t)
+                    )
+                }
+            }
+
+            if (serverSocket.isClosed || !serverSocket.isBound) {
+                runCatching { serverSocket.close() }
+                return@withLock AppResult.Failure(AppError.Network("TCP server socket failed bind verification"))
+            }
+
+            val boundPort = serverSocket.localPort
+            activeServerSocket = serverSocket
+            _advertisedPort.value = boundPort
+            _isAdvertising.value = true
+            _connectionState.value = ConnectionState.Advertising(localDeviceName = sanitizedName, port = boundPort)
+
+            serverAcceptJob = scope.launch(dispatchers.io) {
+                acceptIncomingLoop(serverSocket, sanitizedName)
+            }
+
+            AppResult.Success(boundPort to usedFallbackPort)
+        }
+    }
+
+    fun registerSmartPairingSession(payload: SmartQrPairingPayload) {
+        val compatPayload = PairingPayload(
+            protocolVersion = payload.protocolVersion,
+            sessionId = payload.sessionId,
+            deviceId = payload.deviceId,
+            displayName = payload.displayName,
+            publicKeyFingerprint = payload.publicKeyFingerprint,
+            pairingToken = payload.pairingToken,
+            createdAtEpochMillis = payload.createdAtEpochMillis,
+            expiresAtEpochMillis = payload.expiresAtEpochMillis,
+            hostAddress = payload.hostAddressHint,
+            port = payload.servicePort,
+            preferredConnectionType = ConnectionType.HOTSPOT,
+            hotspotSsid = payload.ssid,
+            hotspotPassphrase = payload.passphrase
+        )
+        pairingTokenManager.registerExternalPairingSession(compatPayload)
+    }
+
+    fun invalidateSmartPairingSession(sessionId: String) {
+        pairingTokenManager.invalidateSession(sessionId)
+    }
+
+    /**
+     * Phase 3 + 10 hook: Performs full mutual ECDSA/ECDH/AES-256-GCM authentication on a TCP socket
+     * that is ALREADY explicitly bound to the Android Wi-Fi [android.net.Network] object.
+     */
+    suspend fun authenticateOnBoundSocket(
+        socket: Socket,
+        peer: PeerDevice,
+        localDeviceName: String,
+        sessionId: String,
+        pairingToken: String,
+        expectedFingerprint: String,
+        transport: ConnectionType
+    ): AppResult<ConnectionState.Connected> = withContext(dispatchers.io) {
+        connectionMutex.withLock {
+            _connectionState.value = ConnectionState.Connecting(peer)
+            val handshake = handshakeProtocol.performClientHandshake(
+                socket = socket,
+                localDisplayName = localDeviceName,
+                targetTransport = transport,
+                sessionId = sessionId,
+                pairingToken = pairingToken,
+                expectedServerFingerprint = expectedFingerprint
+            )
+
+            when (handshake) {
+                is AppResult.Failure -> {
+                    runCatching { socket.close() }
+                    _connectionState.value = ConnectionState.Error(handshake.error.message)
+                    handshake
+                }
+
+                is AppResult.Success -> {
+                    val channel = handshake.data
+                    activeChannel?.close()
+                    activeChannel = channel
+                    val connectedPeer = channel.remotePeer.copy(
+                        connectionType = transport,
+                        hostAddress = peer.hostAddress ?: channel.remotePeer.hostAddress,
+                        port = peer.port ?: channel.remotePeer.port,
+                        hotspotSsid = peer.hotspotSsid,
+                        isTrusted = isCryptographicallyTrusted(
+                            channel.remotePeer.deviceId,
+                            channel.remotePeer.publicKeyFingerprint
+                        ),
+                        connectionStatus = PeerConnectionStatus.CONNECTED
+                    )
+                    updatePeerStatus(connectedPeer.deviceId, PeerConnectionStatus.CONNECTED)
+                    val connectedState = ConnectionState.Connected(
+                        peer = connectedPeer,
+                        sessionId = channel.sessionId,
+                        sasVerificationCode = channel.sasVerificationCode,
+                        isEncrypted = true,
+                        transport = transport,
+                        isInitiator = true
+                    )
+                    _connectionState.value = connectedState
+                    AppResult.Success(connectedState)
+                }
+            }
+        }
+    }
+
+    fun isTcpServerListening(): Boolean =
+        activeServerSocket?.let { it.isBound && !it.isClosed } == true
+
+    fun currentServerPort(): Int? =
+        activeServerSocket?.takeIf { it.isBound && !it.isClosed }?.localPort
+
+    fun clearSmartListeners() {
+        smartHandshakeStartListener = null
+        smartHandshakeCompleteListener = null
+        smartSessionAutoApproveValidQrToken = false
     }
 
     private fun observeTrustedDevices() {

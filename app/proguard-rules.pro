@@ -25,9 +25,11 @@
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**
 
-# Keep AndroidX Biometric and CameraX components
+# Keep AndroidX Biometric, CameraX, and ML Kit Barcode Scanning components
 -keep class androidx.biometric.** { *; }
 -keep class androidx.camera.** { *; }
+-keep class com.google.mlkit.vision.barcode.** { *; }
+-dontwarn com.google.mlkit.vision.barcode.**
 
 # Defense-in-depth: Strip verbose/debug Android log calls in release builds
 -assumenosideeffects class android.util.Log {

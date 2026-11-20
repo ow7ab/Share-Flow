@@ -46,6 +46,7 @@ paging = "3.3.6"
 zxingCore = "3.5.3"
 biometric = "1.1.0"
 fragmentKtx = "1.8.6"
+mlkitBarcodeScanning = "17.3.0"
 
 
 [libraries]
@@ -109,6 +110,7 @@ androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", ve
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
 
 
 [plugins]
