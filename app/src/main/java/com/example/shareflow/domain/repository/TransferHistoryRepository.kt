@@ -14,5 +14,6 @@ interface TransferHistoryRepository {
     fun observeTotalCount(): Flow<Int>
     suspend fun upsertRecord(record: TransferRecord): AppResult<Unit>
     suspend fun deleteRecordById(recordId: String): AppResult<Unit>
+    suspend fun pruneRecordsOlderThan(cutoffEpochMillis: Long): AppResult<Int> = AppResult.Success(0)
     suspend fun clearAllRecords(): AppResult<Unit>
 }

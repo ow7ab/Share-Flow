@@ -98,7 +98,23 @@ data class VaultItemEntity(
     @ColumnInfo(name = "key_alias")
     val keyAlias: String,
     @ColumnInfo(name = "created_at_epoch_millis")
-    val createdAtEpochMillis: Long
+    val createdAtEpochMillis: Long,
+    @ColumnInfo(name = "category", defaultValue = "'DOCUMENTS'")
+    val category: String = "DOCUMENTS",
+    @ColumnInfo(name = "encrypted_metadata_b64", defaultValue = "''")
+    val encryptedMetadataB64: String = "",
+    @ColumnInfo(name = "metadata_iv_b64", defaultValue = "''")
+    val metadataIvB64: String = "",
+    @ColumnInfo(name = "wrapped_dek_b64", defaultValue = "''")
+    val wrappedDekB64: String = "",
+    @ColumnInfo(name = "dek_iv_b64", defaultValue = "''")
+    val dekIvB64: String = "",
+    @ColumnInfo(name = "file_nonce_prefix_b64", defaultValue = "''")
+    val fileNoncePrefixB64: String = "",
+    @ColumnInfo(name = "encrypted_size_bytes", defaultValue = "0")
+    val encryptedSizeBytes: Long = 0L,
+    @ColumnInfo(name = "chunk_count", defaultValue = "0")
+    val chunkCount: Int = 0
 )
 
 fun TransferHistoryEntity.toDomain(): TransferRecord = TransferRecord(

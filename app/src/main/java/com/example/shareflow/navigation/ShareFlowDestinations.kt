@@ -54,6 +54,17 @@ object ShareFlowRoutes {
     const val TRANSFER_HISTORY = "transfer_history"
     const val TRANSFER_PROGRESS = "transfer_progress"
     const val APPLICATION_SHARING = "application_sharing"
+    const val IMAGE_GALLERY = "image_gallery"
+    const val VIDEO_PLAYER = "video_player"
+    const val MUSIC_PLAYER = "music_player"
+    const val PRIVATE_VAULT = "private_vault"
+    const val PHONE_MIGRATION = "phone_migration"
+    const val DUPLICATE_FINDER = "duplicate_finder"
+    const val LARGE_FILES = "large_files"
+    const val COMPRESSION = "compression"
+    const val RECENT_FILES = "recent_files"
+    const val FAVORITES = "favorites"
+    const val QR_SCANNER = "qr_scanner"
 
     const val FILE_CATEGORY_PATTERN = "file_category/{category}"
     const val MODULE_DETAIL_PATTERN = "module_foundation/{moduleId}"
@@ -177,8 +188,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.PHONE_MIGRATION,
                 category = ModuleCategory.TRANSFER,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.PHONE_MIGRATION)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.PHONE_MIGRATION
             ),
             titleRes = R.string.module_phone_migration_title,
             descriptionRes = R.string.module_phone_migration_desc,
@@ -221,8 +232,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.FILE_COMPRESSION,
                 category = ModuleCategory.FILES_AND_UTILITIES,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.FILE_COMPRESSION)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.COMPRESSION
             ),
             titleRes = R.string.module_file_compression_title,
             descriptionRes = R.string.module_file_compression_desc,
@@ -232,8 +243,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.DUPLICATE_FINDER,
                 category = ModuleCategory.FILES_AND_UTILITIES,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.DUPLICATE_FINDER)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.DUPLICATE_FINDER
             ),
             titleRes = R.string.module_duplicate_finder_title,
             descriptionRes = R.string.module_duplicate_finder_desc,
@@ -243,8 +254,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.PRIVATE_VAULT,
                 category = ModuleCategory.PRIVACY_AND_SYSTEM,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.PRIVATE_VAULT)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.PRIVATE_VAULT
             ),
             titleRes = R.string.module_private_vault_title,
             descriptionRes = R.string.module_private_vault_desc,
@@ -254,8 +265,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.IMAGE_GALLERY,
                 category = ModuleCategory.MEDIA,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.IMAGE_GALLERY)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.IMAGE_GALLERY
             ),
             titleRes = R.string.module_image_gallery_title,
             descriptionRes = R.string.module_image_gallery_desc,
@@ -265,8 +276,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.VIDEO_PLAYER,
                 category = ModuleCategory.MEDIA,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.VIDEO_PLAYER)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.VIDEO_PLAYER
             ),
             titleRes = R.string.module_video_player_title,
             descriptionRes = R.string.module_video_player_desc,
@@ -276,8 +287,8 @@ object ShareFlowModuleCatalog {
             descriptor = ShareFlowModuleDescriptor(
                 id = ShareFlowModuleId.MUSIC_PLAYER,
                 category = ModuleCategory.MEDIA,
-                readiness = ModuleReadiness.FOUNDATION_SCAFFOLDED,
-                route = ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.MUSIC_PLAYER)
+                readiness = ModuleReadiness.READY,
+                route = ShareFlowRoutes.MUSIC_PLAYER
             ),
             titleRes = R.string.module_music_player_title,
             descriptionRes = R.string.module_music_player_desc,

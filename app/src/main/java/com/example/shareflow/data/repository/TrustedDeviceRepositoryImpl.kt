@@ -46,4 +46,14 @@ class TrustedDeviceRepositoryImpl(
                 onFailure = { AppResult.Failure(AppError.Storage("Failed to revoke trusted device", it)) }
             )
         }
+
+    override suspend fun clearAllTrustedDevices(): AppResult<Unit> =
+        withContext(dispatchers.io) {
+            runCatching {
+                dao.deleteAll()
+            }.fold(
+                onSuccess = { AppResult.Success(Unit) },
+                onFailure = { AppResult.Failure(AppError.Storage("Failed to revoke all trusted devices", it)) }
+            )
+        }
 }

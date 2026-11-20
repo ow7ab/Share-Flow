@@ -4,6 +4,10 @@ import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.AppSettings
+import com.example.shareflow.domain.model.DiscoveryVisibility
+import com.example.shareflow.domain.model.FileOverwritePolicy
+import com.example.shareflow.domain.model.HistoryRetentionPolicy
+import com.example.shareflow.domain.model.PreferredConnectionMode
 import com.example.shareflow.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 
@@ -24,5 +28,12 @@ interface SettingsRepository {
     suspend fun updateVerifySha256AfterTransfer(enabled: Boolean): AppResult<Unit>
     suspend fun updateAutoAcceptTrustedDevices(enabled: Boolean): AppResult<Unit>
     suspend fun updateRequireVaultAuthentication(enabled: Boolean): AppResult<Unit>
+    suspend fun updateMaxConcurrentTransfers(count: Int): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateFileOverwritePolicy(policy: FileOverwritePolicy): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateTransferNotificationsEnabled(enabled: Boolean): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateHistoryRetentionPolicy(policy: HistoryRetentionPolicy): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateDiscoveryVisibility(visibility: DiscoveryVisibility): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updatePreferredConnectionMode(mode: PreferredConnectionMode): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateBiometricUnlockPreferred(enabled: Boolean): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun resetToDefaults(): AppResult<Unit>
 }

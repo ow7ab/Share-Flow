@@ -214,9 +214,13 @@ class ShareFlowDatabaseTest {
         v1Helper.writableDatabase.close()
         v1Helper.close()
 
-        // Open with Room v2 + MIGRATION_1_2 (without destructive migration)
+        // Open with Room v4 + MIGRATION_1_2, MIGRATION_2_3 & MIGRATION_3_4 (without destructive migration)
         val migratedDb = Room.databaseBuilder(context, ShareFlowDatabase::class.java, dbName)
-            .addMigrations(ShareFlowDatabase.MIGRATION_1_2)
+            .addMigrations(
+                ShareFlowDatabase.MIGRATION_1_2,
+                ShareFlowDatabase.MIGRATION_2_3,
+                ShareFlowDatabase.MIGRATION_3_4
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -231,8 +235,12 @@ class ShareFlowDatabaseTest {
             val preservedPeer = trustedRepo.getTrustedDevice("peer-legacy")
             assertEquals("Old Phone", preservedPeer?.displayName)
 
-            // Verify newly created v2 tables are operational
+            // Verify newly created v2, v3 & v4 tables are operational
             assertTrue(migratedDb.transferSessionDao().getIncompleteSessions().isEmpty())
+            assertTrue(migratedDb.mediaPlaybackDao().getAll().isEmpty())
+            assertNull(migratedDb.vaultConfigDao().getConfig())
+            assertTrue(migratedDb.favoriteFileDao().observeAll().first().isEmpty())
+            assertTrue(migratedDb.storageSnapshotDao().getRecent().isEmpty())
         } finally {
             migratedDb.close()
             context.deleteDatabase(dbName)

@@ -55,8 +55,18 @@ import com.example.shareflow.network.transfer.TransferQueue
 import com.example.shareflow.network.transfer.TransferReceiver
 import com.example.shareflow.network.transfer.TransferRecoveryManager
 import com.example.shareflow.network.transfer.TransferScheduler
+import com.example.shareflow.media.MediaCenterRepository
+import com.example.shareflow.media.music.MusicPlaybackController
 import com.example.shareflow.network.transfer.TransferSender
 import com.example.shareflow.network.transfer.TransferVerifier
+import com.example.shareflow.migration.ContactsMigrationExporter
+import com.example.shareflow.utilities.DuplicateFileFinderEngine
+import com.example.shareflow.utilities.UtilitiesRepository
+import com.example.shareflow.utilities.ZipArchiveEngine
+import com.example.shareflow.vault.AndroidVaultKeystoreProvider
+import com.example.shareflow.vault.VaultCryptoEngine
+import com.example.shareflow.vault.VaultKeystoreProvider
+import com.example.shareflow.vault.VaultManager
 
 /**
  * Constructor-injected Dependency Injection graph for ShareFlow.
@@ -87,6 +97,15 @@ interface AppContainer {
     val transferVerifier: TransferVerifier
     val transferRecoveryManager: TransferRecoveryManager
     val transferManager: TransferManager
+    val mediaCenterRepository: MediaCenterRepository
+    val musicPlaybackController: MusicPlaybackController
+    val vaultCryptoEngine: VaultCryptoEngine
+    val vaultKeystoreProvider: VaultKeystoreProvider
+    val vaultManager: VaultManager
+    val duplicateFileFinderEngine: DuplicateFileFinderEngine
+    val zipArchiveEngine: ZipArchiveEngine
+    val utilitiesRepository: UtilitiesRepository
+    val contactsMigrationExporter: ContactsMigrationExporter
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -260,6 +279,82 @@ class DefaultAppContainer(context: Context) : AppContainer {
             destinationRootProvider = { ChunkProcessor.defaultReceiveRoot(appContext) },
             dispatchers = dispatchers,
             clock = clock
+        )
+    }
+
+    override val mediaCenterRepository: MediaCenterRepository by lazy {
+        MediaCenterRepository(
+            context = appContext,
+            fileManagerRepository = fileManagerRepository,
+            mediaPlaybackDao = database.mediaPlaybackDao(),
+            musicPlaylistDao = database.musicPlaylistDao(),
+            dispatchers = dispatchers,
+            clock = clock
+        )
+    }
+
+    override val musicPlaybackController: MusicPlaybackController by lazy {
+        MusicPlaybackController(
+            context = appContext,
+            mediaCenterRepository = mediaCenterRepository,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val vaultCryptoEngine: VaultCryptoEngine by lazy {
+        VaultCryptoEngine()
+    }
+
+    override val vaultKeystoreProvider: VaultKeystoreProvider by lazy {
+        AndroidVaultKeystoreProvider()
+    }
+
+    override val vaultManager: VaultManager by lazy {
+        VaultManager(
+            context = appContext,
+            vaultConfigDao = database.vaultConfigDao(),
+            vaultItemDao = database.vaultItemDao(),
+            cryptoEngine = vaultCryptoEngine,
+            keystoreProvider = vaultKeystoreProvider,
+            dispatchers = dispatchers,
+            clock = clock
+        )
+    }
+
+    override val duplicateFileFinderEngine: DuplicateFileFinderEngine by lazy {
+        DuplicateFileFinderEngine(
+            context = appContext,
+            fileManagerRepository = fileManagerRepository,
+            checksumVerifier = checksumVerifier,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val zipArchiveEngine: ZipArchiveEngine by lazy {
+        ZipArchiveEngine(
+            context = appContext,
+            checksumVerifier = checksumVerifier,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val utilitiesRepository: UtilitiesRepository by lazy {
+        UtilitiesRepository(
+            context = appContext,
+            storageAnalyzerRepository = storageAnalyzerRepository,
+            fileManagerRepository = fileManagerRepository,
+            favoriteFileDao = database.favoriteFileDao(),
+            storageSnapshotDao = database.storageSnapshotDao(),
+            dispatchers = dispatchers,
+            clock = clock
+        )
+    }
+
+    override val contactsMigrationExporter: ContactsMigrationExporter by lazy {
+        ContactsMigrationExporter(
+            context = appContext,
+            checksumVerifier = checksumVerifier,
+            dispatchers = dispatchers
         )
     }
 }

@@ -58,11 +58,9 @@ fun MediaScreen(
                     title = stringResource(R.string.media_photos_title),
                     description = stringResource(R.string.media_photos_desc),
                     icon = Icons.Filled.PhotoLibrary,
-                    statusLabel = stringResource(R.string.status_scaffolded),
-                    isReady = false,
-                    onClick = {
-                        onNavigateToRoute(ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.IMAGE_GALLERY))
-                    },
+                    statusLabel = stringResource(R.string.status_ready),
+                    isReady = true,
+                    onClick = { onNavigateToRoute(ShareFlowRoutes.IMAGE_GALLERY) },
                     testTag = "media_card_photos"
                 )
             }
@@ -72,11 +70,9 @@ fun MediaScreen(
                     title = stringResource(R.string.media_videos_title),
                     description = stringResource(R.string.media_videos_desc),
                     icon = Icons.Filled.PlayCircle,
-                    statusLabel = stringResource(R.string.status_scaffolded),
-                    isReady = false,
-                    onClick = {
-                        onNavigateToRoute(ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.VIDEO_PLAYER))
-                    },
+                    statusLabel = stringResource(R.string.status_ready),
+                    isReady = true,
+                    onClick = { onNavigateToRoute(ShareFlowRoutes.VIDEO_PLAYER) },
                     testTag = "media_card_videos"
                 )
             }
@@ -86,11 +82,9 @@ fun MediaScreen(
                     title = stringResource(R.string.media_music_title),
                     description = stringResource(R.string.media_music_desc),
                     icon = Icons.Filled.LibraryMusic,
-                    statusLabel = stringResource(R.string.status_scaffolded),
-                    isReady = false,
-                    onClick = {
-                        onNavigateToRoute(ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.MUSIC_PLAYER))
-                    },
+                    statusLabel = stringResource(R.string.status_ready),
+                    isReady = true,
+                    onClick = { onNavigateToRoute(ShareFlowRoutes.MUSIC_PLAYER) },
                     testTag = "media_card_music"
                 )
             }

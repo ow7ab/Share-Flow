@@ -4,13 +4,17 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
-import com.example.shareflow.data.local.preferences.SettingsPreferenceKeys
 import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.core.common.DispatcherProvider
+import com.example.shareflow.data.local.preferences.SettingsPreferenceKeys
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.AppSettings
+import com.example.shareflow.domain.model.DiscoveryVisibility
+import com.example.shareflow.domain.model.FileOverwritePolicy
+import com.example.shareflow.domain.model.HistoryRetentionPolicy
+import com.example.shareflow.domain.model.PreferredConnectionMode
 import com.example.shareflow.domain.model.SettingsValidator
 import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.domain.repository.SettingsRepository
@@ -58,6 +62,26 @@ class SettingsRepositoryImpl(
                 ?.takeIf { SettingsValidator.isValidTransferPort(it) }
                 ?: AppSettings.DEFAULT_TRANSFER_PORT
 
+            val storedConcurrent = prefs[SettingsPreferenceKeys.MAX_CONCURRENT_TRANSFERS]
+                ?.takeIf { SettingsValidator.isValidConcurrentTransfers(it) }
+                ?: AppSettings.DEFAULT_CONCURRENT_TRANSFERS
+
+            val storedOverwrite = prefs[SettingsPreferenceKeys.FILE_OVERWRITE_POLICY]
+                ?.let { raw -> runCatching { FileOverwritePolicy.valueOf(raw) }.getOrNull() }
+                ?: FileOverwritePolicy.KEEP_BOTH_RENAME
+
+            val storedRetention = prefs[SettingsPreferenceKeys.HISTORY_RETENTION_POLICY]
+                ?.let { raw -> runCatching { HistoryRetentionPolicy.valueOf(raw) }.getOrNull() }
+                ?: HistoryRetentionPolicy.DAYS_30
+
+            val storedVisibility = prefs[SettingsPreferenceKeys.DISCOVERY_VISIBILITY]
+                ?.let { raw -> runCatching { DiscoveryVisibility.valueOf(raw) }.getOrNull() }
+                ?: DiscoveryVisibility.EVERYONE_NEARBY
+
+            val storedConnectionMode = prefs[SettingsPreferenceKeys.PREFERRED_CONNECTION_MODE]
+                ?.let { raw -> runCatching { PreferredConnectionMode.valueOf(raw) }.getOrNull() }
+                ?: PreferredConnectionMode.AUTO
+
             AppSettings(
                 deviceName = storedName,
                 themeMode = storedTheme,
@@ -69,7 +93,14 @@ class SettingsRepositoryImpl(
                 preferWifiDirect = prefs[SettingsPreferenceKeys.PREFER_WIFI_DIRECT] ?: true,
                 verifySha256AfterTransfer = prefs[SettingsPreferenceKeys.VERIFY_SHA256] ?: true,
                 autoAcceptTrustedDevices = prefs[SettingsPreferenceKeys.AUTO_ACCEPT_TRUSTED] ?: false,
-                requireVaultAuthentication = prefs[SettingsPreferenceKeys.REQUIRE_VAULT_AUTH] ?: true
+                requireVaultAuthentication = prefs[SettingsPreferenceKeys.REQUIRE_VAULT_AUTH] ?: true,
+                maxConcurrentTransfers = storedConcurrent,
+                fileOverwritePolicy = storedOverwrite,
+                transferNotificationsEnabled = prefs[SettingsPreferenceKeys.TRANSFER_NOTIFICATIONS_ENABLED] ?: true,
+                historyRetentionPolicy = storedRetention,
+                discoveryVisibility = storedVisibility,
+                preferredConnectionMode = storedConnectionMode,
+                biometricUnlockPreferred = prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] ?: true
             )
         }
 
@@ -144,6 +175,49 @@ class SettingsRepositoryImpl(
     override suspend fun updateRequireVaultAuthentication(enabled: Boolean): AppResult<Unit> =
         safeEdit { prefs ->
             prefs[SettingsPreferenceKeys.REQUIRE_VAULT_AUTH] = enabled
+        }
+
+    override suspend fun updateMaxConcurrentTransfers(count: Int): AppResult<Unit> {
+        if (!SettingsValidator.isValidConcurrentTransfers(count)) {
+            return AppResult.Failure(
+                AppError.Validation(
+                    "Concurrent transfers must be between ${AppSettings.MIN_CONCURRENT_TRANSFERS} and ${AppSettings.MAX_CONCURRENT_TRANSFERS}."
+                )
+            )
+        }
+        return safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.MAX_CONCURRENT_TRANSFERS] = count
+        }
+    }
+
+    override suspend fun updateFileOverwritePolicy(policy: FileOverwritePolicy): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.FILE_OVERWRITE_POLICY] = policy.name
+        }
+
+    override suspend fun updateTransferNotificationsEnabled(enabled: Boolean): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.TRANSFER_NOTIFICATIONS_ENABLED] = enabled
+        }
+
+    override suspend fun updateHistoryRetentionPolicy(policy: HistoryRetentionPolicy): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.HISTORY_RETENTION_POLICY] = policy.name
+        }
+
+    override suspend fun updateDiscoveryVisibility(visibility: DiscoveryVisibility): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.DISCOVERY_VISIBILITY] = visibility.name
+        }
+
+    override suspend fun updatePreferredConnectionMode(mode: PreferredConnectionMode): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.PREFERRED_CONNECTION_MODE] = mode.name
+        }
+
+    override suspend fun updateBiometricUnlockPreferred(enabled: Boolean): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] = enabled
         }
 
     override suspend fun resetToDefaults(): AppResult<Unit> = safeEdit { prefs ->

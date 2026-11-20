@@ -13,4 +13,5 @@ interface TrustedDeviceRepository {
     suspend fun getTrustedDevice(deviceId: String): PeerDevice?
     suspend fun saveTrustedDevice(device: PeerDevice): AppResult<Unit>
     suspend fun revokeTrustedDevice(deviceId: String): AppResult<Unit>
+    suspend fun clearAllTrustedDevices(): AppResult<Unit> = AppResult.Success(Unit)
 }

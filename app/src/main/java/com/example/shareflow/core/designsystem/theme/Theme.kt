@@ -1,8 +1,13 @@
 package com.example.shareflow.core.designsystem.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.os.Build
 import android.view.View
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,6 +17,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidedValue
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -21,12 +27,22 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.fragment.app.FragmentActivity
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.ThemeMode
 import java.util.Locale
 
 val LocalShareFlowLocale = staticCompositionLocalOf<Locale> { Locale.US }
+val LocalShareFlowHostActivity = staticCompositionLocalOf<Activity?> { null }
+
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+fun Context.findFragmentActivity(): FragmentActivity? = findActivity() as? FragmentActivity
 
 object ShareFlowDesign {
     val spacing: ShareFlowSpacing
@@ -137,16 +153,29 @@ fun ShareFlowTheme(
         ShareFlowTypography
     }
 
-    CompositionLocalProvider(
-        LocalContext provides localizedContext,
-        LocalConfiguration provides localizedConfig,
-        LocalLayoutDirection provides layoutDirection,
-        LocalShareFlowLocale provides activeLocale,
-        LocalShareFlowSpacing provides ShareFlowSpacing(),
-        LocalShareFlowElevation provides ShareFlowElevation(),
-        LocalShareFlowShapeTokens provides ShareFlowShapeTokens(),
-        LocalShareFlowSemanticColors provides semanticColors
-    ) {
+    val hostActivity = LocalShareFlowHostActivity.current ?: remember(baseContext) { baseContext.findActivity() }
+    val activityResultRegistryOwner = LocalActivityResultRegistryOwner.current
+    val onBackPressedDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
+
+    val providedValues = buildList<ProvidedValue<*>> {
+        add(LocalContext provides localizedContext)
+        add(LocalConfiguration provides localizedConfig)
+        add(LocalLayoutDirection provides layoutDirection)
+        add(LocalShareFlowLocale provides activeLocale)
+        add(LocalShareFlowHostActivity provides hostActivity)
+        add(LocalShareFlowSpacing provides ShareFlowSpacing())
+        add(LocalShareFlowElevation provides ShareFlowElevation())
+        add(LocalShareFlowShapeTokens provides ShareFlowShapeTokens())
+        add(LocalShareFlowSemanticColors provides semanticColors)
+        if (activityResultRegistryOwner != null) {
+            add(LocalActivityResultRegistryOwner provides activityResultRegistryOwner)
+        }
+        if (onBackPressedDispatcherOwner != null) {
+            add(LocalOnBackPressedDispatcherOwner provides onBackPressedDispatcherOwner)
+        }
+    }.toTypedArray()
+
+    CompositionLocalProvider(*providedValues) {
         MaterialTheme(
             colorScheme = animatedColorScheme,
             typography = typography,

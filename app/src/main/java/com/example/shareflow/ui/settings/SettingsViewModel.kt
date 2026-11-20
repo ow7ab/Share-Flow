@@ -3,13 +3,24 @@ package com.example.shareflow.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.shareflow.core.common.AppResult
+import com.example.shareflow.core.common.Clock
+import com.example.shareflow.core.common.SystemClock
 import com.example.shareflow.core.security.KeystoreCipher
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.AppSettings
+import com.example.shareflow.domain.model.DiscoveryVisibility
+import com.example.shareflow.domain.model.FileOverwritePolicy
+import com.example.shareflow.domain.model.HistoryRetentionPolicy
+import com.example.shareflow.domain.model.LocalDeviceIdentity
+import com.example.shareflow.domain.model.PreferredConnectionMode
 import com.example.shareflow.domain.model.SettingsValidator
 import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.domain.repository.SettingsRepository
+import com.example.shareflow.domain.repository.TransferHistoryRepository
+import com.example.shareflow.domain.repository.TrustedDeviceRepository
+import com.example.shareflow.network.security.DeviceIdentityManager
+import com.example.shareflow.utilities.UtilitiesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +31,13 @@ import kotlinx.coroutines.launch
 enum class SettingsFeedbackType {
     DEVICE_NAME_SAVED,
     PORT_SAVED,
-    RESET_DONE
+    RESET_DONE,
+    FOLDER_SAVED,
+    CACHE_CLEARED,
+    HISTORY_CLEARED,
+    HISTORY_PRUNED,
+    FAVORITES_CLEARED,
+    TRUSTED_REVOKED
 }
 
 data class SettingsUiState(
@@ -30,6 +47,9 @@ data class SettingsUiState(
     val deviceNameError: Boolean = false,
     val portError: Boolean = false,
     val isKeystoreAvailable: Boolean = false,
+    val localIdentity: LocalDeviceIdentity? = null,
+    val trustedDeviceCount: Int = 0,
+    val temporaryCacheBytes: Long = 0L,
     val isSaving: Boolean = false,
     val feedbackEvent: SettingsFeedbackType? = null,
     val errorMessage: String? = null
@@ -37,11 +57,19 @@ data class SettingsUiState(
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
-    private val keystoreCipher: KeystoreCipher
+    private val keystoreCipher: KeystoreCipher,
+    private val deviceIdentityManager: DeviceIdentityManager? = null,
+    private val transferHistoryRepository: TransferHistoryRepository? = null,
+    private val trustedDeviceRepository: TrustedDeviceRepository? = null,
+    private val utilitiesRepository: UtilitiesRepository? = null,
+    private val clock: Clock = SystemClock()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        SettingsUiState(isKeystoreAvailable = keystoreCipher.isKeystoreAvailable())
+        SettingsUiState(
+            isKeystoreAvailable = keystoreCipher.isKeystoreAvailable(),
+            localIdentity = runCatching { deviceIdentityManager?.getLocalIdentity() }.getOrNull()
+        )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
@@ -58,6 +86,22 @@ class SettingsViewModel(
                     )
                 }
             }
+        }
+        trustedDeviceRepository?.let { repo ->
+            viewModelScope.launch {
+                repo.observeTrustedCount().collectLatest { count ->
+                    _uiState.update { it.copy(trustedDeviceCount = count) }
+                }
+            }
+        }
+        refreshCacheSize()
+    }
+
+    fun refreshCacheSize() {
+        val utilRepo = utilitiesRepository ?: return
+        viewModelScope.launch {
+            val bytes = utilRepo.computeTemporaryCacheBytes()
+            _uiState.update { it.copy(temporaryCacheBytes = bytes) }
         }
     }
 
@@ -140,51 +184,144 @@ class SettingsViewModel(
         }
     }
 
-    fun onThemeModeSelected(mode: ThemeMode) {
+    fun onDefaultSaveDirectorySelected(uriString: String?) {
         viewModelScope.launch {
-            settingsRepository.updateThemeMode(mode)
+            when (val res = settingsRepository.updateDefaultSaveDirectoryUri(uriString)) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(feedbackEvent = SettingsFeedbackType.FOLDER_SAVED, errorMessage = null)
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
         }
+    }
+
+    fun onThemeModeSelected(mode: ThemeMode) {
+        viewModelScope.launch { settingsRepository.updateThemeMode(mode) }
     }
 
     fun onDynamicColorChanged(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.updateDynamicColor(enabled)
-        }
+        viewModelScope.launch { settingsRepository.updateDynamicColor(enabled) }
     }
 
     fun onAccentColorSelected(accentColor: AccentColor) {
-        viewModelScope.launch {
-            settingsRepository.updateAccentColor(accentColor)
-        }
+        viewModelScope.launch { settingsRepository.updateAccentColor(accentColor) }
     }
 
     fun onAppLanguageSelected(language: AppLanguage) {
-        viewModelScope.launch {
-            settingsRepository.updateAppLanguage(language)
-        }
+        viewModelScope.launch { settingsRepository.updateAppLanguage(language) }
     }
 
     fun onPreferWifiDirectChanged(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.updatePreferWifiDirect(enabled)
-        }
+        viewModelScope.launch { settingsRepository.updatePreferWifiDirect(enabled) }
     }
 
     fun onVerifySha256Changed(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.updateVerifySha256AfterTransfer(enabled)
-        }
+        viewModelScope.launch { settingsRepository.updateVerifySha256AfterTransfer(enabled) }
     }
 
     fun onAutoAcceptTrustedChanged(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.updateAutoAcceptTrustedDevices(enabled)
-        }
+        viewModelScope.launch { settingsRepository.updateAutoAcceptTrustedDevices(enabled) }
     }
 
     fun onRequireVaultAuthChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.updateRequireVaultAuthentication(enabled) }
+    }
+
+    fun onMaxConcurrentTransfersSelected(count: Int) {
+        if (!SettingsValidator.isValidConcurrentTransfers(count)) return
+        viewModelScope.launch { settingsRepository.updateMaxConcurrentTransfers(count) }
+    }
+
+    fun onFileOverwritePolicySelected(policy: FileOverwritePolicy) {
+        viewModelScope.launch { settingsRepository.updateFileOverwritePolicy(policy) }
+    }
+
+    fun onTransferNotificationsChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.updateTransferNotificationsEnabled(enabled) }
+    }
+
+    fun onHistoryRetentionSelected(policy: HistoryRetentionPolicy) {
+        viewModelScope.launch { settingsRepository.updateHistoryRetentionPolicy(policy) }
+    }
+
+    fun onDiscoveryVisibilitySelected(visibility: DiscoveryVisibility) {
+        viewModelScope.launch { settingsRepository.updateDiscoveryVisibility(visibility) }
+    }
+
+    fun onPreferredConnectionModeSelected(mode: PreferredConnectionMode) {
+        viewModelScope.launch { settingsRepository.updatePreferredConnectionMode(mode) }
+    }
+
+    fun onBiometricUnlockPreferredChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.updateBiometricUnlockPreferred(enabled) }
+    }
+
+    fun pruneExpiredHistoryNow() {
+        val repo = transferHistoryRepository ?: return
+        val days = _uiState.value.settings.historyRetentionPolicy.days ?: return
         viewModelScope.launch {
-            settingsRepository.updateRequireVaultAuthentication(enabled)
+            val cutoff = clock.nowEpochMillis() - (days.toLong() * 86_400_000L)
+            when (val res = repo.pruneRecordsOlderThan(cutoff)) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(feedbackEvent = SettingsFeedbackType.HISTORY_PRUNED, errorMessage = null)
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
+        }
+    }
+
+    fun clearTemporaryCache() {
+        val utilRepo = utilitiesRepository ?: return
+        viewModelScope.launch {
+            when (val res = utilRepo.clearTemporaryCache()) {
+                is AppResult.Success -> {
+                    val remaining = utilRepo.computeTemporaryCacheBytes()
+                    _uiState.update {
+                        it.copy(
+                            temporaryCacheBytes = remaining,
+                            feedbackEvent = SettingsFeedbackType.CACHE_CLEARED,
+                            errorMessage = null
+                        )
+                    }
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
+        }
+    }
+
+    fun clearTransferHistory() {
+        val repo = transferHistoryRepository ?: return
+        viewModelScope.launch {
+            when (val res = repo.clearAllRecords()) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(feedbackEvent = SettingsFeedbackType.HISTORY_CLEARED, errorMessage = null)
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
+        }
+    }
+
+    fun clearFavorites() {
+        val utilRepo = utilitiesRepository ?: return
+        viewModelScope.launch {
+            when (val res = utilRepo.clearAllFavorites()) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(feedbackEvent = SettingsFeedbackType.FAVORITES_CLEARED, errorMessage = null)
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
+        }
+    }
+
+    fun revokeAllTrustedDevices() {
+        val repo = trustedDeviceRepository ?: return
+        viewModelScope.launch {
+            when (val res = repo.clearAllTrustedDevices()) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(feedbackEvent = SettingsFeedbackType.TRUSTED_REVOKED, errorMessage = null)
+                }
+                is AppResult.Failure -> _uiState.update { it.copy(errorMessage = res.error.message) }
+            }
         }
     }
 

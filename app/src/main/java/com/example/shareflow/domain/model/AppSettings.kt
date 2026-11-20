@@ -20,8 +20,35 @@ enum class AppLanguage {
     ARABIC
 }
 
+enum class FileOverwritePolicy {
+    KEEP_BOTH_RENAME,
+    SKIP_EXISTING,
+    OVERWRITE_WITH_CONFIRMATION
+}
+
+enum class HistoryRetentionPolicy(val days: Int?) {
+    DAYS_7(7),
+    DAYS_30(30),
+    DAYS_90(90),
+    KEEP_FOREVER(null)
+}
+
+enum class DiscoveryVisibility {
+    EVERYONE_NEARBY,
+    TRUSTED_ONLY,
+    HIDDEN
+}
+
+enum class PreferredConnectionMode {
+    AUTO,
+    WIFI_DIRECT,
+    LOCAL_WIFI,
+    HOTSPOT
+}
+
 /**
  * Pure domain model representing persisted user-configurable ShareFlow settings.
+ * Automatic transfer acceptance is strictly disabled by default.
  */
 data class AppSettings(
     val deviceName: String = DEFAULT_DEVICE_NAME,
@@ -34,7 +61,14 @@ data class AppSettings(
     val preferWifiDirect: Boolean = true,
     val verifySha256AfterTransfer: Boolean = true,
     val autoAcceptTrustedDevices: Boolean = false,
-    val requireVaultAuthentication: Boolean = true
+    val requireVaultAuthentication: Boolean = true,
+    val maxConcurrentTransfers: Int = DEFAULT_CONCURRENT_TRANSFERS,
+    val fileOverwritePolicy: FileOverwritePolicy = FileOverwritePolicy.KEEP_BOTH_RENAME,
+    val transferNotificationsEnabled: Boolean = true,
+    val historyRetentionPolicy: HistoryRetentionPolicy = HistoryRetentionPolicy.DAYS_30,
+    val discoveryVisibility: DiscoveryVisibility = DiscoveryVisibility.EVERYONE_NEARBY,
+    val preferredConnectionMode: PreferredConnectionMode = PreferredConnectionMode.AUTO,
+    val biometricUnlockPreferred: Boolean = true
 ) {
     companion object {
         const val DEFAULT_DEVICE_NAME = "ShareFlow Device"
@@ -43,6 +77,9 @@ data class AppSettings(
         const val MAX_TRANSFER_PORT = 65535
         const val MIN_DEVICE_NAME_LENGTH = 2
         const val MAX_DEVICE_NAME_LENGTH = 32
+        const val DEFAULT_CONCURRENT_TRANSFERS = 2
+        const val MIN_CONCURRENT_TRANSFERS = 1
+        const val MAX_CONCURRENT_TRANSFERS = 4
     }
 }
 
@@ -60,4 +97,7 @@ object SettingsValidator {
 
     fun isValidTransferPort(port: Int): Boolean =
         port in AppSettings.MIN_TRANSFER_PORT..AppSettings.MAX_TRANSFER_PORT
+
+    fun isValidConcurrentTransfers(count: Int): Boolean =
+        count in AppSettings.MIN_CONCURRENT_TRANSFERS..AppSettings.MAX_CONCURRENT_TRANSFERS
 }

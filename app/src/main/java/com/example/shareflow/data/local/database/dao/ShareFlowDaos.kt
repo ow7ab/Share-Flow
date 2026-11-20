@@ -26,6 +26,9 @@ interface TransferHistoryDao {
     @Query("DELETE FROM transfer_history WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("DELETE FROM transfer_history WHERE started_at_epoch_millis < :cutoffEpochMillis")
+    suspend fun deleteOlderThan(cutoffEpochMillis: Long): Int
+
     @Query("DELETE FROM transfer_history")
     suspend fun deleteAll()
 }
@@ -46,6 +49,9 @@ interface TrustedDeviceDao {
 
     @Query("DELETE FROM trusted_devices WHERE device_id = :deviceId")
     suspend fun deleteById(deviceId: String)
+
+    @Query("DELETE FROM trusted_devices")
+    suspend fun deleteAll()
 }
 
 @Dao

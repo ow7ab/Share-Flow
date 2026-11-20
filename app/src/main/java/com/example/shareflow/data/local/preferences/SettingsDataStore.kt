@@ -24,4 +24,11 @@ object SettingsPreferenceKeys {
     val VERIFY_SHA256 = booleanPreferencesKey("verify_sha256_after_transfer")
     val AUTO_ACCEPT_TRUSTED = booleanPreferencesKey("auto_accept_trusted_devices")
     val REQUIRE_VAULT_AUTH = booleanPreferencesKey("require_vault_authentication")
+    val MAX_CONCURRENT_TRANSFERS = intPreferencesKey("max_concurrent_transfers")
+    val FILE_OVERWRITE_POLICY = stringPreferencesKey("file_overwrite_policy")
+    val TRANSFER_NOTIFICATIONS_ENABLED = booleanPreferencesKey("transfer_notifications_enabled")
+    val HISTORY_RETENTION_POLICY = stringPreferencesKey("history_retention_policy")
+    val DISCOVERY_VISIBILITY = stringPreferencesKey("discovery_visibility")
+    val PREFERRED_CONNECTION_MODE = stringPreferencesKey("preferred_connection_mode")
+    val BIOMETRIC_UNLOCK_PREFERRED = booleanPreferencesKey("biometric_unlock_preferred")
 }

@@ -14,11 +14,15 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -38,7 +42,11 @@ import com.example.shareflow.ui.files.FilesHubCategory
 import com.example.shareflow.ui.files.FilesScreen
 import com.example.shareflow.ui.history.TransferHistoryScreen
 import com.example.shareflow.ui.home.HomeDashboardScreen
+import com.example.shareflow.ui.media.ImageGalleryScreen
 import com.example.shareflow.ui.media.MediaScreen
+import com.example.shareflow.ui.media.MusicPlayerScreen
+import com.example.shareflow.ui.media.VideoPlayerScreen
+import com.example.shareflow.ui.migration.PhoneMigrationScreen
 import com.example.shareflow.ui.module.ModuleFoundationScreen
 import com.example.shareflow.ui.receive.QrPairingScreen
 import com.example.shareflow.ui.receive.ReceiveScreen
@@ -48,6 +56,13 @@ import com.example.shareflow.ui.settings.SettingsScreen
 import com.example.shareflow.ui.tools.StorageAnalyzerScreen
 import com.example.shareflow.ui.tools.ToolsScreen
 import com.example.shareflow.ui.transfer.TransferProgressScreen
+import com.example.shareflow.ui.utilities.CompressionScreen
+import com.example.shareflow.ui.utilities.DuplicateFinderScreen
+import com.example.shareflow.ui.utilities.FavoritesScreen
+import com.example.shareflow.ui.utilities.LargeFilesScreen
+import com.example.shareflow.ui.utilities.QrScannerScreen
+import com.example.shareflow.ui.utilities.RecentFilesScreen
+import com.example.shareflow.ui.vault.VaultScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -61,6 +76,25 @@ fun ShareFlowApp(
     val pendingIncoming by container.connectionRepository.pendingIncomingRequest
         .collectAsStateWithLifecycle()
     val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, container) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    approvalScope.launch { container.vaultManager.onAppBackgrounded() }
+                }
+                Lifecycle.Event.ON_START -> {
+                    approvalScope.launch { container.vaultManager.checkAutoLock() }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     ShareFlowTheme(
         themeMode = settings.themeMode,
@@ -207,7 +241,9 @@ private fun ShareFlowNavHost(
             ToolsScreen(onNavigateToRoute = ::navigateToRoute)
         }
         composable(route = ShareFlowRoutes.SETTINGS) {
-            SettingsScreen()
+            SettingsScreen(
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
+            )
         }
 
         // Send & Receive flows
@@ -267,7 +303,8 @@ private fun ShareFlowNavHost(
         // Real Utilities & History
         composable(route = ShareFlowRoutes.STORAGE_ANALYZER) {
             StorageAnalyzerScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onOpenLargeFiles = { navigateToRoute(ShareFlowRoutes.LARGE_FILES) }
             )
         }
         composable(route = ShareFlowRoutes.TRANSFER_HISTORY) {
@@ -287,6 +324,70 @@ private fun ShareFlowNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSendConfirm = { navigateToRoute(ShareFlowRoutes.SEND_CONFIRM) },
                 onNavigateToTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) }
+            )
+        }
+        composable(route = ShareFlowRoutes.IMAGE_GALLERY) {
+            ImageGalleryScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.VIDEO_PLAYER) {
+            VideoPlayerScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.MUSIC_PLAYER) {
+            MusicPlayerScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.PRIVATE_VAULT) {
+            VaultScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.PHONE_MIGRATION) {
+            PhoneMigrationScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenDiscovery = { navigateToRoute(ShareFlowRoutes.DISCOVERY) },
+                onOpenQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) },
+                onOpenReceive = { navigateToRoute(ShareFlowRoutes.RECEIVE) },
+                onOpenTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) },
+                onOpenHistory = { navigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) }
+            )
+        }
+        composable(route = ShareFlowRoutes.DUPLICATE_FINDER) {
+            DuplicateFinderScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.LARGE_FILES) {
+            LargeFilesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) }
+            )
+        }
+        composable(route = ShareFlowRoutes.COMPRESSION) {
+            CompressionScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = ShareFlowRoutes.RECENT_FILES) {
+            RecentFilesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) }
+            )
+        }
+        composable(route = ShareFlowRoutes.FAVORITES) {
+            FavoritesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) }
+            )
+        }
+        composable(route = ShareFlowRoutes.QR_SCANNER) {
+            QrScannerScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenFullQrPairing = { navigateToRoute(ShareFlowRoutes.QR_PAIRING) }
             )
         }
 

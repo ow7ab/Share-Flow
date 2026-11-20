@@ -46,6 +46,16 @@ class TransferHistoryRepositoryImpl(
             )
         }
 
+    override suspend fun pruneRecordsOlderThan(cutoffEpochMillis: Long): AppResult<Int> =
+        withContext(dispatchers.io) {
+            runCatching {
+                dao.deleteOlderThan(cutoffEpochMillis)
+            }.fold(
+                onSuccess = { AppResult.Success(it) },
+                onFailure = { AppResult.Failure(AppError.Storage("Failed to prune expired transfer history", it)) }
+            )
+        }
+
     override suspend fun clearAllRecords(): AppResult<Unit> =
         withContext(dispatchers.io) {
             runCatching {
