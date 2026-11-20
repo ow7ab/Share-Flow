@@ -38,6 +38,17 @@
         android:name="android.hardware.camera.any"
         android:required="false" />
 
+    <!--
+      Least-privilege Android 11+ package visibility query:
+      Discovers only launchable user applications without requesting QUERY_ALL_PACKAGES.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".ShareFlowApplication"
         android:allowBackup="false"
@@ -59,6 +70,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shareflow_file_paths" />
+        </provider>
     </application>
 
 </manifest>

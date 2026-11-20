@@ -32,6 +32,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.AppSettings
 import com.example.shareflow.domain.model.ShareFlowModuleId
+import com.example.shareflow.ui.apps.AppSharingScreen
 import com.example.shareflow.ui.files.FileCategoryDetailScreen
 import com.example.shareflow.ui.files.FilesHubCategory
 import com.example.shareflow.ui.files.FilesScreen
@@ -213,7 +214,8 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.SEND) {
             SendScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onContinueToConfirm = { navigateToRoute(ShareFlowRoutes.SEND_CONFIRM) }
+                onContinueToConfirm = { navigateToRoute(ShareFlowRoutes.SEND_CONFIRM) },
+                onOpenAppSharing = { navigateToRoute(ShareFlowRoutes.APPLICATION_SHARING) }
             )
         }
         composable(route = ShareFlowRoutes.SEND_CONFIRM) {
@@ -278,6 +280,13 @@ private fun ShareFlowNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenSend = { navigateToRoute(ShareFlowRoutes.SEND) },
                 onOpenHistory = { navigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) }
+            )
+        }
+        composable(route = ShareFlowRoutes.APPLICATION_SHARING) {
+            AppSharingScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSendConfirm = { navigateToRoute(ShareFlowRoutes.SEND_CONFIRM) },
+                onNavigateToTransferProgress = { navigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) }
             )
         }
 

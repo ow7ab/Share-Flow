@@ -481,4 +481,40 @@
     <string name="transfer_connect_first_hint">اتصل بجهاز قريب أدناه لبدء إرسال الملفات.</string>
     <string name="transfer_cancel_confirm_title">إلغاء عملية النقل؟</string>
     <string name="transfer_cancel_confirm_body">سيتم إيقاف الملفات غير المكتملة في هذه الجلسة وحذف الملفات المؤقتة بأمان.</string>
+
+    <!-- Application Sharing UI -->
+    <string name="apps_screen_title">مشاركة التطبيقات</string>
+    <string name="apps_tab_installed">التطبيقات المثبّتة</string>
+    <string name="apps_tab_received">ملفات APK المستلمة</string>
+    <string name="apps_search_placeholder">ابحث باسم التطبيق أو اسم الحزمة…</string>
+    <string name="apps_filter_show_system">إظهار تطبيقات النظام</string>
+    <string name="apps_refresh_action">تحديث</string>
+    <string name="apps_visibility_notice_title">خصوصية ورؤية حزم أندرويد</string>
+    <string name="apps_visibility_notice_body">تُعرض فقط التطبيقات المتاحة وفق قواعد رؤية الحزم في أندرويد. يستخرج ShareFlow ملفات التثبيت العامة (APK) فقط ولا يصل أبداً إلى بيانات التطبيقات الخاصة أو بيانات الدخول أو قواعد البيانات.</string>
+    <string name="apps_split_apk_badge">حزمة مقسّمة (%1$d أجزاء)</string>
+    <string name="apps_split_apk_note">يتم تصدير ملفات الحزمة المقسّمة معاً داخل مجلد واحد. يتطلب التثبيت على جهاز آخر توفّر جميع الأجزاء.</string>
+    <string name="apps_unavailable_badge">الاستخراج غير متاح</string>
+    <string name="apps_size_unavailable">الحجم غير متاح</string>
+    <string name="apps_version_format">الإصدار %1$s (%2$d)</string>
+    <string name="apps_selected_summary">تم تحديد %1$s · %2$s</string>
+    <string name="apps_extract_and_send_action">استخراج وإرسال</string>
+    <string name="apps_extracting_label">جارٍ استخراج APK…</string>
+    <string name="apps_clear_selection_action">مسح</string>
+    <string name="apps_empty_title">لا توجد تطبيقات متاحة للعرض</string>
+    <string name="apps_empty_body">لم تطابق أي تطبيقات مثبّتة عامل التصفية وفق قواعد رؤية الحزم في أندرويد.</string>
+    <string name="apps_received_empty_title">لا توجد ملفات APK مستلمة بعد</string>
+    <string name="apps_received_empty_body">ستظهر هنا ملفات APK المستلمة عبر محرك النقل المشفر في ShareFlow بعد التحقق من بصمة SHA-256 وسلامة أرشيف APK.</string>
+    <string name="apps_received_verified_badge">تم التحقق من SHA-256 وأرشيف APK</string>
+    <string name="apps_received_mismatch_badge">عدم تطابق البصمة</string>
+    <string name="apps_received_invalid_badge">ملف APK غير صالح</string>
+    <string name="apps_received_missing_badge">الملف مفقود</string>
+    <string name="apps_received_unverified_badge">ملف غير موثّق</string>
+    <string name="apps_received_from_peer">من %1$s</string>
+    <string name="apps_install_action">التثبيت عبر أندرويد</string>
+    <string name="apps_install_confirm_title">مراجعة وتثبيت ملف APK</string>
+    <string name="apps_install_confirm_body">تحقق ShareFlow من بصمة SHA-256 وسلامة أرشيف APK للتطبيق %1$s (%2$s، الإصدار %3$s). سيتم الآن فتح مثبّت حزم نظام أندرويد لتراجع الأذونات وتوافق بنفسك على التثبيت.</string>
+    <string name="apps_install_confirm_cta">فتح مثبّت أندرويد</string>
+    <string name="apps_install_launch_failed">تعذّر فتح مثبّت حزم نظام أندرويد على هذا الجهاز: %1$s</string>
+    <string name="apps_send_shortcut_action">مشاركة التطبيقات المثبّتة</string>
+    <string name="apps_icon_content_desc">أيقونة التطبيق %1$s</string>
 </resources>

@@ -1,12 +1,18 @@
 package com.example.shareflow.domain.repository
 
+import android.content.Intent
+import android.graphics.drawable.Drawable
 import com.example.shareflow.core.common.AppResult
+import com.example.shareflow.domain.model.ExtractedApkArtifact
 import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.FileOperationResult
 import com.example.shareflow.domain.model.GrantedDirectory
 import com.example.shareflow.domain.model.InstalledAppInfo
 import com.example.shareflow.domain.model.LocalFileEntry
+import com.example.shareflow.domain.model.ReceivedApkInfo
+import com.example.shareflow.domain.model.ShareableAppInfo
 import com.example.shareflow.domain.model.StorageSummary
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -75,8 +81,43 @@ interface StorageAnalyzerRepository {
 }
 
 /**
- * Contract for listing user-installed applications eligible for offline APK sharing.
+ * Contract for discovering accessible installed apps, extracting public APK installation files,
+ * verifying received APKs, and preparing Android system installation handoff intents.
  */
 interface AppSharingRepository {
     suspend fun listShareableApps(includeSystemApps: Boolean = false): AppResult<List<InstalledAppInfo>>
+
+    /** Discovers real installed applications visible under Android package visibility rules. */
+    suspend fun discoverInstalledApps(includeSystemApps: Boolean = false): AppResult<List<ShareableAppInfo>>
+
+    /** Loads the application's launcher/icon drawable via Android PackageManager, or null if unavailable. */
+    fun loadAppIcon(packageName: String): Drawable?
+
+    /**
+     * Streams public APK file(s) for the selected apps into ShareFlow's scoped export cache with
+     * verified SHA-256 digests. Never accesses private application data, databases, or credentials.
+     */
+    suspend fun extractApksForSharing(apps: List<ShareableAppInfo>): AppResult<List<ExtractedApkArtifact>>
+
+    /** Observes received APK files with real on-disk existence, SHA-256, and APK archive verification. */
+    fun observeReceivedApks(): Flow<List<ReceivedApkInfo>>
+
+    /** Performs immediate real on-disk SHA-256 and Android APK archive verification on [apkFile]. */
+    suspend fun verifyReceivedApk(
+        apkFile: File,
+        expectedSha256: String?,
+        recordId: String? = null,
+        peerDeviceName: String? = null,
+        receivedAtEpochMillis: Long = apkFile.lastModified()
+    ): ReceivedApkInfo
+
+    /**
+     * Builds a scoped [androidx.core.content.FileProvider] `Intent.ACTION_VIEW` for Android's
+     * system package installer after re-verifying file boundaries, SHA-256, and APK archive validity.
+     * Never silently installs or bypasses Android installation security.
+     */
+    suspend fun createSystemInstallIntent(
+        apkFile: File,
+        expectedSha256: String? = null
+    ): AppResult<Intent>
 }

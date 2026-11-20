@@ -14,6 +14,7 @@ import com.example.shareflow.core.security.KeystoreCipher
 import com.example.shareflow.core.security.Sha256ChecksumVerifier
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
+import com.example.shareflow.data.repository.AndroidAppSharingRepository
 import com.example.shareflow.data.repository.AndroidFileManagerRepository
 import com.example.shareflow.data.repository.AndroidStorageAnalyzerRepository
 import com.example.shareflow.data.repository.ConnectionRepositoryImpl
@@ -24,6 +25,7 @@ import com.example.shareflow.data.repository.TransferRepositoryImpl
 import com.example.shareflow.data.repository.TrustedDeviceRepositoryImpl
 import com.example.shareflow.data.repository.VaultRepositoryImpl
 import com.example.shareflow.domain.model.ConnectionType
+import com.example.shareflow.domain.repository.AppSharingRepository
 import com.example.shareflow.domain.repository.ConnectionRepository
 import com.example.shareflow.domain.repository.DeviceDiscoveryRepository
 import com.example.shareflow.domain.repository.FileManagerRepository
@@ -73,6 +75,7 @@ interface AppContainer {
     val vaultRepository: VaultRepository
     val storageAnalyzerRepository: StorageAnalyzerRepository
     val fileManagerRepository: FileManagerRepository
+    val appSharingRepository: AppSharingRepository
     val localSessionController: LocalSessionController
     val networkPermissionHelper: NetworkPermissionHelper
     val deviceIdentityManager: DeviceIdentityManager
@@ -142,6 +145,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
             context = appContext,
             checksumVerifier = checksumVerifier,
             dispatchers = dispatchers
+        )
+    }
+
+    override val appSharingRepository: AppSharingRepository by lazy {
+        AndroidAppSharingRepository(
+            context = appContext,
+            transferHistoryRepository = transferHistoryRepository,
+            checksumVerifier = checksumVerifier,
+            ioDispatcher = dispatchers.io
         )
     }
 

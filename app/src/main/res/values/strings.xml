@@ -481,4 +481,40 @@
     <string name="transfer_connect_first_hint">Connect to a nearby device below to start sending.</string>
     <string name="transfer_cancel_confirm_title">Cancel transfer?</string>
     <string name="transfer_cancel_confirm_body">Incomplete files in this session will be stopped and temporary staging files will be cleaned up.</string>
+
+    <!-- Application Sharing UI -->
+    <string name="apps_screen_title">Application Sharing</string>
+    <string name="apps_tab_installed">Installed Apps</string>
+    <string name="apps_tab_received">Received APKs</string>
+    <string name="apps_search_placeholder">Search apps by name or package…</string>
+    <string name="apps_filter_show_system">Show system apps</string>
+    <string name="apps_refresh_action">Refresh</string>
+    <string name="apps_visibility_notice_title">Android Package Visibility &amp; Privacy</string>
+    <string name="apps_visibility_notice_body">Only launchable applications visible under Android package visibility rules are shown. ShareFlow extracts only public APK installation files—never private app data, credentials, or databases.</string>
+    <string name="apps_split_apk_badge">Split APK (%1$d parts)</string>
+    <string name="apps_split_apk_note">App Bundle splits are exported together inside a folder. Installing split APKs on another device requires all parts.</string>
+    <string name="apps_unavailable_badge">Extraction unavailable</string>
+    <string name="apps_size_unavailable">Size unavailable</string>
+    <string name="apps_version_format">v%1$s (%2$d)</string>
+    <string name="apps_selected_summary">%1$s selected · %2$s</string>
+    <string name="apps_extract_and_send_action">Extract &amp; Send</string>
+    <string name="apps_extracting_label">Extracting APK…</string>
+    <string name="apps_clear_selection_action">Clear</string>
+    <string name="apps_empty_title">No accessible applications found</string>
+    <string name="apps_empty_body">No installed applications matched your filter under Android package visibility rules.</string>
+    <string name="apps_received_empty_title">No received APK files yet</string>
+    <string name="apps_received_empty_body">APK files received through ShareFlow\'s encrypted transfer engine will appear here after SHA-256 and Android APK archive verification.</string>
+    <string name="apps_received_verified_badge">SHA-256 &amp; APK Verified</string>
+    <string name="apps_received_mismatch_badge">Checksum Mismatch</string>
+    <string name="apps_received_invalid_badge">Invalid APK Archive</string>
+    <string name="apps_received_missing_badge">File Missing</string>
+    <string name="apps_received_unverified_badge">Unverified File</string>
+    <string name="apps_received_from_peer">From %1$s</string>
+    <string name="apps_install_action">Install via Android</string>
+    <string name="apps_install_confirm_title">Review &amp; Install APK</string>
+    <string name="apps_install_confirm_body">ShareFlow verified the SHA-256 checksum and APK archive for %1$s (%2$s, v%3$s). Android\'s system package installer will now open so you can review permissions and approve installation.</string>
+    <string name="apps_install_confirm_cta">Open Android Installer</string>
+    <string name="apps_install_launch_failed">Unable to open Android\'s system package installer on this device: %1$s</string>
+    <string name="apps_send_shortcut_action">Share Installed Apps</string>
+    <string name="apps_icon_content_desc">Application icon for %1$s</string>
 </resources>

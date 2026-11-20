@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Strictly scoped to ShareFlow's app-managed received files and temporary APK export cache. -->
+    <!-- Never exposes root storage or private app databases/preferences. -->
+    <external-files-path
+        name="shareflow_received_external"
+        path="Download/ShareFlowReceived/" />
+    <files-path
+        name="shareflow_received_internal"
+        path="ShareFlowReceived/" />
+    <cache-path
+        name="shareflow_apk_exports"
+        path="shareflow_apk_exports/" />
+</paths>

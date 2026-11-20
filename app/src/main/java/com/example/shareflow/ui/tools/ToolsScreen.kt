@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
@@ -161,6 +162,18 @@ fun ToolsScreen(
                         )
                     },
                     testTag = "tools_card_phone_migration"
+                )
+            }
+
+            item(key = "tool_app_sharing") {
+                ModuleDirectoryCard(
+                    title = stringResource(R.string.module_app_sharing_title),
+                    description = stringResource(R.string.module_app_sharing_desc),
+                    icon = Icons.Filled.InstallMobile,
+                    statusLabel = stringResource(R.string.status_ready),
+                    isReady = true,
+                    onClick = { onNavigateToRoute(ShareFlowRoutes.APPLICATION_SHARING) },
+                    testTag = "tools_card_app_sharing"
                 )
             }
 

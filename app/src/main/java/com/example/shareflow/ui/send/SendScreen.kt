@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -77,6 +78,7 @@ import kotlinx.coroutines.withContext
 fun SendScreen(
     onNavigateBack: () -> Unit,
     onContinueToConfirm: () -> Unit,
+    onOpenAppSharing: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -257,6 +259,17 @@ fun SendScreen(
                                 .fillMaxWidth()
                                 .testTag("send_pick_folder_button")
                         )
+                        if (onOpenAppSharing != null) {
+                            SecondaryActionButton(
+                                text = stringResource(R.string.apps_send_shortcut_action),
+                                onClick = onOpenAppSharing,
+                                outlined = true,
+                                leadingIcon = Icons.Filled.InstallMobile,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("send_open_app_sharing_button")
+                            )
+                        }
                     }
                 }
 
