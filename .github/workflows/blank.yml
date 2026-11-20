@@ -1,42 +1,126 @@
-
-name: Build ShareFlow APK
+name: Android Debug APK Build
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  build-debug-apk:
+    name: Build ShareFlow Debug APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Locate Android Gradle project root
+        id: locate_project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SETTINGS_FILE=$(find . -maxdepth 4 \
+            \( -name ".git" -o -name ".gradle" -o -name "build" \) -prune -o \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) -print | sort | head -n 1)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "::error::Could not locate settings.gradle or settings.gradle.kts in repository."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "Detected Android Gradle project root: $PROJECT_DIR"
+
+          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
+            echo "::error::Gradle wrapper script (gradlew) not found in $PROJECT_DIR."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "::error::Gradle wrapper JAR missing at $PROJECT_DIR/gradle/wrapper/gradle-wrapper.jar."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties" ]; then
+            echo "::error::Gradle wrapper properties missing at $PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties."
+            exit 1
+          fi
+
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "21"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+      - name: Validate Gradle Wrapper & configure Gradle caching
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Debug APK
+      - name: Restore debug keystore for debugConfig signing
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: |
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+          set -euo pipefail
+          if [ ! -f "debug.keystore" ]; then
+            if [ -f "debug.keystore.base64" ]; then
+              base64 --decode debug.keystore.base64 > debug.keystore
+              chmod 600 debug.keystore
+              echo "Restored debug.keystore from debug.keystore.base64."
+            else
+              echo "::error::Neither debug.keystore nor debug.keystore.base64 found in $(pwd)."
+              exit 1
+            fi
+          else
+            echo "Existing debug.keystore detected."
+          fi
 
-      - name: Upload APK
+      - name: Make Gradle Wrapper executable
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: chmod +x ./gradlew
+
+      - name: Build Android Debug APK
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Dynamically locate and verify generated APK
+        id: locate_apk
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+
+          APK_FILE=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | sort | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(find . -path "*/build/outputs/apk/*.apk" -type f | sort | head -n 1)
+          fi
+
+          if [ -z "$APK_FILE" ] || [ ! -s "$APK_FILE" ]; then
+            echo "::error::No non-empty APK was produced by assembleDebug."
+            exit 1
+          fi
+
+          APK_ABS_PATH=$(realpath "$APK_FILE")
+          APK_SIZE=$(stat -c%s "$APK_ABS_PATH")
+          APK_SHA256=$(sha256sum "$APK_ABS_PATH" | awk '{print $1}')
+
+          echo "Generated APK: $APK_ABS_PATH"
+          echo "APK size (bytes): $APK_SIZE"
+          echo "APK SHA-256: $APK_SHA256"
+          echo "apk_path=$APK_ABS_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShareFlow-Debug-APK
-          path: |
-            **/build/outputs/apk/debug/*.apk
+          name: shareflow-debug-apk
+          path: ${{ steps.locate_apk.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 14
