@@ -1,6 +1,7 @@
 package com.example.shareflow.ui.send
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -18,62 +19,61 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.InstallMobile
-import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.shareflow.core.common.SafDocumentInspector
 import com.example.shareflow.core.common.ShareFlowFormatters
-import com.example.shareflow.core.designsystem.components.DeviceCard
-import com.example.shareflow.core.designsystem.components.EmptyState
-import com.example.shareflow.core.designsystem.components.FileItem
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
-import com.example.shareflow.core.designsystem.components.SecondaryActionButton
-import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
-import com.example.shareflow.domain.model.FileCategory
+import com.example.shareflow.domain.model.MediaImageItem
+import com.example.shareflow.domain.model.MediaVideoItem
 import com.example.shareflow.network.transfer.TransferQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SendScreen(
     onNavigateBack: () -> Unit,
@@ -87,14 +87,52 @@ fun SendScreen(
         factory = shareFlowViewModelFactory {
             SendViewModel(
                 sessionController = container.localSessionController,
-                trustedDeviceRepository = container.trustedDeviceRepository
+                trustedDeviceRepository = container.trustedDeviceRepository,
+                settingsRepository = container.settingsRepository,
+                discoveryRepository = container.deviceDiscoveryRepository,
+                connectionRepository = container.connectionRepository,
+                transferManager = container.transferManager,
+                mediaCenterRepository = container.mediaCenterRepository,
+                appSharingRepository = container.appSharingRepository,
+                fileManagerRepository = container.fileManagerRepository,
+                unifiedConnectionManager = container.unifiedConnectionManager
             )
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var previewPhoto by remember { mutableStateOf<MediaImageItem?>(null) }
+    var previewVideo by remember { mutableStateOf<MediaVideoItem?>(null) }
 
+    LaunchedEffect(uiState.feedbackMessage) {
+        val msg = uiState.feedbackMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumeFeedback()
+        }
+    }
+
+    // Zero-permission Android Photo Picker for original-quality Photos
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.onPhotoPickerResult(uris.map { it.toString() })
+        }
+    }
+
+    // Zero-permission Android Photo Picker for full-resolution Videos
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.onVideoPickerResult(uris.map { it.toString() })
+        }
+    }
+
+    // Zero-permission SAF Pickers for Documents, Audio, Archives, APKs, Folders
     val safPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -120,6 +158,22 @@ fun SendScreen(
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
 
+    previewPhoto?.let { photo ->
+        PhotoPreviewDialog(
+            photo = photo,
+            selected = photo.uriString in uiState.selectedUriSet,
+            onToggleSelect = { viewModel.togglePhotoSelection(photo) },
+            onDismiss = { previewPhoto = null }
+        )
+    }
+
+    previewVideo?.let { video ->
+        VideoPreviewDialog(
+            video = video,
+            onDismiss = { previewVideo = null }
+        )
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -140,175 +194,212 @@ fun SendScreen(
                 }
             )
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             Surface(
                 tonalElevation = ShareFlowDesign.elevation.raised,
                 shadowElevation = 4.dp,
                 color = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (uiState.isExtractingApps) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         Text(
-                            text = "${stringResource(R.string.send_selected_count_label)}: ${
-                                ShareFlowFormatters.formatCount(uiState.selectedCount, locale)
-                            }",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.testTag("send_selected_counter")
-                        )
-                        Text(
-                            text = "${stringResource(R.string.send_total_size_label)}: ${
-                                ShareFlowFormatters.formatBytes(uiState.totalSelectedBytes, locale)
-                            }",
-                            style = ShareFlowMonoStyle,
+                            text = stringResource(R.string.send_apps_extracting_status),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.testTag("send_total_size")
+                            modifier = Modifier.padding(horizontal = spacing.screenHorizontal, vertical = 4.dp)
                         )
                     }
-                    PrimaryActionButton(
-                        text = stringResource(R.string.send_continue_action),
-                        onClick = onContinueToConfirm,
-                        enabled = uiState.selectedCount > 0,
-                        leadingIcon = Icons.AutoMirrored.Filled.ArrowForward,
-                        modifier = Modifier.testTag("send_continue_button")
-                    )
+                    // Selected items compact removable chips preview
+                    if (uiState.allSelectedFiles.isNotEmpty() || uiState.selectedAppPackages.isNotEmpty()) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = spacing.screenHorizontal, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            modifier = Modifier.testTag("send_selected_chips_strip")
+                        ) {
+                            items(
+                                items = uiState.installedApps.filter { it.packageName in uiState.selectedAppPackages },
+                                key = { "chip_app_${it.packageName}" }
+                            ) { app ->
+                                SelectedPreviewPill(
+                                    label = app.appName,
+                                    onRemove = { viewModel.toggleAppSelection(app) }
+                                )
+                            }
+                            items(
+                                items = uiState.allSelectedFiles.take(12),
+                                key = { "chip_file_${it.uriString}" }
+                            ) { file ->
+                                SelectedPreviewPill(
+                                    label = file.displayName.substringAfterLast('/'),
+                                    onRemove = { viewModel.removeSelectedFile(file.uriString) }
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "${stringResource(R.string.send_selected_count_label)}: ${
+                                    ShareFlowFormatters.formatCount(uiState.selectedCount, locale)
+                                }",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.testTag("send_selected_counter")
+                            )
+                            Text(
+                                text = "${stringResource(R.string.send_total_size_label)}: ${
+                                    ShareFlowFormatters.formatBytes(uiState.totalSelectedBytes, locale)
+                                }",
+                                style = ShareFlowMonoStyle,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("send_total_size")
+                            )
+                        }
+                        PrimaryActionButton(
+                            text = stringResource(R.string.send_continue_action),
+                            onClick = {
+                                viewModel.prepareSelectionAndContinue(onReady = onContinueToConfirm)
+                            },
+                            enabled = uiState.selectedCount > 0 && !uiState.isExtractingApps,
+                            leadingIcon = Icons.AutoMirrored.Filled.ArrowForward,
+                            modifier = Modifier.testTag("send_continue_button")
+                        )
+                    }
                 }
             }
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            LazyColumn(
+            // Unified 4-Category SHAREit Selector Tabs: Photos | Videos | Apps | Files
+            val tabs = listOf(
+                Triple(SendContentTab.PHOTOS, R.string.send_tab_photos, Icons.Filled.Image),
+                Triple(SendContentTab.VIDEOS, R.string.send_tab_videos, Icons.Filled.VideoLibrary),
+                Triple(SendContentTab.APPS, R.string.send_tab_apps, Icons.Filled.Apps),
+                Triple(SendContentTab.FILES, R.string.send_tab_files, Icons.Filled.Folder)
+            )
+            PrimaryTabRow(
+                selectedTabIndex = tabs.indexOfFirst { it.first == uiState.activeTab }.coerceAtLeast(0),
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .widthIn(max = spacing.maxContentWidth)
-                    .testTag("send_screen_list"),
-                contentPadding = PaddingValues(
-                    horizontal = spacing.screenHorizontal,
-                    vertical = spacing.md
-                ),
-                verticalArrangement = Arrangement.spacedBy(spacing.md)
+                    .testTag("send_category_selector")
             ) {
-                // File Category Selector
-                item(key = "category_selector") {
-                    val categories: List<Pair<FileCategory?, Int>> = listOf(
-                        null to R.string.send_category_all,
-                        FileCategory.IMAGES to R.string.send_category_images,
-                        FileCategory.VIDEOS to R.string.send_category_videos,
-                        FileCategory.AUDIO to R.string.send_category_audio,
-                        FileCategory.DOCUMENTS to R.string.send_category_documents,
-                        FileCategory.APKS to R.string.send_category_apks,
-                        FileCategory.ARCHIVES to R.string.send_category_archives,
-                        FileCategory.OTHER to R.string.send_category_other
+                tabs.forEach { (tab, labelRes, icon) ->
+                    Tab(
+                        selected = uiState.activeTab == tab,
+                        onClick = { viewModel.selectTab(tab) },
+                        text = {
+                            Text(
+                                text = stringResource(labelRes),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = stringResource(labelRes),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        modifier = Modifier.testTag("send_tab_${tab.name.lowercase()}")
                     )
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("send_category_selector")
-                    ) {
-                        items(categories) { (category, labelRes) ->
-                            val selected = uiState.activeCategory == category
-                            FilterChip(
-                                selected = selected,
-                                onClick = { viewModel.selectCategory(category) },
-                                label = { Text(text = stringResource(labelRes)) },
-                                modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .testTag("send_cat_${category?.name?.lowercase() ?: "all"}")
-                            )
-                        }
-                    }
                 }
+            }
 
-                // Real Zero-Permission SAF File & Folder Pickers
-                item(key = "pick_files_cta") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(spacing.xs)
-                    ) {
-                        SecondaryActionButton(
-                            text = stringResource(R.string.send_add_files_action),
-                            onClick = {
-                                safPickerLauncher.launch(
-                                    SafDocumentInspector.mimeTypesForCategory(uiState.activeCategory)
-                                )
-                            },
-                            outlined = false,
-                            leadingIcon = Icons.Filled.Add,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("send_pick_files_button")
-                        )
-                        SecondaryActionButton(
-                            text = stringResource(R.string.transfer_pick_folder_action),
-                            onClick = { folderPickerLauncher.launch(null) },
-                            outlined = true,
-                            leadingIcon = Icons.Filled.CreateNewFolder,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("send_pick_folder_button")
-                        )
-                        if (onOpenAppSharing != null) {
-                            SecondaryActionButton(
-                                text = stringResource(R.string.apps_send_shortcut_action),
-                                onClick = onOpenAppSharing,
-                                outlined = true,
-                                leadingIcon = Icons.Filled.InstallMobile,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("send_open_app_sharing_button")
-                            )
-                        }
-                    }
-                }
-
-                if (uiState.filteredFiles.isEmpty()) {
-                    item(key = "empty_selection") {
-                        EmptyState(
-                            icon = Icons.Filled.FolderOpen,
-                            title = stringResource(R.string.send_empty_title),
-                            body = stringResource(R.string.send_empty_body),
-                            modifier = Modifier.testTag("send_empty_state")
-                        )
-                    }
-                } else {
-                    items(
-                        items = uiState.filteredFiles,
-                        key = { it.uriString }
-                    ) { file ->
-                        FileItem(
-                            file = file,
-                            onClick = {},
-                            trailingContent = {
-                                IconButton(
-                                    onClick = { viewModel.removeSelectedFile(file.uriString) },
-                                    modifier = Modifier.minimumInteractiveComponentSize()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Close,
-                                        contentDescription = stringResource(R.string.send_clear_selection),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = spacing.maxContentWidth)
+                        .testTag("send_screen_list"),
+                    contentPadding = PaddingValues(
+                        horizontal = spacing.screenHorizontal,
+                        vertical = spacing.md
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                ) {
+                    when (uiState.activeTab) {
+                        SendContentTab.PHOTOS -> {
+                            sendPhotosTabItems(
+                                uiState = uiState,
+                                onPickPhotos = {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                     )
-                                }
-                            },
-                            modifier = Modifier.testTag("send_selected_file_${file.displayName}")
-                        )
-                    }
-                }
+                                },
+                                onSelectFilter = viewModel::selectPhotoFilter,
+                                onToggleSelectAll = viewModel::toggleSelectAllVisiblePhotos,
+                                onTogglePhoto = viewModel::togglePhotoSelection,
+                                onPreviewPhoto = { previewPhoto = it }
+                            )
+                        }
 
-                item(key = "send_bottom_spacer") {
-                    Spacer(modifier = Modifier.height(spacing.md))
+                        SendContentTab.VIDEOS -> {
+                            sendVideosTabItems(
+                                uiState = uiState,
+                                onPickVideos = {
+                                    videoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                                    )
+                                },
+                                onToggleSelectAll = viewModel::toggleSelectAllVideos,
+                                onToggleVideo = viewModel::toggleVideoSelection,
+                                onPreviewVideo = { previewVideo = it }
+                            )
+                        }
+
+                        SendContentTab.APPS -> {
+                            sendAppsTabItems(
+                                uiState = uiState,
+                                appSharingRepository = container.appSharingRepository,
+                                onSearchChange = viewModel::updateAppSearchQuery,
+                                onSortChange = viewModel::setAppSortOption,
+                                onToggleIncludeSystem = viewModel::setIncludeSystemApps,
+                                onToggleSelectAll = viewModel::toggleSelectAllVisibleApps,
+                                onToggleApp = viewModel::toggleAppSelection
+                            )
+                        }
+
+                        SendContentTab.FILES -> {
+                            sendFilesTabItems(
+                                uiState = uiState,
+                                onSelectCategory = viewModel::selectCategory,
+                                onPickFiles = {
+                                    safPickerLauncher.launch(
+                                        SafDocumentInspector.mimeTypesForCategory(uiState.activeCategory)
+                                    )
+                                },
+                                onPickFolder = { folderPickerLauncher.launch(null) },
+                                onToggleSelectAll = viewModel::toggleSelectAllVisibleFiles,
+                                onToggleFile = viewModel::toggleFileSelection,
+                                onRemoveSelectedFile = viewModel::removeSelectedFile
+                            )
+                        }
+                    }
+
+                    item(key = "send_bottom_spacer") {
+                        Spacer(modifier = Modifier.height(spacing.md))
+                    }
                 }
             }
         }
@@ -316,231 +407,38 @@ fun SendScreen(
 }
 
 @Composable
-fun SendConfirmScreen(
-    onNavigateBack: () -> Unit,
-    onOpenQrPairing: () -> Unit,
-    onOpenTransferProgress: () -> Unit = {},
-    modifier: Modifier = Modifier
+private fun SelectedPreviewPill(
+    label: String,
+    onRemove: () -> Unit
 ) {
-    val container = LocalAppContainer.current
-    val viewModel: SendViewModel = viewModel(
-        factory = shareFlowViewModelFactory {
-            SendViewModel(
-                sessionController = container.localSessionController,
-                trustedDeviceRepository = container.trustedDeviceRepository,
-                settingsRepository = container.settingsRepository,
-                discoveryRepository = container.deviceDiscoveryRepository,
-                connectionRepository = container.connectionRepository,
-                transferManager = container.transferManager
-            )
-        }
-    )
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val spacing = ShareFlowDesign.spacing
-    val locale = ShareFlowDesign.locale
-    val semantic = ShareFlowDesign.semanticColors
-    val peers = (uiState.discoveredDevices + uiState.trustedDevices).distinctBy { it.deviceId }
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(uiState.feedbackMessage) {
-        val msg = uiState.feedbackMessage
-        if (msg != null) {
-            snackbarHostState.showSnackbar(msg)
-            viewModel.consumeFeedback()
-        }
-    }
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            ShareFlowTopBar(
-                title = stringResource(R.string.send_confirm_title),
-                onNavigateBack = onNavigateBack
-            )
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = spacing.maxContentWidth)
-                    .testTag("send_confirm_screen"),
-                contentPadding = PaddingValues(
-                    horizontal = spacing.screenHorizontal,
-                    vertical = spacing.md
-                ),
-                verticalArrangement = Arrangement.spacedBy(spacing.md)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 120.dp)
+            )
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(22.dp)
             ) {
-                val connState = uiState.connectionState
-                if (connState is com.example.shareflow.domain.model.ConnectionState.Connected) {
-                    item(key = "active_connection") {
-                        com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard(
-                            connected = connState,
-                            onDisconnect = viewModel::disconnect
-                        )
-                    }
-                    if (uiState.selectedCount > 0) {
-                        item(key = "start_encrypted_transfer") {
-                            PrimaryActionButton(
-                                text = stringResource(R.string.transfer_start_encrypted_action),
-                                onClick = {
-                                    viewModel.startEncryptedTransfer(
-                                        onStarted = onOpenTransferProgress
-                                    )
-                                },
-                                enabled = !uiState.isStartingTransfer,
-                                leadingIcon = Icons.AutoMirrored.Filled.Send,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("send_confirm_start_transfer_button")
-                            )
-                        }
-                    }
-                } else if (uiState.selectedCount > 0) {
-                    item(key = "connect_first_hint") {
-                        Text(
-                            text = stringResource(R.string.transfer_connect_first_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (uiState.activeTransferCount > 0) {
-                    item(key = "open_active_transfers") {
-                        SecondaryActionButton(
-                            text = stringResource(R.string.transfer_open_progress_action),
-                            onClick = onOpenTransferProgress,
-                            outlined = false,
-                            leadingIcon = Icons.Filled.SwapVert,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("send_confirm_open_progress_button")
-                        )
-                    }
-                }
-
-                item(key = "package_summary") {
-                    Surface(
-                        shape = ShareFlowDesign.shapes.card,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(spacing.cardPadding),
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.send_confirm_summary_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.send_selected_count_label),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = ShareFlowFormatters.formatCount(uiState.selectedCount, locale),
-                                    style = ShareFlowMonoStyle,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.send_total_size_label),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = ShareFlowFormatters.formatBytes(uiState.totalSelectedBytes, locale),
-                                    style = ShareFlowMonoStyle,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.VerifiedUser,
-                                    contentDescription = null,
-                                    tint = semantic.verifiedBadge,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.send_confirm_sha256_note),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item(key = "peers_header") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionHeader(title = stringResource(R.string.send_confirm_peers_title))
-                        TextButton(
-                            onClick = viewModel::startPeerDiscovery,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .testTag("send_confirm_scan_button")
-                        ) {
-                            Text(text = stringResource(R.string.discovery_start_action))
-                        }
-                    }
-                }
-
-                if (peers.isEmpty()) {
-                    item(key = "no_peers") {
-                        EmptyState(
-                            icon = Icons.Filled.Devices,
-                            title = stringResource(R.string.send_confirm_no_peers_title),
-                            body = stringResource(R.string.send_confirm_no_peers_body),
-                            actionLabel = stringResource(R.string.send_open_qr_action),
-                            onAction = onOpenQrPairing,
-                            modifier = Modifier.testTag("send_confirm_empty_peers")
-                        )
-                    }
-                } else {
-                    items(items = peers, key = { it.deviceId }) { peer ->
-                        DeviceCard(
-                            device = peer,
-                            onClick = { viewModel.connectToPeer(peer) }
-                        )
-                    }
-                }
-
-                item(key = "qr_shortcut") {
-                    SecondaryActionButton(
-                        text = stringResource(R.string.send_open_qr_action),
-                        onClick = onOpenQrPairing,
-                        leadingIcon = Icons.Filled.QrCode2,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("send_confirm_qr_button")
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.send_clear_selection),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }

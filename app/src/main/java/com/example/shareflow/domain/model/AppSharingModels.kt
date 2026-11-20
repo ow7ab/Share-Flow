@@ -1,5 +1,8 @@
 package com.example.shareflow.domain.model
 
+import org.json.JSONArray
+import org.json.JSONObject
+
 /**
  * Classifies whether an installed application's public APK installation file(s) can be safely
  * extracted for offline peer-to-peer sharing without accessing any private application data.
@@ -31,7 +34,9 @@ data class ShareableAppInfo(
     val isSystemApp: Boolean,
     val isSplitApk: Boolean,
     val extractionStatus: ApkExtractionStatus,
-    val unavailableReason: String? = null
+    val unavailableReason: String? = null,
+    val categoryLabel: String = "",
+    val installedAtEpochMillis: Long = 0L
 ) {
     val isExtractable: Boolean
         get() = extractionStatus != ApkExtractionStatus.UNAVAILABLE
@@ -50,8 +55,82 @@ data class ShareableAppInfo(
 }
 
 /**
- * Represents an extracted public APK file (or split APK part) staged in ShareFlow's scoped export
- * cache with a verified streaming SHA-256 digest, ready to be queued in the Transfer Engine.
+ * JSON manifest emitted alongside split APK bundles so the receiver can verify
+ * completeness, package identity consistency, and per-part SHA-256 checksums before staging
+ * a multi-split Android PackageInstaller.Session.
+ */
+data class ShareFlowApkPartManifest(
+    val fileName: String,
+    val sizeBytes: Long,
+    val sha256: String,
+    val isBase: Boolean
+)
+
+data class ShareFlowAppBundleManifest(
+    val formatVersion: Int = 1,
+    val packageName: String,
+    val appName: String,
+    val versionName: String,
+    val versionCode: Long,
+    val baseApkFileName: String,
+    val parts: List<ShareFlowApkPartManifest>
+) {
+    fun toJsonString(): String {
+        val partsArray = JSONArray()
+        parts.forEach { part ->
+            partsArray.put(
+                JSONObject().apply {
+                    put("fileName", part.fileName)
+                    put("sizeBytes", part.sizeBytes)
+                    put("sha256", part.sha256)
+                    put("isBase", part.isBase)
+                }
+            )
+        }
+        return JSONObject().apply {
+            put("formatVersion", formatVersion)
+            put("packageName", packageName)
+            put("appName", appName)
+            put("versionName", versionName)
+            put("versionCode", versionCode)
+            put("baseApkFileName", baseApkFileName)
+            put("parts", partsArray)
+        }.toString()
+    }
+
+    companion object {
+        fun fromJsonString(raw: String): ShareFlowAppBundleManifest {
+            val obj = JSONObject(raw)
+            val partsArray = obj.optJSONArray("parts") ?: JSONArray()
+            val parts = buildList {
+                for (i in 0 until partsArray.length()) {
+                    val p = partsArray.getJSONObject(i)
+                    add(
+                        ShareFlowApkPartManifest(
+                            fileName = p.getString("fileName"),
+                            sizeBytes = p.optLong("sizeBytes", 0L),
+                            sha256 = p.getString("sha256"),
+                            isBase = p.optBoolean("isBase", false)
+                        )
+                    )
+                }
+            }
+            return ShareFlowAppBundleManifest(
+                formatVersion = obj.optInt("formatVersion", 1),
+                packageName = obj.getString("packageName"),
+                appName = obj.optString("appName", ""),
+                versionName = obj.optString("versionName", "1.0"),
+                versionCode = obj.optLong("versionCode", 0L),
+                baseApkFileName = obj.optString("baseApkFileName", "base.apk"),
+                parts = parts
+            )
+        }
+    }
+}
+
+/**
+ * Represents an extracted public APK file (or split APK part / bundle manifest) staged in
+ * ShareFlow's scoped export cache with a verified streaming SHA-256 digest.
  */
 data class ExtractedApkArtifact(
     val packageName: String,
@@ -63,7 +142,8 @@ data class ExtractedApkArtifact(
     val uriString: String,
     val sizeBytes: Long,
     val sha256Checksum: String,
-    val isSplitPart: Boolean
+    val isSplitPart: Boolean,
+    val isBundleManifest: Boolean = false
 )
 
 /**
@@ -87,7 +167,7 @@ enum class ReceivedApkIntegrityStatus {
 }
 
 /**
- * Verified metadata and integrity verdict for a received APK file.
+ * Verified metadata and integrity verdict for a received APK file or split APK bundle.
  */
 data class ReceivedApkInfo(
     val id: String,
@@ -103,7 +183,10 @@ data class ReceivedApkInfo(
     val integrityStatus: ReceivedApkIntegrityStatus,
     val statusDetail: String,
     val receivedAtEpochMillis: Long,
-    val peerDeviceName: String? = null
+    val peerDeviceName: String? = null,
+    val isSplitBundle: Boolean = false,
+    val splitBundleApkPaths: List<String> = emptyList(),
+    val bundleManifestPath: String? = null
 ) {
     val canLaunchSystemInstaller: Boolean
         get() = integrityStatus == ReceivedApkIntegrityStatus.VERIFIED_INSTALLABLE

@@ -1,0 +1,376 @@
+package com.example.shareflow.ui.receive
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
+import com.example.shareflow.core.common.ShareFlowFormatters
+import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.StatusPill
+import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
+import com.example.shareflow.core.permissions.PermissionManager
+import com.example.shareflow.data.apps.AppInstallSessionState
+import com.example.shareflow.data.apps.ApplicationInstallationManager
+import com.example.shareflow.domain.model.IncomingTransferOffer
+import com.example.shareflow.domain.model.ReceivedApkInfo
+import kotlinx.coroutines.launch
+
+/**
+ * Phase 1/11 Incoming Transfer Offer Approval dialog shown to the receiving user before any file
+ * bytes are accepted from a connected, authenticated sender.
+ */
+@Composable
+fun IncomingTransferOfferDialog(
+    offer: IncomingTransferOffer,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    val locale = ShareFlowDesign.locale
+    val spacing = ShareFlowDesign.spacing
+    val formattedSize = ShareFlowFormatters.formatBytes(offer.totalBytes, locale)
+
+    AlertDialog(
+        onDismissRequest = onReject,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.CloudDownload,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.receive_offer_title),
+                modifier = Modifier.testTag("incoming_transfer_offer_title")
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs)
+            ) {
+                Text(
+                    text = stringResource(R.string.receive_offer_from_format, offer.peer.displayName),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = stringResource(
+                        R.string.receive_offer_summary_format,
+                        offer.items.size,
+                        formattedSize
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                offer.items.take(5).forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = item.fileName,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = ShareFlowFormatters.formatBytes(item.fileSizeBytes, locale),
+                            style = ShareFlowMonoStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+                if (offer.items.size > 5) {
+                    Text(
+                        text = stringResource(R.string.receive_offer_more_items_format, offer.items.size - 5),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAccept,
+                modifier = Modifier.testTag("receive_offer_accept_button")
+            ) {
+                Text(text = stringResource(R.string.receive_offer_accept_action))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onReject,
+                modifier = Modifier.testTag("receive_offer_reject_button")
+            ) {
+                Text(text = stringResource(R.string.receive_offer_reject_action))
+            }
+        }
+    )
+}
+
+/**
+ * Phase 6 Receiver-side verified APK & Split APK bundle installer section powered by
+ * [ApplicationInstallationManager] (`PackageInstaller.Session`).
+ */
+@Composable
+fun ReceivedAppsInstallerCard(
+    receivedApks: List<ReceivedApkInfo>,
+    installationManager: ApplicationInstallationManager,
+    permissionManager: PermissionManager,
+    modifier: Modifier = Modifier
+) {
+    val installable = receivedApks.filter { it.canLaunchSystemInstaller }
+    if (installable.isEmpty()) return
+
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val installState by installationManager.installState.collectAsStateWithLifecycle()
+    val spacing = ShareFlowDesign.spacing
+    val locale = ShareFlowDesign.locale
+    val semantic = ShareFlowDesign.semanticColors
+
+    // Automatically launch Android's system installation confirmation Intent when PackageInstaller signals STATUS_PENDING_USER_ACTION
+    LaunchedEffect(installState) {
+        val state = installState
+        if (state is AppInstallSessionState.AwaitingUserConfirmation) {
+            runCatching { context.startActivity(state.confirmationIntent) }
+        }
+    }
+
+    // Automatically resume pending install when user returns from Android's Install Unknown Apps Settings
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    installationManager.resumePendingInstallIfPermitted()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("receive_apps_installer_section"),
+        shape = ShareFlowDesign.shapes.card,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            SectionHeader(title = stringResource(R.string.receive_apps_ready_title))
+
+            // Active installation session feedback banner
+            when (val state = installState) {
+                AppInstallSessionState.Idle -> Unit
+                is AppInstallSessionState.Validating -> {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = stringResource(R.string.receive_app_install_validating),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                is AppInstallSessionState.Staging -> {
+                    LinearProgressIndicator(
+                        progress = { state.progressFraction },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.receive_app_install_staging,
+                            (state.progressFraction * 100f).toInt().coerceIn(0, 100)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                is AppInstallSessionState.NeedsUnknownSourcesPermission -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        Text(
+                            text = stringResource(R.string.perm_install_unknown_body),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        PrimaryActionButton(
+                            text = stringResource(R.string.perm_open_settings_action),
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(permissionManager.createManageUnknownSourcesIntent())
+                                }
+                            },
+                            leadingIcon = Icons.Filled.InstallMobile,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_install_unknown_sources_button")
+                        )
+                    }
+                }
+
+                is AppInstallSessionState.AwaitingUserConfirmation -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.receive_app_install_confirm_prompt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(state.confirmationIntent) }
+                            }
+                        ) {
+                            Text(stringResource(R.string.receive_app_install_confirm_action))
+                        }
+                    }
+                }
+
+                is AppInstallSessionState.Succeeded -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = semantic.verifiedBadge,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.receive_app_install_success, state.appName),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantic.verifiedBadge
+                        )
+                    }
+                }
+
+                is AppInstallSessionState.Failed -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.receive_app_install_failed, state.reason),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            installable.take(5).forEach { apk ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Android,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = apk.appLabel ?: apk.fileName,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val meta = listOfNotNull(
+                            apk.versionName?.let { "v$it" },
+                            ShareFlowFormatters.formatBytes(apk.fileSizeBytes, locale)
+                        ).joinToString(" • ")
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (apk.isSplitBundle) {
+                            StatusPill(
+                                label = stringResource(
+                                    R.string.receive_app_split_bundle_badge,
+                                    apk.splitBundleApkPaths.size
+                                ),
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                    SecondaryActionButton(
+                        text = stringResource(R.string.receive_app_install_action),
+                        onClick = {
+                            scope.launch {
+                                installationManager.startInstallation(apk)
+                            }
+                        },
+                        outlined = false,
+                        leadingIcon = Icons.Filled.InstallMobile,
+                        modifier = Modifier.testTag("receive_install_apk_${apk.id}")
+                    )
+                }
+            }
+        }
+    }
+}

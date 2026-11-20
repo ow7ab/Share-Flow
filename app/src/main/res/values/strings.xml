@@ -1001,5 +1001,83 @@
     <string name="diag_value_ssid_unavailable">Unavailable</string>
     <string name="module_connection_diagnostics_title">Connection Diagnostics</string>
     <string name="module_connection_diagnostics_desc">Inspect local hotspot, bound Wi-Fi network, NSD/UDP discovery, and test encrypted connectivity.</string>
+
+    <!-- Unified SHAREit Experience: Smart Permission UX -->
+    <string name="perm_allow_continue_action">Allow &amp; Continue</string>
+    <string name="perm_open_settings_action">Open Settings</string>
+    <string name="perm_settings_resume_note">Once enabled in Settings, return to ShareFlow to continue automatically.</string>
+    <string name="perm_wifi_receive_title">Nearby Wi-Fi Permission Required</string>
+    <string name="perm_wifi_receive_body">ShareFlow needs Nearby Wi-Fi Devices permission to create a temporary local hotspot or Wi-Fi Direct group so nearby devices can connect directly.</string>
+    <string name="perm_wifi_send_title">Nearby Wi-Fi Permission Required</string>
+    <string name="perm_wifi_send_body">ShareFlow needs Nearby Wi-Fi Devices permission to discover nearby ShareFlow receivers and join their temporary local network.</string>
+    <string name="perm_camera_qr_title">Camera Permission Required</string>
+    <string name="perm_camera_qr_body">ShareFlow uses the camera strictly to scan the receiver QR code for instant automatic pairing.</string>
+    <string name="perm_install_unknown_title">Allow App Installations</string>
+    <string name="perm_install_unknown_body">Android requires permission to install verified received applications via the system PackageInstaller. You will always confirm each installation.</string>
+    <string name="perm_notifications_title">Transfer Notifications</string>
+    <string name="perm_notifications_body">Allow notifications to display live file transfer progress and completion status.</string>
+
+    <!-- Unified SHAREit Send: 4 Primary Tabs & Controls -->
+    <string name="send_tab_photos">Photos</string>
+    <string name="send_tab_videos">Videos</string>
+    <string name="send_tab_apps">Apps</string>
+    <string name="send_tab_files">Files</string>
+    <string name="send_select_all">Select All</string>
+    <string name="send_deselect_all">Deselect All</string>
+    <string name="send_photos_pick_action">Select Photos from Device</string>
+    <string name="send_photos_all_filter">All Photos</string>
+    <string name="send_photos_recent_filter">Recent</string>
+    <string name="send_photos_albums_filter">Albums</string>
+    <string name="send_photos_empty_title">No Photos Loaded Yet</string>
+    <string name="send_photos_empty_body">Use the Android Photo Picker to browse and select original-quality photos with zero broad storage permissions.</string>
+    <string name="send_photos_original_note">Original quality preserved — no forced compression.</string>
+    <string name="send_videos_pick_action">Select Videos from Device</string>
+    <string name="send_videos_empty_title">No Videos Loaded Yet</string>
+    <string name="send_videos_empty_body">Use the Android Photo Picker to browse and select full-resolution videos to send at original quality.</string>
+    <string name="send_videos_preview_action">Preview</string>
+    <string name="send_apps_search_placeholder">Search installed apps or package name…</string>
+    <string name="send_apps_sort_name">Name</string>
+    <string name="send_apps_sort_size">Size</string>
+    <string name="send_apps_sort_recent">Recent</string>
+    <string name="send_apps_user_filter">User Apps</string>
+    <string name="send_apps_system_filter">Include System</string>
+    <string name="send_apps_extracting_status">Packaging verified APKs &amp; split bundles…</string>
+    <string name="send_apps_split_badge">Split APK (%1$d)</string>
+    <string name="send_apps_selected_suffix">apps</string>
+    <string name="send_files_filter_all">All Files</string>
+    <string name="send_files_filter_docs">Documents</string>
+    <string name="send_files_filter_audio">Audio</string>
+    <string name="send_files_filter_archives">Archives</string>
+    <string name="send_files_filter_apks">APK Files</string>
+    <string name="send_files_filter_other">Other</string>
+    <string name="send_selection_summary_title">Selected Items</string>
+
+    <!-- Unified Send Connection Step (Inline Smart QR + Nearby) -->
+    <string name="send_connect_scan_qr_tab">Scan QR</string>
+    <string name="send_connect_manual_code_tab">Manual Code</string>
+    <string name="send_connect_nearby_tab">Nearby</string>
+    <string name="send_connect_header_subtitle">Scan the receiver QR code to auto-join its local network and send immediately over AES-256-GCM.</string>
+    <string name="send_connect_camera_grant_action">Enable Camera Scanner</string>
+    <string name="send_connect_manual_submit_action">Connect with Code</string>
+    <string name="send_connect_ready_to_send">Authenticated &amp; ready to send selected items</string>
+
+    <!-- Unified Receive: Incoming Offer Approval & PackageInstaller -->
+    <string name="receive_offer_title">Incoming File Transfer</string>
+    <string name="receive_offer_from_format">From %1$s</string>
+    <string name="receive_offer_summary_format">%1$d item(s) • %2$s</string>
+    <string name="receive_offer_more_items_format">+%1$d more item(s)</string>
+    <string name="receive_offer_accept_action">Accept &amp; Receive</string>
+    <string name="receive_offer_reject_action">Decline</string>
+    <string name="receive_apps_ready_title">Received Applications Ready to Install</string>
+    <string name="receive_app_install_action">Install</string>
+    <string name="receive_app_update_action">Update</string>
+    <string name="receive_app_split_bundle_badge">Split Bundle (%1$d APKs)</string>
+    <string name="receive_app_install_validating">Verifying SHA-256 &amp; APK integrity…</string>
+    <string name="receive_app_install_staging">Staging package (%1$d%%)…</string>
+    <string name="receive_app_install_confirm_prompt">Confirm installation in Android system dialog</string>
+    <string name="receive_app_install_confirm_action">Open Installer</string>
+    <string name="receive_app_install_success">Installed %1$s successfully</string>
+    <string name="receive_app_install_failed">Installation failed: %1$s</string>
 </resources>
+
 

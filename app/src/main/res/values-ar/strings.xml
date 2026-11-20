@@ -1001,5 +1001,83 @@
     <string name="diag_value_ssid_unavailable">غير متوفر</string>
     <string name="module_connection_diagnostics_title">تشخيص الاتصال</string>
     <string name="module_connection_diagnostics_desc">فحص نقطة الاتصال المحلية وربط شبكة Wi-Fi واكتشاف NSD/UDP واختبار الاتصال المشفّر.</string>
+
+    <!-- تجربة SHAREit الموحّدة: إدارة الأذونات الذكية -->
+    <string name="perm_allow_continue_action">السماح والمتابعة</string>
+    <string name="perm_open_settings_action">فتح الإعدادات</string>
+    <string name="perm_settings_resume_note">بعد التفعيل من الإعدادات، عُد إلى ShareFlow للاستئناف تلقائياً.</string>
+    <string name="perm_wifi_receive_title">إذن أجهزة Wi-Fi القريبة مطلوب</string>
+    <string name="perm_wifi_receive_body">يحتاج ShareFlow إلى إذن أجهزة Wi-Fi القريبة لإنشاء نقطة اتصال محلية مؤقتة أو مجموعة Wi-Fi Direct ليتمكن المرسل من الاتصال مباشرة.</string>
+    <string name="perm_wifi_send_title">إذن أجهزة Wi-Fi القريبة مطلوب</string>
+    <string name="perm_wifi_send_body">يحتاج ShareFlow إلى إذن أجهزة Wi-Fi القريبة لاكتشاف الأجهزة المستقبِلة القريبة والانضمام إلى شبكتها المؤقتة.</string>
+    <string name="perm_camera_qr_title">إذن الكاميرا مطلوب</string>
+    <string name="perm_camera_qr_body">يستخدم ShareFlow الكاميرا حصراً لمسح رمز QR الخاص بالمستقبِل للاقتران التلقائي الفوري.</string>
+    <string name="perm_install_unknown_title">السماح بتثبيت التطبيقات</string>
+    <string name="perm_install_unknown_body">يتطلب نظام Android إذن تثبيت التطبيقات المستلَمة الموثّقة عبر مثبّت الحزم الرسمي للنظام. سيُطلب تأكيدك دائماً لكل تثبيت.</string>
+    <string name="perm_notifications_title">إشعارات النقل</string>
+    <string name="perm_notifications_body">اسمح بالإشعارات لعرض تقدم نقل الملفات وحالة الاكتمال مباشرة.</string>
+
+    <!-- الإرسال الموحّد: التبويبات الأربعة وأدوات الاختيار -->
+    <string name="send_tab_photos">الصور</string>
+    <string name="send_tab_videos">الفيديوهات</string>
+    <string name="send_tab_apps">التطبيقات</string>
+    <string name="send_tab_files">الملفات</string>
+    <string name="send_select_all">تحديد الكل</string>
+    <string name="send_deselect_all">إلغاء التحديد</string>
+    <string name="send_photos_pick_action">اختيار صور من الجهاز</string>
+    <string name="send_photos_all_filter">كل الصور</string>
+    <string name="send_photos_recent_filter">الأحدث</string>
+    <string name="send_photos_albums_filter">الألبومات</string>
+    <string name="send_photos_empty_title">لا توجد صور محمّلة بعد</string>
+    <string name="send_photos_empty_body">استخدم منتقي صور Android لاستعراض الصور واختيارها بالجودة الأصلية دون الحاجة لأذونات تخزين شاملة.</string>
+    <string name="send_photos_original_note">يتم الحفاظ على الجودة الأصلية دون ضغط إجباري.</string>
+    <string name="send_videos_pick_action">اختيار فيديوهات من الجهاز</string>
+    <string name="send_videos_empty_title">لا توجد فيديوهات محمّلة بعد</string>
+    <string name="send_videos_empty_body">استخدم منتقي وسائط Android لاختيار الفيديوهات وإرسالها بالدقة الأصلية الكاملة.</string>
+    <string name="send_videos_preview_action">معاينة</string>
+    <string name="send_apps_search_placeholder">ابحث في التطبيقات المثبّتة أو اسم الحزمة…</string>
+    <string name="send_apps_sort_name">الاسم</string>
+    <string name="send_apps_sort_size">الحجم</string>
+    <string name="send_apps_sort_recent">الأحدث</string>
+    <string name="send_apps_user_filter">تطبيقات المستخدم</string>
+    <string name="send_apps_system_filter">تضمين النظام</string>
+    <string name="send_apps_extracting_status">جارٍ تجهيز حزم APK والتحقق من التجزئة…</string>
+    <string name="send_apps_split_badge">حزمة مقسّمة (%1$d)</string>
+    <string name="send_apps_selected_suffix">تطبيقات</string>
+    <string name="send_files_filter_all">كل الملفات</string>
+    <string name="send_files_filter_docs">المستندات</string>
+    <string name="send_files_filter_audio">الصوتيات</string>
+    <string name="send_files_filter_archives">الأرشيفات</string>
+    <string name="send_files_filter_apks">ملفات APK</string>
+    <string name="send_files_filter_other">أخرى</string>
+    <string name="send_selection_summary_title">العناصر المحددة</string>
+
+    <!-- خطوة الاتصال الموحّدة داخل الإرسال -->
+    <string name="send_connect_scan_qr_tab">مسح QR</string>
+    <string name="send_connect_manual_code_tab">رمز يدوي</string>
+    <string name="send_connect_nearby_tab">الأجهزة القريبة</string>
+    <string name="send_connect_header_subtitle">امسح رمز QR على الجهاز المستقبِل للانضمام تلقائياً إلى شبكته المحلية والإرسال فوراً بتشفير AES-256-GCM.</string>
+    <string name="send_connect_camera_grant_action">تفعيل ماسح الكاميرا</string>
+    <string name="send_connect_manual_submit_action">الاتصال بالرمز</string>
+    <string name="send_connect_ready_to_send">تمت المصادقة والجهاز جاهز لإرسال العناصر المحددة</string>
+
+    <!-- الاستقبال الموحّد: الموافقة على الاستلام ومثبّت التطبيقات -->
+    <string name="receive_offer_title">طلب استلام ملفات وارد</string>
+    <string name="receive_offer_from_format">من %1$s</string>
+    <string name="receive_offer_summary_format">%1$d عنصر • %2$s</string>
+    <string name="receive_offer_more_items_format">+%1$d عناصر إضافية</string>
+    <string name="receive_offer_accept_action">قبول واستلام</string>
+    <string name="receive_offer_reject_action">رفض</string>
+    <string name="receive_apps_ready_title">التطبيقات المستلَمة الجاهزة للتثبيت</string>
+    <string name="receive_app_install_action">تثبيت</string>
+    <string name="receive_app_update_action">تحديث</string>
+    <string name="receive_app_split_bundle_badge">حزمة مقسّمة (%1$d APK)</string>
+    <string name="receive_app_install_validating">جارٍ التحقق من SHA-256 وسلامة الحزمة…</string>
+    <string name="receive_app_install_staging">جارٍ تجهيز الحزمة (%1$d%%)…</string>
+    <string name="receive_app_install_confirm_prompt">أكّد التثبيت في نافذة نظام Android</string>
+    <string name="receive_app_install_confirm_action">فتح المثبّت</string>
+    <string name="receive_app_install_success">تم تثبيت %1$s بنجاح</string>
+    <string name="receive_app_install_failed">فشل التثبيت: %1$s</string>
 </resources>
+
 

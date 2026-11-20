@@ -8,10 +8,12 @@ import com.example.shareflow.core.common.Clock
 import com.example.shareflow.core.common.DefaultDispatcherProvider
 import com.example.shareflow.core.common.DispatcherProvider
 import com.example.shareflow.core.common.SystemClock
+import com.example.shareflow.core.permissions.PermissionManager
 import com.example.shareflow.core.security.AndroidKeystoreCipher
 import com.example.shareflow.core.security.ChecksumVerifier
 import com.example.shareflow.core.security.KeystoreCipher
 import com.example.shareflow.core.security.Sha256ChecksumVerifier
+import com.example.shareflow.data.apps.ApplicationInstallationManager
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
 import com.example.shareflow.data.repository.AndroidAppSharingRepository
@@ -39,6 +41,7 @@ import com.example.shareflow.network.LocalSessionController
 import com.example.shareflow.network.coordinator.ConnectionCoordinator
 import com.example.shareflow.network.coordinator.DefaultConnectionCoordinator
 import com.example.shareflow.network.coordinator.SmartConnectionCoordinator
+import com.example.shareflow.network.coordinator.UnifiedConnectionManager
 import com.example.shareflow.network.discovery.AndroidSessionServiceDiscovery
 import com.example.shareflow.network.discovery.SessionServiceDiscovery
 import com.example.shareflow.network.qr.SmartQrPairingProtocol
@@ -95,6 +98,8 @@ interface AppContainer {
     val appSharingRepository: AppSharingRepository
     val localSessionController: LocalSessionController
     val networkPermissionHelper: NetworkPermissionHelper
+    val permissionManager: PermissionManager
+    val applicationInstallationManager: ApplicationInstallationManager
     val deviceIdentityManager: DeviceIdentityManager
     val connectionCoordinator: ConnectionCoordinator
     val smartQrPairingProtocol: SmartQrPairingProtocol
@@ -103,6 +108,7 @@ interface AppContainer {
     val existingLocalWiFiStrategy: ExistingLocalWiFiStrategy
     val sessionServiceDiscovery: SessionServiceDiscovery
     val smartConnectionCoordinator: SmartConnectionCoordinator
+    val unifiedConnectionManager: UnifiedConnectionManager
     val deviceDiscoveryRepository: DeviceDiscoveryRepository
     val connectionRepository: ConnectionRepository
     val transferDataSource: TransferDataSource
@@ -328,6 +334,21 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
+    override val permissionManager: PermissionManager by lazy {
+        PermissionManager(
+            context = appContext,
+            networkPermissionHelper = networkPermissionHelper
+        )
+    }
+
+    override val applicationInstallationManager: ApplicationInstallationManager by lazy {
+        ApplicationInstallationManager(
+            context = appContext,
+            checksumVerifier = checksumVerifier,
+            permissionManager = permissionManager
+        )
+    }
+
     override val transferManager: TransferManager by lazy {
         TransferManager(
             connectionCoordinator = connectionCoordinator,
@@ -350,7 +371,18 @@ class DefaultAppContainer(context: Context) : AppContainer {
             recoveryManager = transferRecoveryManager,
             destinationRootProvider = { ChunkProcessor.defaultReceiveRoot(appContext) },
             dispatchers = dispatchers,
-            clock = clock
+            clock = clock,
+            requireExplicitOfferApproval = true
+        )
+    }
+
+    override val unifiedConnectionManager: UnifiedConnectionManager by lazy {
+        UnifiedConnectionManager(
+            smartCoordinator = smartConnectionCoordinator,
+            connectionRepository = connectionRepository,
+            discoveryRepository = deviceDiscoveryRepository,
+            transferManager = transferManager,
+            permissionManager = permissionManager
         )
     }
 

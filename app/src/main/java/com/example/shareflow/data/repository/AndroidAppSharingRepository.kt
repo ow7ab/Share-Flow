@@ -18,6 +18,8 @@ import com.example.shareflow.domain.model.ExtractedApkArtifact
 import com.example.shareflow.domain.model.InstalledAppInfo
 import com.example.shareflow.domain.model.ReceivedApkInfo
 import com.example.shareflow.domain.model.ReceivedApkIntegrityStatus
+import com.example.shareflow.domain.model.ShareFlowApkPartManifest
+import com.example.shareflow.domain.model.ShareFlowAppBundleManifest
 import com.example.shareflow.domain.model.ShareableAppInfo
 import com.example.shareflow.domain.model.TransferDirection
 import com.example.shareflow.domain.model.TransferFileType
@@ -217,10 +219,19 @@ class AndroidAppSharingRepository(
                 val relativeFolder = "${safeAppStem}_split_apk"
                 val targetFolder = File(batchDir, relativeFolder).apply { mkdirs() }
 
+                val bundleParts = mutableListOf<ShareFlowApkPartManifest>()
                 val baseDest = File(targetFolder, "base.apk")
                 when (val copyRes = streamCopyWithSha256(baseFile, baseDest)) {
                     is AppResult.Failure -> return@withContext copyRes
                     is AppResult.Success -> {
+                        bundleParts.add(
+                            ShareFlowApkPartManifest(
+                                fileName = baseDest.name,
+                                sizeBytes = copyRes.data.sizeBytes,
+                                sha256 = copyRes.data.sha256Hex,
+                                isBase = true
+                            )
+                        )
                         artifacts.add(
                             ExtractedApkArtifact(
                                 packageName = app.packageName,
@@ -253,6 +264,14 @@ class AndroidAppSharingRepository(
                     when (val splitCopy = streamCopyWithSha256(splitSource, splitDest)) {
                         is AppResult.Failure -> return@withContext splitCopy
                         is AppResult.Success -> {
+                            bundleParts.add(
+                                ShareFlowApkPartManifest(
+                                    fileName = splitDest.name,
+                                    sizeBytes = splitCopy.data.sizeBytes,
+                                    sha256 = splitCopy.data.sha256Hex,
+                                    isBase = false
+                                )
+                            )
                             artifacts.add(
                                 ExtractedApkArtifact(
                                     packageName = app.packageName,
@@ -270,6 +289,37 @@ class AndroidAppSharingRepository(
                         }
                     }
                 }
+
+                // Emit verified JSON bundle manifest so receiver validates and installs all split parts together.
+                val manifest = ShareFlowAppBundleManifest(
+                    packageName = app.packageName,
+                    appName = app.appName,
+                    versionName = app.versionName,
+                    versionCode = app.versionCode,
+                    baseApkFileName = baseDest.name,
+                    parts = bundleParts
+                )
+                val manifestJson = manifest.toJsonString()
+                val manifestFile = File(targetFolder, BUNDLE_MANIFEST_FILE_NAME)
+                manifestFile.writeText(manifestJson, Charsets.UTF_8)
+                val manifestSha = MessageDigest.getInstance("SHA-256")
+                    .digest(manifestFile.readBytes())
+                    .joinToString("") { "%02x".format(it) }
+                artifacts.add(
+                    ExtractedApkArtifact(
+                        packageName = app.packageName,
+                        appName = app.appName,
+                        versionName = app.versionName,
+                        fileName = manifestFile.name,
+                        relativePath = relativeFolder,
+                        localFilePath = manifestFile.absolutePath,
+                        uriString = Uri.fromFile(manifestFile).toString(),
+                        sizeBytes = manifestFile.length(),
+                        sha256Checksum = manifestSha,
+                        isSplitPart = true,
+                        isBundleManifest = true
+                    )
+                )
             } else {
                 val destName = "$safeAppStem.apk"
                 val destFile = allocateUniqueExportFile(batchDir, destName)
@@ -502,6 +552,8 @@ class AndroidAppSharingRepository(
         val isSplitApk = splitPaths.isNotEmpty()
 
         val evaluation = evaluateExtractionAvailability(basePath, splitPaths)
+        val categoryLabel = resolveAppCategoryLabel(appInfo)
+        val installedAt = maxOf(pkgInfo.lastUpdateTime, pkgInfo.firstInstallTime)
 
         return ShareableAppInfo(
             packageName = packageName,
@@ -514,8 +566,25 @@ class AndroidAppSharingRepository(
             isSystemApp = isSystemApp,
             isSplitApk = isSplitApk,
             extractionStatus = evaluation.status,
-            unavailableReason = evaluation.unavailableReason
+            unavailableReason = evaluation.unavailableReason,
+            categoryLabel = categoryLabel,
+            installedAtEpochMillis = installedAt
         )
+    }
+
+    private fun resolveAppCategoryLabel(appInfo: ApplicationInfo): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return ""
+        return when (appInfo.category) {
+            ApplicationInfo.CATEGORY_GAME -> "Games"
+            ApplicationInfo.CATEGORY_AUDIO -> "Audio"
+            ApplicationInfo.CATEGORY_VIDEO -> "Video"
+            ApplicationInfo.CATEGORY_IMAGE -> "Photo"
+            ApplicationInfo.CATEGORY_SOCIAL -> "Social"
+            ApplicationInfo.CATEGORY_NEWS -> "News"
+            ApplicationInfo.CATEGORY_MAPS -> "Maps"
+            ApplicationInfo.CATEGORY_PRODUCTIVITY -> "Productivity"
+            else -> ""
+        }
     }
 
     private data class ExtractionEvaluation(
@@ -669,6 +738,20 @@ class AndroidAppSharingRepository(
             )
         }
 
+        val companionManifest = apkFile.parentFile
+            ?.let { File(it, BUNDLE_MANIFEST_FILE_NAME) }
+            ?.takeIf { it.exists() && it.isFile }
+        val siblingApks = if (companionManifest != null) {
+            apkFile.parentFile?.listFiles()
+                ?.filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
+                ?.sortedBy { if (it.name.equals("base.apk", ignoreCase = true)) 0 else 1 }
+                ?.map { it.absolutePath }
+                .orEmpty()
+        } else {
+            emptyList()
+        }
+        val isSplitBundle = companionManifest != null && siblingApks.size > 1
+
         return if (normalizedExpected != null) {
             ReceivedApkInfo(
                 id = recordId,
@@ -682,9 +765,16 @@ class AndroidAppSharingRepository(
                 expectedSha256 = normalizedExpected,
                 actualSha256 = actualSha256,
                 integrityStatus = ReceivedApkIntegrityStatus.VERIFIED_INSTALLABLE,
-                statusDetail = "SHA-256 checksum and Android APK archive verified. Ready for system installer.",
+                statusDetail = if (isSplitBundle) {
+                    "Verified split APK bundle (${siblingApks.size} parts) ready for PackageInstaller."
+                } else {
+                    "SHA-256 checksum and Android APK archive verified. Ready for system installer."
+                },
                 receivedAtEpochMillis = receivedAtEpochMillis,
-                peerDeviceName = peerDeviceName
+                peerDeviceName = peerDeviceName,
+                isSplitBundle = isSplitBundle,
+                splitBundleApkPaths = siblingApks,
+                bundleManifestPath = companionManifest?.absolutePath
             )
         } else {
             ReceivedApkInfo(
@@ -701,7 +791,10 @@ class AndroidAppSharingRepository(
                 integrityStatus = ReceivedApkIntegrityStatus.UNVERIFIED_EXTERNAL,
                 statusDetail = "Valid APK found on disk, but no ShareFlow transfer checksum record exists.",
                 receivedAtEpochMillis = receivedAtEpochMillis,
-                peerDeviceName = peerDeviceName
+                peerDeviceName = peerDeviceName,
+                isSplitBundle = isSplitBundle,
+                splitBundleApkPaths = siblingApks,
+                bundleManifestPath = companionManifest?.absolutePath
             )
         }
     }
@@ -788,6 +881,7 @@ class AndroidAppSharingRepository(
     companion object {
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
         const val APK_EXPORT_DIR_NAME = "shareflow_apk_exports"
+        const val BUNDLE_MANIFEST_FILE_NAME = "shareflow_app_manifest.json"
         private const val STREAM_BUFFER_BYTES = 64 * 1024
         private const val EXPORT_CACHE_TTL_MS = 24L * 60L * 60L * 1000L
     }

@@ -69,6 +69,8 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
+import com.example.shareflow.core.permissions.ShareFlowPermissionFeature
+import com.example.shareflow.core.permissions.rememberPermissionRequestCoordinator
 import com.example.shareflow.domain.model.ConnectionState
 import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
@@ -104,6 +106,9 @@ fun ReceiveScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val activeTransferSessions by container.transferManager.activeSessions.collectAsStateWithLifecycle()
+    val receivedApks by container.appSharingRepository.observeReceivedApks()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val permissionCoordinator = rememberPermissionRequestCoordinator(container.permissionManager)
     val spacing = ShareFlowDesign.spacing
     val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
@@ -387,7 +392,23 @@ fun ReceiveScreen(
                             } else {
                                 PrimaryActionButton(
                                     text = stringResource(R.string.receive_start_action),
-                                    onClick = viewModel::toggleReceiving,
+                                    onClick = {
+                                        if (uiState.enableLocalHotspot && missingWifiPerms.isNotEmpty()) {
+                                            permissionCoordinator.ensureFeatureReady(
+                                                feature = ShareFlowPermissionFeature.RECEIVE_WIFI_HOTSPOT,
+                                                onGranted = {
+                                                    missingWifiPerms = container.networkPermissionHelper.missingNearbyWifiPermissions()
+                                                    viewModel.toggleReceiving()
+                                                },
+                                                onDenied = {
+                                                    // Gracefully continue with fallback strategy (e.g. Existing Local Wi-Fi)
+                                                    viewModel.toggleReceiving()
+                                                }
+                                            )
+                                        } else {
+                                            viewModel.toggleReceiving()
+                                        }
+                                    },
                                     leadingIcon = Icons.Filled.CloudDownload,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -587,6 +608,17 @@ fun ReceiveScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // Received Applications Ready to Install (PackageInstaller.Session)
+                if (receivedApks.any { it.canLaunchSystemInstaller }) {
+                    item(key = "received_apps_installer") {
+                        ReceivedAppsInstallerCard(
+                            receivedApks = receivedApks,
+                            installationManager = container.applicationInstallationManager,
+                            permissionManager = container.permissionManager
+                        )
                     }
                 }
 

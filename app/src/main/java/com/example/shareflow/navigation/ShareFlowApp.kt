@@ -78,6 +78,8 @@ fun ShareFlowApp(
     )
     val pendingIncoming by container.connectionRepository.pendingIncomingRequest
         .collectAsStateWithLifecycle()
+    val pendingTransferOffer by container.unifiedConnectionManager.pendingIncomingOffer
+        .collectAsStateWithLifecycle()
     val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -131,6 +133,17 @@ fun ShareFlowApp(
                     approvalScope.launch {
                         container.connectionRepository.rejectIncomingConnection(request.requestId)
                     }
+                }
+            )
+        }
+        pendingTransferOffer?.let { offer ->
+            com.example.shareflow.ui.receive.IncomingTransferOfferDialog(
+                offer = offer,
+                onAccept = {
+                    container.unifiedConnectionManager.approveIncomingTransferOffer(offer.sessionId)
+                },
+                onReject = {
+                    container.unifiedConnectionManager.rejectIncomingTransferOffer(offer.sessionId)
                 }
             )
         }
