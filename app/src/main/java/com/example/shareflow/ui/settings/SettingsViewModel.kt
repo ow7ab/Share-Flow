@@ -6,6 +6,10 @@ import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.core.common.Clock
 import com.example.shareflow.core.common.SystemClock
 import com.example.shareflow.core.security.KeystoreCipher
+import com.example.shareflow.data.update.CloudUpdateManager
+import com.example.shareflow.data.update.CloudUpdateManifest
+import com.example.shareflow.data.update.CloudUpdateState
+import com.example.shareflow.data.update.UpdateInstallLaunchResult
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.AppSettings
@@ -21,6 +25,7 @@ import com.example.shareflow.domain.repository.TransferHistoryRepository
 import com.example.shareflow.domain.repository.TrustedDeviceRepository
 import com.example.shareflow.network.security.DeviceIdentityManager
 import com.example.shareflow.utilities.UtilitiesRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,19 +42,25 @@ enum class SettingsFeedbackType {
     HISTORY_CLEARED,
     HISTORY_PRUNED,
     FAVORITES_CLEARED,
-    TRUSTED_REVOKED
+    TRUSTED_REVOKED,
+    UPDATE_URL_SAVED,
+    UPDATE_INSTALL_PERMISSION_REQUIRED,
+    UPDATE_INSTALL_LAUNCH_FAILED
 }
 
 data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     val deviceNameDraft: String = AppSettings.DEFAULT_DEVICE_NAME,
     val portDraft: String = AppSettings.DEFAULT_TRANSFER_PORT.toString(),
+    val cloudUpdateUrlDraft: String = "",
     val deviceNameError: Boolean = false,
     val portError: Boolean = false,
+    val cloudUpdateUrlError: Boolean = false,
     val isKeystoreAvailable: Boolean = false,
     val localIdentity: LocalDeviceIdentity? = null,
     val trustedDeviceCount: Int = 0,
     val temporaryCacheBytes: Long = 0L,
+    val cloudUpdateState: CloudUpdateState = CloudUpdateState.Idle,
     val isSaving: Boolean = false,
     val feedbackEvent: SettingsFeedbackType? = null,
     val errorMessage: String? = null
@@ -62,8 +73,11 @@ class SettingsViewModel(
     private val transferHistoryRepository: TransferHistoryRepository? = null,
     private val trustedDeviceRepository: TrustedDeviceRepository? = null,
     private val utilitiesRepository: UtilitiesRepository? = null,
+    private val cloudUpdateManager: CloudUpdateManager? = null,
     private val clock: Clock = SystemClock()
 ) : ViewModel() {
+
+    private var activeUpdateJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(
@@ -81,8 +95,10 @@ class SettingsViewModel(
                         settings = persisted,
                         deviceNameDraft = persisted.deviceName,
                         portDraft = persisted.transferPort.toString(),
+                        cloudUpdateUrlDraft = persisted.cloudUpdateManifestUrl,
                         deviceNameError = false,
-                        portError = false
+                        portError = false,
+                        cloudUpdateUrlError = false
                     )
                 }
             }
@@ -91,6 +107,13 @@ class SettingsViewModel(
             viewModelScope.launch {
                 repo.observeTrustedCount().collectLatest { count ->
                     _uiState.update { it.copy(trustedDeviceCount = count) }
+                }
+            }
+        }
+        cloudUpdateManager?.let { updater ->
+            viewModelScope.launch {
+                updater.state.collectLatest { updateState ->
+                    _uiState.update { it.copy(cloudUpdateState = updateState) }
                 }
             }
         }
@@ -343,6 +366,93 @@ class SettingsViewModel(
                         errorMessage = result.error.message
                     )
                 }
+            }
+        }
+    }
+
+    fun onCloudUpdateUrlDraftChange(value: String) {
+        _uiState.update {
+            it.copy(
+                cloudUpdateUrlDraft = value,
+                cloudUpdateUrlError = false,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun saveCloudUpdateUrl() {
+        val draft = _uiState.value.cloudUpdateUrlDraft.trim()
+        if (!SettingsValidator.isValidOptionalHttpsUpdateUrl(draft)) {
+            _uiState.update { it.copy(cloudUpdateUrlError = true) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            when (val res = settingsRepository.updateCloudUpdateManifestUrl(draft)) {
+                is AppResult.Success -> {
+                    cloudUpdateManager?.resetState()
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            cloudUpdateUrlError = false,
+                            feedbackEvent = SettingsFeedbackType.UPDATE_URL_SAVED,
+                            errorMessage = null
+                        )
+                    }
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        cloudUpdateUrlError = true,
+                        errorMessage = res.error.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun checkForCloudUpdates() {
+        val updater = cloudUpdateManager ?: return
+        val draftUrl = _uiState.value.cloudUpdateUrlDraft.trim()
+        val persistedUrl = _uiState.value.settings.cloudUpdateManifestUrl.trim()
+        val targetUrl = draftUrl.ifEmpty { persistedUrl }
+        if (draftUrl.isNotEmpty() && !SettingsValidator.isValidOptionalHttpsUpdateUrl(draftUrl)) {
+            _uiState.update { it.copy(cloudUpdateUrlError = true) }
+            return
+        }
+        activeUpdateJob?.cancel()
+        activeUpdateJob = viewModelScope.launch {
+            if (draftUrl != persistedUrl && SettingsValidator.isValidOptionalHttpsUpdateUrl(draftUrl)) {
+                settingsRepository.updateCloudUpdateManifestUrl(draftUrl)
+            }
+            updater.checkForUpdates(targetUrl)
+        }
+    }
+
+    fun downloadCloudUpdate(manifest: CloudUpdateManifest) {
+        val updater = cloudUpdateManager ?: return
+        activeUpdateJob?.cancel()
+        activeUpdateJob = viewModelScope.launch {
+            updater.downloadAndVerifyUpdate(manifest)
+        }
+    }
+
+    fun cancelCloudUpdateDownload() {
+        activeUpdateJob?.cancel()
+        activeUpdateJob = null
+        cloudUpdateManager?.resetState()
+    }
+
+    fun installVerifiedCloudUpdate(apkPath: String, onNeedInstallPermission: () -> Unit) {
+        val updater = cloudUpdateManager ?: return
+        when (updater.launchVerifiedUpdateInstaller(apkPath)) {
+            UpdateInstallLaunchResult.LAUNCHED -> Unit
+            UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
+                _uiState.update { it.copy(feedbackEvent = SettingsFeedbackType.UPDATE_INSTALL_PERMISSION_REQUIRED) }
+                onNeedInstallPermission()
+            }
+            UpdateInstallLaunchResult.FAILED -> {
+                _uiState.update { it.copy(feedbackEvent = SettingsFeedbackType.UPDATE_INSTALL_LAUNCH_FAILED) }
             }
         }
     }

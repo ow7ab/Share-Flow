@@ -1,8 +1,11 @@
 package com.example.shareflow.ui.discovery
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.Bitmap
+import android.view.WindowManager
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -374,3 +379,70 @@ fun shareQrCodeImage(
     context.startActivity(chooser)
     true
 }.getOrDefault(false)
+
+/**
+ * Safely keeps the host Activity window awake while a live QR code or scanner is active,
+ * unwrapping localized [ContextWrapper] layers and restoring the window flag on dispose.
+ */
+@Composable
+fun KeepScreenOnEffect(enabled: Boolean) {
+    val context = LocalContext.current
+    DisposableEffect(context, enabled) {
+        val window = context.findHostActivity()?.window
+        if (enabled && window != null) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (enabled && window != null) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findHostActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findHostActivity()
+    else -> null
+}
+
+/**
+ * Compact 3-step visual pairing helper card shared by Send & Receive flows.
+ */
+@Composable
+fun QuickPairingGuideCard(
+    title: String,
+    steps: List<String>,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val spacing = ShareFlowDesign.spacing
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(testTag),
+        shape = ShareFlowDesign.shapes.card,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            steps.forEach { step ->
+                Text(
+                    text = step,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}

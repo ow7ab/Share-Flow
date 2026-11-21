@@ -614,24 +614,53 @@ class SmartConnectionCoordinator(
                 updatePhase(SmartConnectionPhase.AUTHENTICATING, effectiveStrategy)
                 updateDiagnostics { it.copy(authenticationStatus = "AUTHENTICATING_MUTUAL_ECDSA") }
 
-                val socket: Socket = try {
-                    val created = if (boundHandle != null) {
-                        senderWifiConnector.createBoundTcpSocket(boundHandle)
-                    } else {
-                        Socket()
+                val candidateHosts = buildList {
+                    add(endpoint.hostAddress)
+                    payload.hostAddressHint?.trim()
+                        ?.takeIf { it.isNotBlank() && it != endpoint.hostAddress }
+                        ?.let { add(it) }
+                }
+                var connectedHost = endpoint.hostAddress
+                var lastConnectError: Throwable? = null
+                var connectedSocket: Socket? = null
+
+                outer@ for (attempt in 0 until 2) {
+                    for (host in candidateHosts) {
+                        val candidateSocket = runCatching {
+                            val created = if (boundHandle != null) {
+                                senderWifiConnector.createBoundTcpSocket(boundHandle)
+                            } else {
+                                Socket()
+                            }
+                            created.connect(
+                                InetSocketAddress(host, endpoint.port),
+                                TransferProtocol.SOCKET_CONNECT_TIMEOUT_MS
+                            )
+                            created
+                        }
+                        if (candidateSocket.isSuccess) {
+                            connectedSocket = candidateSocket.getOrNull()
+                            connectedHost = host
+                            break@outer
+                        } else {
+                            lastConnectError = candidateSocket.exceptionOrNull()
+                        }
                     }
-                    created.connect(
-                        InetSocketAddress(endpoint.hostAddress, endpoint.port),
-                        TransferProtocol.SOCKET_CONNECT_TIMEOUT_MS
-                    )
-                    created
-                } catch (t: Throwable) {
+                    if (attempt == 0) {
+                        delay(400L)
+                    }
+                }
+
+                val socket: Socket = connectedSocket ?: run {
                     senderWifiConnector.releaseNetwork()
                     activeBoundNetwork = null
                     return@withLock failLocked(
                         code = SmartConnectionErrorCode.SERVER_UNAVAILABLE,
-                        detail = "Could not connect to receiver at ${endpoint.hostAddress}:${endpoint.port}: ${t.message ?: "unreachable"}"
+                        detail = "Could not connect to receiver at ${endpoint.hostAddress}:${endpoint.port}: ${lastConnectError?.message ?: "unreachable"}"
                     )
+                }
+                if (connectedHost != endpoint.hostAddress) {
+                    updateDiagnostics { it.copy(remoteIp = connectedHost) }
                 }
 
                 val transportType = when (effectiveStrategy) {
@@ -645,7 +674,7 @@ class SmartConnectionCoordinator(
                     deviceId = payload.deviceId,
                     displayName = payload.displayName,
                     connectionType = transportType,
-                    hostAddress = endpoint.hostAddress,
+                    hostAddress = connectedHost,
                     port = endpoint.port,
                     publicKeyFingerprint = payload.publicKeyFingerprint,
                     hotspotSsid = payload.ssid,
@@ -678,7 +707,7 @@ class SmartConnectionCoordinator(
                         updateDiagnostics {
                             it.copy(
                                 authenticationStatus = "AUTHENTICATED_AES_256_GCM",
-                                remoteIp = endpoint.hostAddress,
+                                remoteIp = connectedHost,
                                 serverPort = endpoint.port,
                                 lastError = null
                             )

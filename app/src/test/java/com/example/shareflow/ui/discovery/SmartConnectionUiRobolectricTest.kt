@@ -101,4 +101,34 @@ class SmartConnectionUiRobolectricTest {
         waitForTag("connection_diagnostics_screen")
         composeTestRule.onNodeWithTag("connection_diagnostics_screen").assertIsDisplayed()
     }
+
+    @Test
+    fun `receive shows quick pairing guide and settings exposes Sudanese cloud update checker`() {
+        waitForTag("home_receive_button")
+        composeTestRule.onNodeWithTag("home_receive_button").performClick()
+        waitForTag("receive_screen_list")
+        composeTestRule.waitForIdle()
+
+        val receiveList = composeTestRule.onNodeWithTag("receive_screen_list")
+        receiveList.performScrollToNode(hasTestTag("receive_quick_guide_card"))
+        composeTestRule.onNodeWithTag("receive_quick_guide_card").assertIsDisplayed()
+
+        // Return Home and open Settings
+        composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
+        waitForTag("nav_item_settings")
+        composeTestRule.onNodeWithTag("nav_item_settings").performClick()
+        waitForTag("settings_screen_list")
+        composeTestRule.waitForIdle()
+
+        val settingsList = composeTestRule.onNodeWithTag("settings_screen_list")
+        settingsList.performScrollToNode(hasTestTag("settings_section_cloud_update"))
+        composeTestRule.onNodeWithTag("settings_section_cloud_update").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_sudan_badge").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_current_version").assertIsDisplayed()
+
+        // Tapping Check for Updates before portal URL is configured displays guidance cleanly
+        composeTestRule.onNodeWithTag("settings_check_updates_button").performClick()
+        waitForTag("settings_update_not_configured_card")
+        composeTestRule.onNodeWithTag("settings_update_not_configured_card").assertIsDisplayed()
+    }
 }

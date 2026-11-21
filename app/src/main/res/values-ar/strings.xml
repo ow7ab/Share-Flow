@@ -1122,6 +1122,65 @@
     <string name="viewer_vault_not_setup_title">إعداد الخزنة الخاصة</string>
     <string name="viewer_vault_not_setup_body">أنشئ خزنة خاصة محمية برمز PIN وتشفير AES-256-GCM أولاً لنقل الملفات إليها بأمان.</string>
     <string name="viewer_vault_setup_action">إعداد الخزنة</string>
+
+    <!-- تسهيل الربط السريع بين الأجهزة (الإرسال والاستقبال) -->
+    <string name="send_summary_compact_format">%1$s عنصر • %2$s</string>
+    <string name="send_summary_sha256_badge">SHA-256</string>
+    <string name="send_quick_nearby_title">جهاز مستقبِل قريب — اضغط للإرسال فوراً</string>
+    <string name="send_quick_nearby_subtitle">اضغط على أي جهاز أدناه للربط المباشر وبدء النقل تلقائياً.</string>
+    <string name="send_quick_nearby_connect_action">ربط</string>
+    <string name="send_paste_and_connect_action">لصق وربط فوري</string>
+    <string name="send_clipboard_empty_toast">الحافظة فارغة. انسخ رمز أو رابط ShareFlow أولاً.</string>
+    <string name="send_guide_title">ربط سريع في 3 خطوات</string>
+    <string name="send_guide_step_1">1. افتح «استقبال» على الهاتف الآخر</string>
+    <string name="send_guide_step_2">2. امسح رمز QR أو اضغط على الجهاز القريب</string>
+    <string name="send_guide_step_3">3. يتم الربط والإرسال تلقائياً فوراً</string>
+    <string name="receive_guide_title">استقبال سريع في 3 خطوات</string>
+    <string name="receive_guide_step_1">1. اضغط «بدء الاستقبال» أعلاه</string>
+    <string name="receive_guide_step_2">2. وجّه كاميرا المُرسِل نحو رمز QR</string>
+    <string name="receive_guide_step_3">3. وافق على استلام الملفات الواردة</string>
+    <string name="receive_qr_expired_refresh_action">انتهت صلاحية الرمز — تحديث فوري</string>
+    <string name="receive_screen_awake_badge">الشاشة تبقى مضاءة</string>
+    <string name="receive_hotspot_ready_ssid_format">الشبكة: %1$s</string>
+
+    <!-- فحص النسخة والتحديث السحابي وبوابة التحميل السودانية -->
+    <string name="settings_section_cloud_update">فحص النسخة والتحديث السحابي</string>
+    <string name="settings_update_sudan_portal_badge">مهيأ لبوابة التحميل بالهوية السودانية</string>
+    <string name="settings_update_sudan_portal_desc">افحص وجود إصدارات جديدة وموثّقة من ShareFlow مباشرة عبر الموقع الإلكتروني السوداني الرسمي عند إطلاقه. تخضع جميع التحديثات لاتصال HTTPS والتحقق من SHA-256 وتطابق شهادة التوقيع.</string>
+    <string name="settings_update_current_version_label">النسخة المثبّتة حالياً</string>
+    <string name="settings_update_portal_url_label">رابط ملف التحديث السحابي للموقع (HTTPS)</string>
+    <string name="settings_update_portal_url_placeholder">https://your-sudan-portal.sd/shareflow/version.json</string>
+    <string name="settings_update_portal_url_error">أدخل رابط HTTPS عاماً وصالحاً (مثال: https://example.sd/version.json).</string>
+    <string name="settings_update_check_action">فحص التحديثات الآن</string>
+    <string name="settings_update_checking_status">جارٍ فحص بوابة التحديث السحابي…</string>
+    <string name="settings_update_up_to_date_title">تطبيق ShareFlow محدث بالكامل</string>
+    <string name="settings_update_up_to_date_body">أنت تستخدم أحدث إصدار موثّق حالياً: v%1$s (البناء %2$s).</string>
+    <string name="settings_update_not_configured_title">بوابة التحميل السودانية لم تُربط بعد</string>
+    <string name="settings_update_not_configured_body">أدخل رابط ملف الإصدارات HTTPS الخاص بالموقع السوداني أعلاه فور إطلاقه لتفعيل الفحص والتحديث السحابي المباشر.</string>
+    <string name="settings_update_available_title">يتوفر إصدار جديد: v%1$s (البناء %2$s)</string>
+    <string name="settings_update_release_notes_label">الجديد في هذا الإصدار</string>
+    <string name="settings_update_download_action">تحميل التحديث والتحقق منه</string>
+    <string name="settings_update_downloading_format">جارٍ تحميل التحديث… %1$d%% (%2$s)</string>
+    <string name="settings_update_cancel_download_action">إلغاء التحميل</string>
+    <string name="settings_update_verifying_status">جارٍ التحقق من SHA-256 وتطابق شهادة التوقيع…</string>
+    <string name="settings_update_ready_title">التحديث موثّق وجاهز للتثبيت</string>
+    <string name="settings_update_ready_body">تم التحقق من بصمة SHA-256 وهوية الحزمة وشهادة التوقيع بنجاح. اضغط أدناه لتأكيد التثبيت في Android.</string>
+    <string name="settings_update_install_action">تثبيت التحديث الموثّق</string>
+    <string name="settings_update_open_portal_action">فتح موقع التحميل الرسمي</string>
+    <string name="settings_update_retry_action">إعادة الفحص</string>
+    <string name="settings_update_error_title">تعذّر إكمال التحديث</string>
+    <string name="settings_update_err_invalid_url">يجب أن يكون رابط بوابة التحديث عبر HTTPS عاماً وصالحاً.</string>
+    <string name="settings_update_err_network">تعذّر الاتصال ببوابة التحديث السحابي. تحقق من اتصال الإنترنت وأعد المحاولة.</string>
+    <string name="settings_update_err_manifest">تنسيق ملف التحديث غير صالح أو يفتقد بصمة التحقق SHA-256 المطلوبة.</string>
+    <string name="settings_update_err_incompatible">يتطلب هذا الإصدار نسخة Android أحدث من إصدار جهازك الحالي.</string>
+    <string name="settings_update_err_checksum">فشل التحقق من SHA-256. تم حذف ملف التحديث تلقائياً لحماية جهازك.</string>
+    <string name="settings_update_err_package_id">هوية الحزمة في الملف المحمّل لا تطابق ShareFlow. تم منع التثبيت.</string>
+    <string name="settings_update_err_signature">شهادة التوقيع لا تطابق النسخة المثبّتة من ShareFlow. تم منع التثبيت حفاظاً على بياناتك.</string>
+    <string name="settings_update_err_downgrade">تم منع الرجوع إلى إصدار أقدم حفاظاً على سلامة بياناتك.</string>
+    <string name="settings_update_err_download">انقطع تحميل التحديث قبل اكتماله. يرجى المحاولة مجدداً.</string>
+    <string name="settings_feedback_update_url_saved">تم حفظ رابط بوابة التحديث السحابي.</string>
+    <string name="settings_feedback_update_install_perm">اسمح لـ ShareFlow بتثبيت التحديثات الموثّقة في إعدادات Android ثم اضغط تثبيت مجدداً.</string>
+    <string name="settings_feedback_update_install_failed">تعذّر فتح مثبّت حزم Android لهذا التحديث.</string>
 </resources>
 
 

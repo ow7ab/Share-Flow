@@ -100,7 +100,10 @@ class SettingsRepositoryImpl(
                 historyRetentionPolicy = storedRetention,
                 discoveryVisibility = storedVisibility,
                 preferredConnectionMode = storedConnectionMode,
-                biometricUnlockPreferred = prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] ?: true
+                biometricUnlockPreferred = prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] ?: true,
+                cloudUpdateManifestUrl = prefs[SettingsPreferenceKeys.CLOUD_UPDATE_MANIFEST_URL]
+                    ?.takeIf { SettingsValidator.isValidOptionalHttpsUpdateUrl(it) }
+                    .orEmpty()
             )
         }
 
@@ -219,6 +222,22 @@ class SettingsRepositoryImpl(
         safeEdit { prefs ->
             prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] = enabled
         }
+
+    override suspend fun updateCloudUpdateManifestUrl(url: String): AppResult<Unit> {
+        val trimmed = url.trim()
+        if (!SettingsValidator.isValidOptionalHttpsUpdateUrl(trimmed)) {
+            return AppResult.Failure(
+                AppError.Validation("Update manifest URL must be a valid public HTTPS URL.")
+            )
+        }
+        return safeEdit { prefs ->
+            if (trimmed.isEmpty()) {
+                prefs.remove(SettingsPreferenceKeys.CLOUD_UPDATE_MANIFEST_URL)
+            } else {
+                prefs[SettingsPreferenceKeys.CLOUD_UPDATE_MANIFEST_URL] = trimmed
+            }
+        }
+    }
 
     override suspend fun resetToDefaults(): AppResult<Unit> = safeEdit { prefs ->
         prefs.clear()

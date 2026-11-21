@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
@@ -45,6 +46,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +75,11 @@ import com.example.shareflow.core.permissions.ShareFlowPermissionFeature
 import com.example.shareflow.core.permissions.rememberPermissionRequestCoordinator
 import com.example.shareflow.domain.model.ConnectionState
 import com.example.shareflow.domain.model.SmartConnectionPhase
+import com.example.shareflow.domain.model.TransferDirection
+import com.example.shareflow.domain.model.TransferState
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
+import com.example.shareflow.ui.discovery.KeepScreenOnEffect
+import com.example.shareflow.ui.discovery.QuickPairingGuideCard
 import com.example.shareflow.ui.discovery.RealQrCodeView
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
 import com.example.shareflow.ui.discovery.SmartConnectionPhasePill
@@ -114,7 +120,10 @@ fun ReceiveScreen(
     val locale = ShareFlowDesign.locale
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    KeepScreenOnEffect(enabled = uiState.isSmartQrReady || uiState.isPreparingReceiver)
 
     val linkCopiedToast = stringResource(R.string.qr_pairing_copied_toast)
     val codeCopiedToast = stringResource(R.string.smart_receive_code_copied_toast)
@@ -136,6 +145,23 @@ fun ReceiveScreen(
         while (uiState.smartQrPayload != null) {
             nowMillis = System.currentTimeMillis()
             delay(1_000L)
+        }
+    }
+
+    LaunchedEffect(uiState.isSmartQrReady, uiState.isPreparingReceiver) {
+        if (uiState.isSmartQrReady || uiState.isPreparingReceiver) {
+            listState.animateScrollToItem(0)
+        }
+    }
+
+    var autoNavigatedTransferId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(activeTransferSessions) {
+        val incomingActive = activeTransferSessions.firstOrNull {
+            it.direction == TransferDirection.RECEIVED && it.state == TransferState.TRANSFERRING
+        }
+        if (incomingActive != null && autoNavigatedTransferId != incomingActive.sessionId) {
+            autoNavigatedTransferId = incomingActive.sessionId
+            onOpenTransferProgress()
         }
     }
 
@@ -215,6 +241,7 @@ fun ReceiveScreen(
             contentAlignment = Alignment.TopCenter
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .widthIn(max = spacing.maxContentWidth)
@@ -294,6 +321,268 @@ fun ReceiveScreen(
                             error = smartErr,
                             onRetry = viewModel::retrySmartConnection,
                             onDismiss = viewModel::clearSmartError
+                        )
+                    }
+                }
+
+                // Preparation Progress Card (top-priority while hotspot/server starts — QR stays hidden!)
+                if (uiState.isPreparingReceiver) {
+                    item(key = "smart_preparing_card") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_preparing_card"),
+                            shape = ShareFlowDesign.shapes.featuredCard,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.cardPadding),
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                ) {
+                                    CircularProgressIndicator(
+                                        strokeWidth = 2.5.dp,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.smart_receive_preparing_title),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                Text(
+                                    text = stringResource(R.string.smart_receive_preparing_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Live Signed Smart QR Card — elevated to TOP so sender can scan immediately with zero scrolling
+                if (uiState.isSmartQrReady) {
+                    val payload = uiState.smartQrPayload!!
+                    val remainingSeconds = ((payload.expiresAtEpochMillis - nowMillis) / 1_000L).coerceAtLeast(0L)
+                    val isExpired = remainingSeconds <= 0L || uiState.smartPhase == SmartConnectionPhase.EXPIRED
+
+                    item(key = "smart_live_qr_card") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_live_smart_qr_card"),
+                            shape = ShareFlowDesign.shapes.featuredCard,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.5.dp, semantic.verifiedBadge.copy(alpha = 0.6f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.cardPadding),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    StatusPill(
+                                        label = stringResource(R.string.smart_receive_network_ready_badge),
+                                        containerColor = semantic.verifiedContainer,
+                                        contentColor = semantic.verifiedBadge
+                                    )
+                                    StatusPill(
+                                        label = if (isExpired) {
+                                            stringResource(R.string.qr_token_expired)
+                                        } else {
+                                            stringResource(R.string.qr_expires_in_format, remainingSeconds)
+                                        },
+                                        containerColor = if (isExpired) {
+                                            MaterialTheme.colorScheme.errorContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        },
+                                        contentColor = if (isExpired) {
+                                            MaterialTheme.colorScheme.onErrorContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        }
+                                    )
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (!payload.ssid.isNullOrBlank()) {
+                                        StatusPill(
+                                            label = stringResource(R.string.receive_hotspot_ready_ssid_format, payload.ssid),
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    StatusPill(
+                                        label = stringResource(R.string.receive_screen_awake_badge),
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+
+                                Text(
+                                    text = stringResource(R.string.smart_receive_qr_ready_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(R.string.smart_receive_qr_ready_subtitle),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                if (!isExpired && uiState.smartPhase == SmartConnectionPhase.WAITING_FOR_QR) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("receive_waiting_searching_banner"),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = semantic.verifiedBadge
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.receive_waiting_searching_banner),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = semantic.verifiedBadge,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = ShareFlowDesign.shapes.featuredCard,
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier
+                                        .size(236.dp)
+                                        .testTag("receive_smart_qr_matrix")
+                                ) {
+                                    RealQrCodeView(
+                                        payload = uiState.smartQrUri,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(12.dp)
+                                    )
+                                }
+
+                                if (isExpired) {
+                                    PrimaryActionButton(
+                                        text = stringResource(R.string.receive_qr_expired_refresh_action),
+                                        onClick = viewModel::regeneratePairingSession,
+                                        leadingIcon = Icons.Filled.Refresh,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("receive_expired_refresh_button")
+                                    )
+                                }
+
+                                if (uiState.smartManualCode.isNotBlank()) {
+                                    Text(
+                                        text = stringResource(R.string.smart_receive_manual_code_label),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = uiState.smartManualCode.take(36) + if (uiState.smartManualCode.length > 36) "…" else "",
+                                        style = ShareFlowMonoStyle,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                                ) {
+                                    SecondaryActionButton(
+                                        text = stringResource(R.string.smart_receive_copy_link_action),
+                                        onClick = {
+                                            clipboard.setText(AnnotatedString(uiState.smartQrUri))
+                                            scope.launch { snackbarHostState.showSnackbar(linkCopiedToast) }
+                                        },
+                                        outlined = true,
+                                        leadingIcon = Icons.Filled.ContentCopy,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("receive_copy_link_button")
+                                    )
+                                    SecondaryActionButton(
+                                        text = stringResource(R.string.smart_receive_copy_code_action),
+                                        onClick = {
+                                            clipboard.setText(AnnotatedString(uiState.smartManualCode))
+                                            scope.launch { snackbarHostState.showSnackbar(codeCopiedToast) }
+                                        },
+                                        outlined = true,
+                                        leadingIcon = Icons.Filled.Key,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("receive_copy_code_button")
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                                ) {
+                                    SecondaryActionButton(
+                                        text = stringResource(R.string.smart_receive_share_qr_action),
+                                        onClick = {
+                                            val shared = shareQrCodeImage(
+                                                context = context,
+                                                qrPayloadUri = uiState.smartQrUri,
+                                                chooserTitle = shareChooserTitle
+                                            )
+                                            if (!shared) {
+                                                scope.launch { snackbarHostState.showSnackbar(shareErrorToast) }
+                                            }
+                                        },
+                                        outlined = false,
+                                        leadingIcon = Icons.Filled.Share,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("receive_share_qr_button")
+                                    )
+                                    SecondaryActionButton(
+                                        text = stringResource(R.string.smart_receive_regenerate_action),
+                                        onClick = viewModel::regeneratePairingSession,
+                                        outlined = true,
+                                        leadingIcon = Icons.Filled.Refresh,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("receive_refresh_qr_button")
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (uiState.smartPhase == SmartConnectionPhase.EXPIRED) {
+                    item(key = "smart_expired_quick_refresh") {
+                        PrimaryActionButton(
+                            text = stringResource(R.string.receive_qr_expired_refresh_action),
+                            onClick = viewModel::regeneratePairingSession,
+                            leadingIcon = Icons.Filled.Refresh,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_expired_refresh_button")
                         )
                     }
                 }
@@ -465,216 +754,18 @@ fun ReceiveScreen(
                     }
                 }
 
-                // Preparation Progress Card (shown ONLY while hotspot/server is starting — QR stays hidden!)
-                if (uiState.isPreparingReceiver) {
-                    item(key = "smart_preparing_card") {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("receive_preparing_card"),
-                            shape = ShareFlowDesign.shapes.card,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(spacing.cardPadding),
-                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.smart_receive_preparing_title),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                                Text(
-                                    text = stringResource(R.string.smart_receive_preparing_body),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Live Signed Smart QR Card — strictly rendered ONLY when isSmartQrReady == true
-                if (uiState.isSmartQrReady) {
-                    val payload = uiState.smartQrPayload!!
-                    val remainingSeconds = ((payload.expiresAtEpochMillis - nowMillis) / 1_000L).coerceAtLeast(0L)
-                    val isExpired = remainingSeconds <= 0L || uiState.smartPhase == SmartConnectionPhase.EXPIRED
-
-                    item(key = "smart_live_qr_card") {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("receive_live_smart_qr_card"),
-                            shape = ShareFlowDesign.shapes.featuredCard,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            border = BorderStroke(1.5.dp, semantic.verifiedBadge.copy(alpha = 0.6f))
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(spacing.cardPadding),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    StatusPill(
-                                        label = stringResource(R.string.smart_receive_network_ready_badge),
-                                        containerColor = semantic.verifiedContainer,
-                                        contentColor = semantic.verifiedBadge
-                                    )
-                                    StatusPill(
-                                        label = if (isExpired) {
-                                            stringResource(R.string.qr_token_expired)
-                                        } else {
-                                            stringResource(R.string.qr_expires_in_format, remainingSeconds)
-                                        },
-                                        containerColor = if (isExpired) {
-                                            MaterialTheme.colorScheme.errorContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        },
-                                        contentColor = if (isExpired) {
-                                            MaterialTheme.colorScheme.onErrorContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
-                                        }
-                                    )
-                                }
-
-                                Text(
-                                    text = stringResource(R.string.smart_receive_qr_ready_title),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = stringResource(R.string.smart_receive_qr_ready_subtitle),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-
-                                if (!isExpired && uiState.smartPhase == SmartConnectionPhase.WAITING_FOR_QR) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .testTag("receive_waiting_searching_banner"),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        LinearProgressIndicator(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            color = semantic.verifiedBadge
-                                        )
-                                        Text(
-                                            text = stringResource(R.string.receive_waiting_searching_banner),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = semantic.verifiedBadge,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = ShareFlowDesign.shapes.featuredCard,
-                                    color = Color.White,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                    modifier = Modifier
-                                        .size(236.dp)
-                                        .testTag("receive_smart_qr_matrix")
-                                ) {
-                                    RealQrCodeView(
-                                        payload = uiState.smartQrUri,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(12.dp)
-                                    )
-                                }
-
-                                if (uiState.smartManualCode.isNotBlank()) {
-                                    Text(
-                                        text = stringResource(R.string.smart_receive_manual_code_label),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = uiState.smartManualCode.take(36) + if (uiState.smartManualCode.length > 36) "…" else "",
-                                        style = ShareFlowMonoStyle,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                                ) {
-                                    SecondaryActionButton(
-                                        text = stringResource(R.string.smart_receive_copy_link_action),
-                                        onClick = {
-                                            clipboard.setText(AnnotatedString(uiState.smartQrUri))
-                                            scope.launch { snackbarHostState.showSnackbar(linkCopiedToast) }
-                                        },
-                                        outlined = true,
-                                        leadingIcon = Icons.Filled.ContentCopy,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("receive_copy_link_button")
-                                    )
-                                    SecondaryActionButton(
-                                        text = stringResource(R.string.smart_receive_copy_code_action),
-                                        onClick = {
-                                            clipboard.setText(AnnotatedString(uiState.smartManualCode))
-                                            scope.launch { snackbarHostState.showSnackbar(codeCopiedToast) }
-                                        },
-                                        outlined = true,
-                                        leadingIcon = Icons.Filled.Key,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("receive_copy_code_button")
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                                ) {
-                                    SecondaryActionButton(
-                                        text = stringResource(R.string.smart_receive_share_qr_action),
-                                        onClick = {
-                                            val shared = shareQrCodeImage(
-                                                context = context,
-                                                qrPayloadUri = uiState.smartQrUri,
-                                                chooserTitle = shareChooserTitle
-                                            )
-                                            if (!shared) {
-                                                scope.launch { snackbarHostState.showSnackbar(shareErrorToast) }
-                                            }
-                                        },
-                                        outlined = false,
-                                        leadingIcon = Icons.Filled.Share,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("receive_share_qr_button")
-                                    )
-                                    SecondaryActionButton(
-                                        text = stringResource(R.string.smart_receive_regenerate_action),
-                                        onClick = viewModel::regeneratePairingSession,
-                                        outlined = true,
-                                        leadingIcon = Icons.Filled.Refresh,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("receive_refresh_qr_button")
-                                    )
-                                }
-                            }
-                        }
+                // Compact 3-step quick receiving guide when idle
+                if (!uiState.isReceiving && !uiState.isPreparingReceiver && connState !is ConnectionState.Connected) {
+                    item(key = "receive_quick_guide") {
+                        QuickPairingGuideCard(
+                            title = stringResource(R.string.receive_guide_title),
+                            steps = listOf(
+                                stringResource(R.string.receive_guide_step_1),
+                                stringResource(R.string.receive_guide_step_2),
+                                stringResource(R.string.receive_guide_step_3)
+                            ),
+                            testTag = "receive_quick_guide_card"
+                        )
                     }
                 }
 

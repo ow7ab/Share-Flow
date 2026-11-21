@@ -175,21 +175,44 @@ class AndroidSessionServiceDiscovery(
 
         val found = withTimeoutOrNull(timeoutMillis) {
             coroutineScope {
-                val udpDeferred = async {
-                    discoverViaAuthenticatedUdp(payload, boundNetwork, timeoutMillis - 500L)
-                }
-                val nsdDeferred = async {
-                    discoverViaNsd(payload, timeoutMillis - 500L)
+                val winner = kotlinx.coroutines.CompletableDeferred<DiscoveredReceiverEndpoint?>()
+                val remainingCount = java.util.concurrent.atomic.AtomicInteger(3)
+                fun completeIfLast() {
+                    if (remainingCount.decrementAndGet() <= 0 && !winner.isCompleted) {
+                        winner.complete(null)
+                    }
                 }
 
-                // Prefer authenticated UDP or NSD — whichever resolves first with valid session match
-                val udpResult = udpDeferred.await()
-                if (udpResult != null) {
-                    nsdDeferred.cancel()
-                    udpResult
-                } else {
-                    nsdDeferred.await()
+                val jobs = mutableListOf<Job>()
+                jobs += launch {
+                    val res = discoverViaAuthenticatedUdp(payload, boundNetwork, timeoutMillis - 500L)
+                    if (res != null) winner.complete(res) else completeIfLast()
                 }
+                jobs += launch {
+                    val res = discoverViaNsd(payload, timeoutMillis - 500L)
+                    if (res != null) winner.complete(res) else completeIfLast()
+                }
+                jobs += launch {
+                    val hintHost = payload.hostAddressHint?.trim()?.takeIf { it.isNotBlank() }
+                    val res = if (hintHost != null &&
+                        payload.servicePort in 1024..65535 &&
+                        verifyTcpReachability(hintHost, payload.servicePort, boundNetwork)
+                    ) {
+                        DiscoveredReceiverEndpoint(
+                            hostAddress = hintHost,
+                            port = payload.servicePort,
+                            serviceName = payload.serviceName,
+                            method = ReceiverDiscoveryMethod.QR_HOST_HINT_VERIFIED
+                        )
+                    } else {
+                        null
+                    }
+                    if (res != null) winner.complete(res) else completeIfLast()
+                }
+
+                val result = winner.await()
+                jobs.forEach { it.cancel() }
+                result
             }
         }
 

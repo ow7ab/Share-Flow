@@ -16,6 +16,7 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.Socket
 import kotlin.coroutines.resume
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -136,18 +137,50 @@ class WiFiNetworkSpecifierStrategy(
 
         val result = withTimeoutOrNull(timeoutMillis) {
             suspendCancellableCoroutine<WifiJoinOutcome> { cont ->
+                var pendingNetwork: Network? = null
+                var fallbackJob: kotlinx.coroutines.Job? = null
                 val callback = object : ConnectivityManager.NetworkCallback() {
-                    override fun onAvailable(network: Network) {
-                        activeNetwork = network
-                        onJoiningNetwork()
-                        val props = runCatching { cm.getLinkProperties(network) }.getOrNull()
+                    private fun resumeWithNetwork(network: Network, props: LinkProperties?) {
+                        fallbackJob?.cancel()
+                        fallbackJob = null
                         val handle = buildHandleFromNetwork(network, props, isLocalOnly = true)
                         if (cont.isActive) {
                             cont.resume(WifiJoinOutcome.Connected(handle))
                         }
                     }
 
+                    override fun onAvailable(network: Network) {
+                        activeNetwork = network
+                        pendingNetwork = network
+                        onJoiningNetwork()
+                        val props = runCatching { cm.getLinkProperties(network) }.getOrNull()
+                        val handle = buildHandleFromNetwork(network, props, isLocalOnly = true)
+                        if (!handle.gatewayIpv4Address.isNullOrBlank() || !handle.localIpv4Address.isNullOrBlank()) {
+                            resumeWithNetwork(network, props)
+                        } else {
+                            // Android 10-15 often fires onAvailable slightly before DHCP populates LinkProperties.
+                            // Wait up to 1.5s for onLinkPropertiesChanged, then resume with best available properties.
+                            fallbackJob?.cancel()
+                            fallbackJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                                kotlinx.coroutines.delay(1_500L)
+                                val latestProps = runCatching { cm.getLinkProperties(network) }.getOrNull()
+                                resumeWithNetwork(network, latestProps)
+                            }
+                        }
+                    }
+
+                    override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                        if (pendingNetwork == network && cont.isActive) {
+                            val handle = buildHandleFromNetwork(network, linkProperties, isLocalOnly = true)
+                            if (!handle.gatewayIpv4Address.isNullOrBlank() || !handle.localIpv4Address.isNullOrBlank()) {
+                                resumeWithNetwork(network, linkProperties)
+                            }
+                        }
+                    }
+
                     override fun onUnavailable() {
+                        fallbackJob?.cancel()
+                        fallbackJob = null
                         activeNetwork = null
                         if (cont.isActive) {
                             cont.resume(
@@ -161,6 +194,8 @@ class WiFiNetworkSpecifierStrategy(
 
                     override fun onLost(network: Network) {
                         if (activeNetwork == network) {
+                            fallbackJob?.cancel()
+                            fallbackJob = null
                             activeNetwork = null
                             onNetworkLost()
                         }
@@ -193,6 +228,8 @@ class WiFiNetworkSpecifierStrategy(
                 }
 
                 cont.invokeOnCancellation {
+                    fallbackJob?.cancel()
+                    fallbackJob = null
                     releaseNetwork()
                 }
             }

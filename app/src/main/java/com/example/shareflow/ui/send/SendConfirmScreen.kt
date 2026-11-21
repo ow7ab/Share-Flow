@@ -18,18 +18,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPasteGo
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,9 +60,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,7 +79,6 @@ import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
-import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.core.permissions.ShareFlowPermissionFeature
@@ -83,6 +89,8 @@ import com.example.shareflow.domain.model.QrScannerUiState
 import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
 import com.example.shareflow.ui.discovery.AdvancedQrScannerView
+import com.example.shareflow.ui.discovery.KeepScreenOnEffect
+import com.example.shareflow.ui.discovery.QuickPairingGuideCard
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
 import com.example.shareflow.ui.discovery.SmartSenderProgressCard
 import com.example.shareflow.ui.discovery.decodeQrCodeFromGalleryUri
@@ -101,6 +109,7 @@ private enum class SendConnectMode {
  * Embeds the Smart QR Scanner (CameraX + ML Kit + ZXing fallback), Manual SF3- code, Gallery QR
  * import, Wi-Fi auto-join progress, Nearby peers, Smart Permission UX, and Encrypted Transfer trigger.
  */
+@Suppress("DEPRECATION")
 @Composable
 fun SendConfirmScreen(
     onNavigateBack: () -> Unit,
@@ -110,6 +119,7 @@ fun SendConfirmScreen(
 ) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val viewModel: SendViewModel = viewModel(
         factory = shareFlowViewModelFactory {
             SendViewModel(
@@ -129,15 +139,19 @@ fun SendConfirmScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val permissionCoordinator = rememberPermissionRequestCoordinator(container.permissionManager)
 
+    KeepScreenOnEffect(enabled = uiState.connectionState !is ConnectionState.Connected)
+
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
     val semantic = ShareFlowDesign.semanticColors
     val peers = (uiState.discoveredDevices + uiState.trustedDevices).distinctBy { it.deviceId }
+    val liveNearbyReceivers = uiState.discoveredDevices
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var connectMode by rememberSaveable { mutableStateOf(SendConnectMode.SCAN_QR) }
     var manualCodeInput by rememberSaveable { mutableStateOf("") }
+    var awaitingFreshLinkAutoSend by rememberSaveable { mutableStateOf(false) }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -147,6 +161,7 @@ fun SendConfirmScreen(
 
     val galleryNoQrMsg = stringResource(R.string.smart_scanner_gallery_no_qr)
     val galleryErrorMsg = stringResource(R.string.smart_scanner_gallery_error)
+    val clipboardEmptyMsg = stringResource(R.string.send_clipboard_empty_toast)
 
     val galleryQrLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -157,6 +172,7 @@ fun SendConfirmScreen(
                     runCatching { decodeQrCodeFromGalleryUri(context, uri) }.getOrNull()
                 }
                 if (!decoded.isNullOrBlank()) {
+                    awaitingFreshLinkAutoSend = true
                     viewModel.connectViaQrOrCode(decoded)
                 } else {
                     viewModel.showFeedback(galleryNoQrMsg)
@@ -176,25 +192,42 @@ fun SendConfirmScreen(
     var autoStartedPeerSession by rememberSaveable { mutableStateOf<String?>(null) }
     val autoSendStartingMsg = stringResource(R.string.shareit_auto_send_starting)
 
-    // SHAREit-style zero-intermediary workflow: once QR direct link + AES-256-GCM auth succeeds,
-    // immediately start sending the selected items without an extra manual confirmation tap.
-    LaunchedEffect(uiState.connectionState, uiState.scannerState, uiState.selectedCount) {
+    // SHAREit-style zero-intermediary workflow: once a fresh QR, manual code, or 1-tap Nearby
+    // link succeeds with AES-256-GCM auth, immediately start sending without an extra confirmation tap.
+    LaunchedEffect(
+        uiState.connectionState,
+        uiState.scannerState,
+        awaitingFreshLinkAutoSend,
+        uiState.selectedCount
+    ) {
         val connected = uiState.connectionState as? ConnectionState.Connected
+        val readyForAutoSend = uiState.scannerState == QrScannerUiState.SUCCESS || awaitingFreshLinkAutoSend
         if (connected != null &&
-            uiState.scannerState == QrScannerUiState.SUCCESS &&
+            readyForAutoSend &&
             uiState.selectedCount > 0 &&
             !uiState.isStartingTransfer
         ) {
             val sessionKey = "${connected.peer.deviceId}:${connected.sasVerificationCode}"
             if (autoStartedPeerSession != sessionKey) {
                 autoStartedPeerSession = sessionKey
+                awaitingFreshLinkAutoSend = false
                 viewModel.showFeedback(autoSendStartingMsg)
                 viewModel.startEncryptedTransfer(onStarted = onOpenTransferProgress)
             }
         }
     }
 
-    // Automatically start searching for nearby receivers when user selects Nearby tab
+    // Proactively discover nearby receivers on the same local network as soon as SendConfirm opens
+    // so 1-tap Quick Connect pills pop up even while the QR scanner is open.
+    LaunchedEffect(Unit) {
+        if (uiState.connectionState !is ConnectionState.Connected &&
+            uiState.discoveryStatus !is DiscoveryStatus.Discovering
+        ) {
+            viewModel.startPeerDiscovery()
+        }
+    }
+
+    // Re-trigger discovery if user explicitly switches to Nearby tab while idle
     LaunchedEffect(connectMode) {
         if (connectMode == SendConnectMode.NEARBY &&
             uiState.connectionState !is ConnectionState.Connected &&
@@ -395,69 +428,143 @@ fun SendConfirmScreen(
                     }
                 }
 
-                // 4. Selected Package Summary
+                // 4. Compact 1-Line Package Summary Pill Bar (keeps QR Scanner immediately above the fold)
                 item(key = "package_summary") {
                     Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("send_confirm_summary_bar"),
                         shape = ShareFlowDesign.shapes.card,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(spacing.cardPadding),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                                .padding(horizontal = spacing.md, vertical = spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
                         ) {
-                            Text(
-                                text = stringResource(R.string.send_confirm_summary_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                            Icon(
+                                imageVector = Icons.Filled.FolderZip,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            Text(
+                                text = stringResource(
+                                    R.string.send_summary_compact_format,
+                                    ShareFlowFormatters.formatCount(uiState.selectedCount, locale),
+                                    ShareFlowFormatters.formatBytes(uiState.totalSelectedBytes, locale)
+                                ),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Surface(
+                                shape = ShareFlowDesign.shapes.chip,
+                                color = semantic.verifiedContainer
                             ) {
-                                Text(
-                                    text = stringResource(R.string.send_selected_count_label),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = ShareFlowFormatters.formatCount(uiState.selectedCount, locale),
-                                    style = ShareFlowMonoStyle,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.VerifiedUser,
+                                        contentDescription = null,
+                                        tint = semantic.verifiedBadge,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.send_summary_sha256_badge),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = semantic.verifiedBadge
+                                    )
+                                }
                             }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                        }
+                    }
+                }
+
+                // 4b. Instant 1-Tap Quick Connect Nearby Receivers Strip (pops up even while on Scan QR tab!)
+                if (connState !is ConnectionState.Connected &&
+                    !isSmartJoining &&
+                    !isDirectConnecting &&
+                    connectMode != SendConnectMode.NEARBY &&
+                    liveNearbyReceivers.isNotEmpty()
+                ) {
+                    item(key = "quick_nearby_strip") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_quick_nearby_strip"),
+                            shape = ShareFlowDesign.shapes.card,
+                            color = semantic.verifiedContainer.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, semantic.verifiedBadge.copy(alpha = 0.55f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(spacing.xs)
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Radar,
+                                        contentDescription = null,
+                                        tint = semantic.verifiedBadge,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.send_quick_nearby_title),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                                 Text(
-                                    text = stringResource(R.string.send_total_size_label),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = ShareFlowFormatters.formatBytes(uiState.totalSelectedBytes, locale),
-                                    style = ShareFlowMonoStyle,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.VerifiedUser,
-                                    contentDescription = null,
-                                    tint = semantic.verifiedBadge,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.send_confirm_sha256_note),
+                                    text = stringResource(R.string.send_quick_nearby_subtitle),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                                ) {
+                                    items(items = liveNearbyReceivers, key = { it.deviceId }) { peer ->
+                                        AssistChip(
+                                            onClick = {
+                                                awaitingFreshLinkAutoSend = true
+                                                viewModel.connectToPeer(peer)
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = "${peer.displayName} • ${stringResource(R.string.send_quick_nearby_connect_action)}",
+                                                    maxLines = 1
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Devices,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                containerColor = MaterialTheme.colorScheme.surface,
+                                                labelColor = MaterialTheme.colorScheme.onSurface,
+                                                leadingIconContentColor = semantic.verifiedBadge
+                                            ),
+                                            modifier = Modifier
+                                                .minimumInteractiveComponentSize()
+                                                .testTag("send_quick_nearby_peer_${peer.deviceId}")
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -534,6 +641,7 @@ fun SendConfirmScreen(
                                                 scannerState = uiState.scannerState,
                                                 onQrDecoded = { raw ->
                                                     if (uiState.scannerState == QrScannerUiState.SCANNING) {
+                                                        awaitingFreshLinkAutoSend = true
                                                         viewModel.connectViaQrOrCode(raw)
                                                     }
                                                 },
@@ -631,10 +739,30 @@ fun SendConfirmScreen(
                                                 .fillMaxWidth()
                                                 .testTag("send_confirm_manual_code_input")
                                         )
+                                        SecondaryActionButton(
+                                            text = stringResource(R.string.send_paste_and_connect_action),
+                                            onClick = {
+                                                val pasted = clipboard.getText()?.text?.trim().orEmpty()
+                                                if (pasted.isNotBlank()) {
+                                                    manualCodeInput = pasted
+                                                    awaitingFreshLinkAutoSend = true
+                                                    viewModel.connectViaQrOrCode(pasted)
+                                                } else {
+                                                    viewModel.showFeedback(clipboardEmptyMsg)
+                                                }
+                                            },
+                                            outlined = true,
+                                            enabled = !isSmartJoining,
+                                            leadingIcon = Icons.Filled.ContentPasteGo,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("send_confirm_paste_connect_button")
+                                        )
                                         PrimaryActionButton(
                                             text = stringResource(R.string.send_connect_manual_submit_action),
                                             onClick = {
                                                 if (manualCodeInput.isNotBlank()) {
+                                                    awaitingFreshLinkAutoSend = true
                                                     viewModel.connectViaQrOrCode(manualCodeInput)
                                                 }
                                             },
@@ -697,11 +825,27 @@ fun SendConfirmScreen(
                                 items(items = peers, key = { it.deviceId }) { peer ->
                                     DeviceCard(
                                         device = peer,
-                                        onClick = { viewModel.connectToPeer(peer) }
+                                        onClick = {
+                                            awaitingFreshLinkAutoSend = true
+                                            viewModel.connectToPeer(peer)
+                                        }
                                     )
                                 }
                             }
                         }
+                    }
+
+                    // 7. Compact 3-Step Quick Pairing Guide
+                    item(key = "send_quick_guide") {
+                        QuickPairingGuideCard(
+                            title = stringResource(R.string.send_guide_title),
+                            steps = listOf(
+                                stringResource(R.string.send_guide_step_1),
+                                stringResource(R.string.send_guide_step_2),
+                                stringResource(R.string.send_guide_step_3)
+                            ),
+                            testTag = "send_quick_guide_card"
+                        )
                     }
                 }
             }

@@ -1122,6 +1122,65 @@
     <string name="viewer_vault_not_setup_title">Set Up Private Vault</string>
     <string name="viewer_vault_not_setup_body">Create a PIN-protected AES-256-GCM Private Vault first to move files into encrypted storage.</string>
     <string name="viewer_vault_setup_action">Set Up Vault</string>
+
+    <!-- Effortless 1-Tap Device Pairing (Send & Receive) -->
+    <string name="send_summary_compact_format">%1$s items • %2$s</string>
+    <string name="send_summary_sha256_badge">SHA-256</string>
+    <string name="send_quick_nearby_title">Nearby Receiver Ready — Tap to Send</string>
+    <string name="send_quick_nearby_subtitle">Tap any device below to connect &amp; start transferring immediately.</string>
+    <string name="send_quick_nearby_connect_action">Connect</string>
+    <string name="send_paste_and_connect_action">Paste &amp; Connect</string>
+    <string name="send_clipboard_empty_toast">Clipboard is empty. Copy a ShareFlow code or link first.</string>
+    <string name="send_guide_title">Fast 3-Step Pairing</string>
+    <string name="send_guide_step_1">1. Tap Receive on the other phone</string>
+    <string name="send_guide_step_2">2. Scan its QR or tap it under Nearby</string>
+    <string name="send_guide_step_3">3. Connects &amp; sends automatically</string>
+    <string name="receive_guide_title">Fast 3-Step Receiving</string>
+    <string name="receive_guide_step_1">1. Tap Start Receiving above</string>
+    <string name="receive_guide_step_2">2. Let the sender scan your QR code</string>
+    <string name="receive_guide_step_3">3. Approve the incoming files</string>
+    <string name="receive_qr_expired_refresh_action">QR Expired — Refresh Now</string>
+    <string name="receive_screen_awake_badge">Screen Kept Awake</string>
+    <string name="receive_hotspot_ready_ssid_format">Hotspot: %1$s</string>
+
+    <!-- Cloud Updates & Sudanese Official Download Portal -->
+    <string name="settings_section_cloud_update">Version Check &amp; Cloud Updates</string>
+    <string name="settings_update_sudan_portal_badge">Sudanese Official Portal Ready</string>
+    <string name="settings_update_sudan_portal_desc">Check for new verified ShareFlow releases directly from the official Sudanese download website once launched. All updates require HTTPS, SHA-256 checksum, and matching signing certificate verification.</string>
+    <string name="settings_update_current_version_label">Installed Version</string>
+    <string name="settings_update_portal_url_label">Official Portal Manifest URL (HTTPS)</string>
+    <string name="settings_update_portal_url_placeholder">https://your-sudan-portal.sd/shareflow/version.json</string>
+    <string name="settings_update_portal_url_error">Enter a valid public HTTPS URL (e.g., https://example.sd/version.json).</string>
+    <string name="settings_update_check_action">Check for Updates</string>
+    <string name="settings_update_checking_status">Checking official cloud portal…</string>
+    <string name="settings_update_up_to_date_title">ShareFlow is up to date</string>
+    <string name="settings_update_up_to_date_body">You are running the latest verified release: v%1$s (Build %2$s).</string>
+    <string name="settings_update_not_configured_title">Official Sudanese Portal Not Linked Yet</string>
+    <string name="settings_update_not_configured_body">Enter the HTTPS version manifest URL of your Sudanese website above once live to enable instant verified cloud updates.</string>
+    <string name="settings_update_available_title">New Update Available: v%1$s (Build %2$s)</string>
+    <string name="settings_update_release_notes_label">What\'s New</string>
+    <string name="settings_update_download_action">Download &amp; Verify Update</string>
+    <string name="settings_update_downloading_format">Downloading update… %1$d%% (%2$s)</string>
+    <string name="settings_update_cancel_download_action">Cancel Download</string>
+    <string name="settings_update_verifying_status">Verifying SHA-256 integrity &amp; signing certificate…</string>
+    <string name="settings_update_ready_title">Update Verified &amp; Ready to Install</string>
+    <string name="settings_update_ready_body">SHA-256 checksum, package identity, and signing certificate match. Tap below to confirm installation in Android.</string>
+    <string name="settings_update_install_action">Install Verified Update</string>
+    <string name="settings_update_open_portal_action">Open Download Website</string>
+    <string name="settings_update_retry_action">Retry Check</string>
+    <string name="settings_update_error_title">Update Check Failed</string>
+    <string name="settings_update_err_invalid_url">Update URL must use a valid public HTTPS address.</string>
+    <string name="settings_update_err_network">Could not connect to the cloud update portal. Check your internet connection and retry.</string>
+    <string name="settings_update_err_manifest">The update manifest format is invalid or missing required SHA-256 verification fields.</string>
+    <string name="settings_update_err_incompatible">This release requires a newer Android version than your device supports.</string>
+    <string name="settings_update_err_checksum">SHA-256 verification failed. The downloaded package was deleted for your security.</string>
+    <string name="settings_update_err_package_id">Downloaded APK package ID does not match ShareFlow. Installation blocked.</string>
+    <string name="settings_update_err_signature">Signing certificate does not match the installed ShareFlow app. Installation blocked to protect your data.</string>
+    <string name="settings_update_err_downgrade">Downgrading to an older version is blocked for data safety.</string>
+    <string name="settings_update_err_download">Update download was interrupted. Please try again.</string>
+    <string name="settings_feedback_update_url_saved">Cloud update portal URL saved.</string>
+    <string name="settings_feedback_update_install_perm">Allow ShareFlow to install verified updates in Android Settings, then tap Install again.</string>
+    <string name="settings_feedback_update_install_failed">Unable to open the Android package installer for this update.</string>
 </resources>
 
 

@@ -31,4 +31,5 @@ object SettingsPreferenceKeys {
     val DISCOVERY_VISIBILITY = stringPreferencesKey("discovery_visibility")
     val PREFERRED_CONNECTION_MODE = stringPreferencesKey("preferred_connection_mode")
     val BIOMETRIC_UNLOCK_PREFERRED = booleanPreferencesKey("biometric_unlock_preferred")
+    val CLOUD_UPDATE_MANIFEST_URL = stringPreferencesKey("cloud_update_manifest_url")
 }

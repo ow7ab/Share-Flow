@@ -15,6 +15,9 @@ import com.example.shareflow.core.security.KeystoreCipher
 import com.example.shareflow.core.security.Sha256ChecksumVerifier
 import com.example.shareflow.data.apps.ApplicationInstallationManager
 import com.example.shareflow.data.files.ReceivedMediaStorePublisher
+import com.example.shareflow.data.update.AndroidApkPackageSecurityInspector
+import com.example.shareflow.data.update.CloudUpdateManager
+import com.example.shareflow.data.update.HttpsCloudUpdateHttpClient
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
 import com.example.shareflow.data.repository.AndroidAppSharingRepository
@@ -126,6 +129,7 @@ interface AppContainer {
     val zipArchiveEngine: ZipArchiveEngine
     val utilitiesRepository: UtilitiesRepository
     val contactsMigrationExporter: ContactsMigrationExporter
+    val cloudUpdateManager: CloudUpdateManager
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -461,6 +465,17 @@ class DefaultAppContainer(context: Context) : AppContainer {
         ContactsMigrationExporter(
             context = appContext,
             checksumVerifier = checksumVerifier,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val cloudUpdateManager: CloudUpdateManager by lazy {
+        CloudUpdateManager(
+            context = appContext,
+            httpClient = HttpsCloudUpdateHttpClient(dispatchers = dispatchers),
+            checksumVerifier = checksumVerifier,
+            packageInspector = AndroidApkPackageSecurityInspector(context = appContext),
+            permissionManager = permissionManager,
             dispatchers = dispatchers
         )
     }

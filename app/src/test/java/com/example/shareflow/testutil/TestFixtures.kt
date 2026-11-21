@@ -114,6 +114,15 @@ class FakeSettingsRepository(
         return AppResult.Success(Unit)
     }
 
+    override suspend fun updateCloudUpdateManifestUrl(url: String): AppResult<Unit> {
+        val trimmed = url.trim()
+        if (!SettingsValidator.isValidOptionalHttpsUpdateUrl(trimmed)) {
+            return AppResult.Failure(AppError.Validation("Invalid HTTPS cloud update URL"))
+        }
+        state.update { it.copy(cloudUpdateManifestUrl = trimmed) }
+        return AppResult.Success(Unit)
+    }
+
     override suspend fun resetToDefaults(): AppResult<Unit> {
         state.value = AppSettings()
         return AppResult.Success(Unit)

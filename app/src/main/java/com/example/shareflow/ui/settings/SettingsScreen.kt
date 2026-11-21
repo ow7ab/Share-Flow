@@ -95,6 +95,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.designsystem.theme.swatchColor
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
+import com.example.shareflow.data.update.CloudUpdateManifest
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.DiscoveryVisibility
@@ -119,6 +120,7 @@ fun SettingsScreen(
                 transferHistoryRepository = container.transferHistoryRepository,
                 trustedDeviceRepository = container.trustedDeviceRepository,
                 utilitiesRepository = container.utilitiesRepository,
+                cloudUpdateManager = container.cloudUpdateManager,
                 clock = container.clock
             )
         }
@@ -170,6 +172,20 @@ fun SettingsScreen(
         onClearHistory = viewModel::clearTransferHistory,
         onClearFavorites = viewModel::clearFavorites,
         onRevokeTrustedDevices = viewModel::revokeAllTrustedDevices,
+        onCloudUpdateUrlDraftChange = viewModel::onCloudUpdateUrlDraftChange,
+        onSaveCloudUpdateUrl = viewModel::saveCloudUpdateUrl,
+        onCheckForCloudUpdates = viewModel::checkForCloudUpdates,
+        onDownloadCloudUpdate = viewModel::downloadCloudUpdate,
+        onCancelCloudUpdateDownload = viewModel::cancelCloudUpdateDownload,
+        onInstallVerifiedCloudUpdate = { apkPath ->
+            viewModel.installVerifiedCloudUpdate(
+                apkPath = apkPath,
+                onNeedInstallPermission = {
+                    val intent = container.permissionManager.createManageUnknownSourcesIntent()
+                    runCatching { context.startActivity(intent) }
+                }
+            )
+        },
         modifier = modifier
     )
 }
@@ -206,6 +222,12 @@ fun SettingsContent(
     onClearHistory: () -> Unit = {},
     onClearFavorites: () -> Unit = {},
     onRevokeTrustedDevices: () -> Unit = {},
+    onCloudUpdateUrlDraftChange: (String) -> Unit = {},
+    onSaveCloudUpdateUrl: () -> Unit = {},
+    onCheckForCloudUpdates: () -> Unit = {},
+    onDownloadCloudUpdate: (CloudUpdateManifest) -> Unit = {},
+    onCancelCloudUpdateDownload: () -> Unit = {},
+    onInstallVerifiedCloudUpdate: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -228,6 +250,9 @@ fun SettingsContent(
     val historyPrunedText = stringResource(R.string.settings_feedback_history_pruned)
     val favoritesClearedText = stringResource(R.string.settings_feedback_favorites_cleared)
     val trustedRevokedText = stringResource(R.string.settings_feedback_trusted_revoked)
+    val updateUrlSavedText = stringResource(R.string.settings_feedback_update_url_saved)
+    val updateInstallPermText = stringResource(R.string.settings_feedback_update_install_perm)
+    val updateInstallFailedText = stringResource(R.string.settings_feedback_update_install_failed)
 
     val isDark = when (uiState.settings.themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -282,6 +307,9 @@ fun SettingsContent(
             SettingsFeedbackType.HISTORY_PRUNED -> historyPrunedText
             SettingsFeedbackType.FAVORITES_CLEARED -> favoritesClearedText
             SettingsFeedbackType.TRUSTED_REVOKED -> trustedRevokedText
+            SettingsFeedbackType.UPDATE_URL_SAVED -> updateUrlSavedText
+            SettingsFeedbackType.UPDATE_INSTALL_PERMISSION_REQUIRED -> updateInstallPermText
+            SettingsFeedbackType.UPDATE_INSTALL_LAUNCH_FAILED -> updateInstallFailedText
             null -> null
         }
         if (message != null) {
@@ -960,7 +988,24 @@ fun SettingsContent(
                     }
                 }
 
-                // 8. About Section & Reset Action
+                // 8. Cloud Updates & Sudanese Download Portal Section
+                item(key = "section_cloud_update") {
+                    CloudUpdateSettingsCard(
+                        updateState = uiState.cloudUpdateState,
+                        portalUrlDraft = uiState.cloudUpdateUrlDraft,
+                        persistedPortalUrl = uiState.settings.cloudUpdateManifestUrl,
+                        portalUrlError = uiState.cloudUpdateUrlError,
+                        isSaving = uiState.isSaving,
+                        onPortalUrlDraftChange = onCloudUpdateUrlDraftChange,
+                        onSavePortalUrl = onSaveCloudUpdateUrl,
+                        onCheckForUpdates = onCheckForCloudUpdates,
+                        onDownloadUpdate = onDownloadCloudUpdate,
+                        onCancelDownload = onCancelCloudUpdateDownload,
+                        onInstallVerifiedUpdate = onInstallVerifiedCloudUpdate
+                    )
+                }
+
+                // 9. About Section & Reset Action
                 item(key = "section_about") {
                     SettingsGroupCard(
                         title = stringResource(R.string.settings_section_about),

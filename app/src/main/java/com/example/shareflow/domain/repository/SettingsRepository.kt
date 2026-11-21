@@ -35,5 +35,6 @@ interface SettingsRepository {
     suspend fun updateDiscoveryVisibility(visibility: DiscoveryVisibility): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun updatePreferredConnectionMode(mode: PreferredConnectionMode): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun updateBiometricUnlockPreferred(enabled: Boolean): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateCloudUpdateManifestUrl(url: String): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun resetToDefaults(): AppResult<Unit>
 }

@@ -14,4 +14,7 @@
     <cache-path
         name="shareflow_qr_shares"
         path="shareflow_qr_shares/" />
+    <cache-path
+        name="shareflow_updates"
+        path="shareflow_updates/" />
 </paths>

@@ -45,4 +45,27 @@ class SettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(ThemeMode.DARK, viewModel.uiState.value.settings.themeMode)
     }
+
+    @Test
+    fun `validates and persists cloud update portal HTTPS URL`() = runTest(mainDispatcherRule.dispatcher) {
+        val fakeRepo = FakeSettingsRepository()
+        val viewModel = SettingsViewModel(fakeRepo, FakeKeystoreCipher(available = true))
+        advanceUntilIdle()
+
+        viewModel.onCloudUpdateUrlDraftChange("http://insecure.example.sd/version.json")
+        viewModel.saveCloudUpdateUrl()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.cloudUpdateUrlError)
+        assertEquals("", viewModel.uiState.value.settings.cloudUpdateManifestUrl)
+
+        viewModel.onCloudUpdateUrlDraftChange("https://shareflow.sd/releases/version.json")
+        viewModel.saveCloudUpdateUrl()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.cloudUpdateUrlError)
+        assertEquals(
+            "https://shareflow.sd/releases/version.json",
+            viewModel.uiState.value.settings.cloudUpdateManifestUrl
+        )
+        assertEquals(SettingsFeedbackType.UPDATE_URL_SAVED, viewModel.uiState.value.feedbackEvent)
+    }
 }
