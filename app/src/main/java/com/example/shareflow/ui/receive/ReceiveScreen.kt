@@ -154,6 +154,21 @@ fun ReceiveScreen(
         }
     }
 
+    val allTransferSessions by container.transferManager.allSessions
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val recentReceivedNonApkItems = remember(allTransferSessions) {
+        allTransferSessions
+            .filter {
+                !it.state.isActive &&
+                    !it.isResumable &&
+                    it.direction == TransferDirection.RECEIVED &&
+                    it.state == TransferState.COMPLETED
+            }
+            .flatMap { com.example.shareflow.ui.common.TransferDisplayPresentation.groupTransferItemsForDisplay(it.transferItems) }
+            .filter { !it.isApp && !it.localUri.isNullOrBlank() }
+    }
+    var previewReceivedFile by remember { mutableStateOf<com.example.shareflow.domain.model.LocalFileEntry?>(null) }
+
     var autoNavigatedTransferId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(activeTransferSessions) {
         val incomingActive = activeTransferSessions.firstOrNull {
@@ -780,6 +795,20 @@ fun ReceiveScreen(
                     }
                 }
 
+                // Received Non-APK Files Ready to View immediately
+                if (recentReceivedNonApkItems.isNotEmpty()) {
+                    item(key = "received_files_quick_view") {
+                        ReceivedFilesQuickActionCard(
+                            receivedFiles = recentReceivedNonApkItems,
+                            onViewFile = { displayItem ->
+                                com.example.shareflow.ui.common.TransferDisplayPresentation
+                                    .toLocalFileEntry(displayItem)
+                                    ?.let { previewReceivedFile = it }
+                            }
+                        )
+                    }
+                }
+
                 // Connection Status Card
                 item(key = "connection_status") {
                     ReceiveStatusCard(
@@ -805,6 +834,27 @@ fun ReceiveScreen(
                 }
             }
         }
+    }
+
+    previewReceivedFile?.let { fileEntry ->
+        com.example.shareflow.ui.viewer.CustomFileViewerDialog(
+            file = fileEntry,
+            onSendWithShareFlow = {
+                container.localSessionController.addSelectedFiles(listOf(fileEntry))
+                previewReceivedFile = null
+            },
+            onDismiss = { previewReceivedFile = null },
+            onOpenExternal = {
+                com.example.shareflow.ui.files.FileSharesheetHelper.openExternally(context, fileEntry)
+            },
+            onShareExternal = {
+                com.example.shareflow.ui.files.FileSharesheetHelper.shareFiles(
+                    context,
+                    listOf(fileEntry),
+                    fileEntry.displayName
+                )
+            }
+        )
     }
 }
 

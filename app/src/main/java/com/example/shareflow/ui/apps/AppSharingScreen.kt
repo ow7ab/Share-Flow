@@ -548,11 +548,7 @@ private fun InstalledAppCard(
 ) {
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
-    val appIconBitmap = remember(app.packageName) {
-        runCatching {
-            iconLoader(app.packageName)?.toBitmap(width = 96, height = 96)?.asImageBitmap()
-        }.getOrNull()
-    }
+    val appIconBitmap = com.example.shareflow.ui.common.rememberAppIconBitmap(packageName = app.packageName)
 
     val containerColor = if (selected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
@@ -621,19 +617,15 @@ private fun InstalledAppCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = app.packageName,
-                        style = ShareFlowMonoStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val versionText = stringResource(R.string.apps_version_format, app.versionName, app.versionCode)
                     val sizeText = app.totalApkSizeBytes?.let { bytes ->
                         ShareFlowFormatters.formatBytes(bytes, locale)
                     } ?: stringResource(R.string.apps_size_unavailable)
+                    val cleanMeta = listOfNotNull(
+                        app.versionName.takeIf { it.isNotBlank() }?.let { "v$it" },
+                        sizeText
+                    ).joinToString(" · ")
                     Text(
-                        text = "$versionText · $sizeText",
+                        text = cleanMeta,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -782,35 +774,46 @@ private fun ReceivedApkCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.InstallMobile,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
+                val receivedIcon = com.example.shareflow.ui.common.rememberAppIconBitmap(apkPathOrUri = apk.filePath)
+                Surface(
+                    shape = ShareFlowDesign.shapes.chip,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (receivedIcon != null) {
+                            Image(
+                                bitmap = receivedIcon,
+                                contentDescription = apk.appLabel ?: apk.fileName,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(ShareFlowDesign.shapes.chip)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.InstallMobile,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = apk.appLabel ?: apk.fileName,
+                        text = apk.appLabel?.takeIf { it.isNotBlank() }
+                            ?: com.example.shareflow.ui.common.TransferDisplayPresentation.cleanAppDisplayName(apk.fileName),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (!apk.packageName.isNullOrBlank()) {
-                        Text(
-                            text = apk.packageName,
-                            style = ShareFlowMonoStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                     val metaParts = buildList {
-                        if (!apk.versionName.isNullOrBlank() && apk.versionCode != null) {
-                            add(stringResource(R.string.apps_version_format, apk.versionName, apk.versionCode))
+                        if (!apk.versionName.isNullOrBlank()) {
+                            add("v${apk.versionName}")
                         }
                         if (apk.fileSizeBytes > 0L) {
                             add(ShareFlowFormatters.formatBytes(apk.fileSizeBytes, locale))
@@ -836,14 +839,6 @@ private fun ReceivedApkCard(
                 tint = badgeTint,
                 detailTestTag = "received_apk_status_${apk.id}"
             )
-
-            if (!apk.actualSha256.isNullOrBlank()) {
-                Text(
-                    text = "SHA-256: ${apk.actualSha256.take(16)}…${apk.actualSha256.takeLast(8)}",
-                    style = ShareFlowMonoStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             PrimaryActionButton(
                 text = stringResource(R.string.apps_install_action),

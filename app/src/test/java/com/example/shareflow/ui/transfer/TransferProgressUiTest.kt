@@ -231,4 +231,83 @@ class TransferProgressUiTest {
         composeRule.onNodeWithTag("transfer_session_card_tx_done").assertIsDisplayed()
         composeRule.onNodeWithText("photo.jpg").assertIsDisplayed()
     }
+
+    @Test
+    fun `received completed session displays Install App for apk and View File for non-apk while hiding split internals`() {
+        var viewedKey: String? = null
+        var installedKey: String? = null
+
+        val mixedReceivedSession = TransferSession(
+            sessionId = "tx_rx_mixed",
+            peer = samplePeer,
+            direction = TransferDirection.RECEIVED,
+            state = TransferState.COMPLETED,
+            transferItems = listOf(
+                TransferItem(
+                    itemId = "apk_base",
+                    sessionId = "tx_rx_mixed",
+                    fileName = "base.apk",
+                    relativePath = "WhatsApp_v2.24_split_apk",
+                    mimeType = "application/vnd.android.package-archive",
+                    fileType = TransferFileType.APK,
+                    fileSizeBytes = 12_000_000L,
+                    bytesTransferred = 12_000_000L,
+                    destinationUri = "file:///tmp/WhatsApp_v2.24_split_apk/base.apk",
+                    state = TransferState.COMPLETED
+                ),
+                TransferItem(
+                    itemId = "apk_split",
+                    sessionId = "tx_rx_mixed",
+                    fileName = "split_config.arm64_v8a.apk",
+                    relativePath = "WhatsApp_v2.24_split_apk",
+                    mimeType = "application/vnd.android.package-archive",
+                    fileType = TransferFileType.APK,
+                    fileSizeBytes = 4_000_000L,
+                    bytesTransferred = 4_000_000L,
+                    state = TransferState.COMPLETED
+                ),
+                TransferItem(
+                    itemId = "img_1",
+                    sessionId = "tx_rx_mixed",
+                    fileName = "report_scan.jpg",
+                    mimeType = "image/jpeg",
+                    fileType = TransferFileType.IMAGE,
+                    fileSizeBytes = 2_000_000L,
+                    bytesTransferred = 2_000_000L,
+                    destinationUri = "content://media/external/images/media/99",
+                    state = TransferState.COMPLETED
+                )
+            )
+        )
+
+        composeRule.setContent {
+            ShareFlowTheme(appLanguage = AppLanguage.ARABIC) {
+                TransferProgressContent(
+                    uiState = TransferProgressUiState(recentCompletedSessions = listOf(mixedReceivedSession)),
+                    onNavigateBack = {},
+                    onOpenSend = {},
+                    onOpenHistory = {},
+                    onPauseSession = {},
+                    onResumeSession = {},
+                    onRetrySession = {},
+                    onCancelSession = {},
+                    onConsumeFeedback = {},
+                    onViewFile = { viewedKey = it.key },
+                    onInstallApp = { installedKey = it.key }
+                )
+            }
+        }
+
+        // Install App button appears for the grouped WhatsApp app (not split_config.arm64_v8a.apk)
+        composeRule.onNodeWithTag("transfer_item_install_bundle_WhatsApp_v2.24_split_apk")
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals("bundle_WhatsApp_v2.24_split_apk", installedKey)
+
+        // View File button appears for the received photo
+        composeRule.onNodeWithTag("transfer_item_view_img_1")
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals("img_1", viewedKey)
+    }
 }

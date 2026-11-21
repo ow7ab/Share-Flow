@@ -476,7 +476,11 @@
     <string name="transfer_action_resume">Resume</string>
     <string name="transfer_action_cancel">Cancel</string>
     <string name="transfer_action_retry">Retry</string>
-    <string name="transfer_sha256_verified_badge">SHA-256 Verified</string>
+    <string name="transfer_sha256_verified_badge">Verified &amp; Safe</string>
+    <string name="transfer_action_view_file">View File</string>
+    <string name="transfer_action_install_app">Install App</string>
+    <string name="transfer_app_badge">App</string>
+    <string name="receive_completed_files_title">Received Files</string>
     <string name="transfer_resumable_badge">Verified Resumable</string>
     <string name="transfer_connect_first_hint">Connect to a nearby device below to start sending.</string>
     <string name="transfer_cancel_confirm_title">Cancel transfer?</string>
@@ -491,8 +495,8 @@
     <string name="apps_refresh_action">Refresh</string>
     <string name="apps_visibility_notice_title">Android Package Visibility &amp; Privacy</string>
     <string name="apps_visibility_notice_body">Only launchable applications visible under Android package visibility rules are shown. ShareFlow extracts only public APK installation files—never private app data, credentials, or databases.</string>
-    <string name="apps_split_apk_badge">Split APK (%1$d parts)</string>
-    <string name="apps_split_apk_note">App Bundle splits are exported together inside a folder. Installing split APKs on another device requires all parts.</string>
+    <string name="apps_split_apk_badge">Full App (%1$d)</string>
+    <string name="apps_split_apk_note">Complete app ready to share and install smoothly.</string>
     <string name="apps_unavailable_badge">Extraction unavailable</string>
     <string name="apps_size_unavailable">Size unavailable</string>
     <string name="apps_version_format">v%1$s (%2$d)</string>
@@ -1035,20 +1039,20 @@
     <string name="send_videos_empty_title">No Videos Loaded Yet</string>
     <string name="send_videos_empty_body">Use the Android Photo Picker to browse and select full-resolution videos to send at original quality.</string>
     <string name="send_videos_preview_action">Preview</string>
-    <string name="send_apps_search_placeholder">Search installed apps or package name…</string>
+    <string name="send_apps_search_placeholder">Search installed apps…</string>
     <string name="send_apps_sort_name">Name</string>
     <string name="send_apps_sort_size">Size</string>
     <string name="send_apps_sort_recent">Recent</string>
     <string name="send_apps_user_filter">User Apps</string>
     <string name="send_apps_system_filter">Include System</string>
-    <string name="send_apps_extracting_status">Packaging verified APKs &amp; split bundles…</string>
-    <string name="send_apps_split_badge">Split APK (%1$d)</string>
+    <string name="send_apps_extracting_status">Preparing apps for transfer…</string>
+    <string name="send_apps_split_badge">Full App (%1$d)</string>
     <string name="send_apps_selected_suffix">apps</string>
     <string name="send_files_filter_all">All Files</string>
     <string name="send_files_filter_docs">Documents</string>
     <string name="send_files_filter_audio">Audio</string>
     <string name="send_files_filter_archives">Archives</string>
-    <string name="send_files_filter_apks">APK Files</string>
+    <string name="send_files_filter_apks">Apps</string>
     <string name="send_files_filter_other">Other</string>
     <string name="send_selection_summary_title">Selected Items</string>
 
@@ -1056,10 +1060,10 @@
     <string name="send_connect_scan_qr_tab">Scan QR</string>
     <string name="send_connect_manual_code_tab">Manual Code</string>
     <string name="send_connect_nearby_tab">Nearby</string>
-    <string name="send_connect_header_subtitle">Scan the receiver QR code to auto-join its local network and send immediately over AES-256-GCM.</string>
+    <string name="send_connect_header_subtitle">Scan the receiver QR code to connect directly and start sending immediately.</string>
     <string name="send_connect_camera_grant_action">Enable Camera Scanner</string>
     <string name="send_connect_manual_submit_action">Connect with Code</string>
-    <string name="send_connect_ready_to_send">Authenticated &amp; ready to send selected items</string>
+    <string name="send_connect_ready_to_send">Connected &amp; ready to send selected items</string>
 
     <!-- Unified Receive: Incoming Offer Approval & PackageInstaller -->
     <string name="receive_offer_title">Incoming File Transfer</string>
@@ -1068,13 +1072,13 @@
     <string name="receive_offer_more_items_format">+%1$d more item(s)</string>
     <string name="receive_offer_accept_action">Accept &amp; Receive</string>
     <string name="receive_offer_reject_action">Decline</string>
-    <string name="receive_apps_ready_title">Received Applications Ready to Install</string>
+    <string name="receive_apps_ready_title">Received Apps Ready to Install</string>
     <string name="receive_app_install_action">Install</string>
     <string name="receive_app_update_action">Update</string>
-    <string name="receive_app_split_bundle_badge">Split Bundle (%1$d APKs)</string>
-    <string name="receive_app_install_validating">Verifying SHA-256 &amp; APK integrity…</string>
-    <string name="receive_app_install_staging">Staging package (%1$d%%)…</string>
-    <string name="receive_app_install_confirm_prompt">Confirm installation in Android system dialog</string>
+    <string name="receive_app_split_bundle_badge">Full App (%1$d)</string>
+    <string name="receive_app_install_validating">Checking app safety…</string>
+    <string name="receive_app_install_staging">Preparing to install (%1$d%%)…</string>
+    <string name="receive_app_install_confirm_prompt">Confirm installation in Android dialog</string>
     <string name="receive_app_install_confirm_action">Open Installer</string>
     <string name="receive_app_install_success">Installed %1$s successfully</string>
     <string name="receive_app_install_failed">Installation failed: %1$s</string>
@@ -1085,10 +1089,10 @@
     <string name="send_searching_nearby_title">Searching for nearby devices…</string>
     <string name="send_searching_nearby_subtitle">Make sure Receive mode is open on the other device.</string>
     <string name="send_connecting_peer_title">Connecting to device…</string>
-    <string name="send_connecting_peer_subtitle">Verifying encrypted channel and waiting for receiver approval.</string>
+    <string name="send_connecting_peer_subtitle">Linking securely and waiting for receiver approval.</string>
     <string name="receive_waiting_searching_banner">Searching &amp; waiting for sender to scan QR…</string>
-    <string name="receive_linking_sender_banner">Connecting &amp; authenticating with sender…</string>
-    <string name="home_unified_transfer_hint">Use Send or Receive above to connect via QR code, local hotspot, or Wi-Fi.</string>
+    <string name="receive_linking_sender_banner">Connecting with sender…</string>
+    <string name="home_unified_transfer_hint">Use Send or Receive above to connect via QR code or nearby wireless.</string>
 
     <!-- SHAREit Direct QR Scanning & Inline Retry Feedback -->
     <string name="qr_status_scan_in_progress">Scan in progress…</string>
@@ -1099,8 +1103,8 @@
     <string name="qr_error_failed_title">Direct Connection Failed</string>
     <string name="qr_error_failed_body">Could not link directly to the receiver. Keep both devices close and retry.</string>
     <string name="qr_scanner_retry_action">Retry</string>
-    <string name="shareit_direct_p2p_badge">Direct P2P • No Router Needed</string>
-    <string name="shareit_auto_send_starting">Connected directly! Starting encrypted transfer…</string>
+    <string name="shareit_direct_p2p_badge">Direct Offline Transfer • No Internet Needed</string>
+    <string name="shareit_auto_send_starting">Connected! Starting transfer…</string>
 
     <!-- Custom File Viewer & APK Fallback Installer -->
     <string name="receive_app_install_fallback_action">Open System Installer</string>
@@ -1125,7 +1129,7 @@
 
     <!-- Effortless 1-Tap Device Pairing (Send & Receive) -->
     <string name="send_summary_compact_format">%1$s items • %2$s</string>
-    <string name="send_summary_sha256_badge">SHA-256</string>
+    <string name="send_summary_sha256_badge">Protected</string>
     <string name="send_quick_nearby_title">Nearby Receiver Ready — Tap to Send</string>
     <string name="send_quick_nearby_subtitle">Tap any device below to connect &amp; start transferring immediately.</string>
     <string name="send_quick_nearby_connect_action">Connect</string>

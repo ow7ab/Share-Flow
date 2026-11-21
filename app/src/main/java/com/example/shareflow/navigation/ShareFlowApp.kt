@@ -246,6 +246,50 @@ private fun ShareFlowNavHost(
     NavHost(
         navController = navController,
         startDestination = ShareFlowRoutes.HOME,
+        enterTransition = {
+            androidx.compose.animation.fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 220,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                )
+            ) + androidx.compose.animation.slideInHorizontally(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 220,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                initialOffsetX = { fullWidth -> fullWidth / 14 }
+            )
+        },
+        exitTransition = {
+            androidx.compose.animation.fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 180,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                )
+            )
+        },
+        popEnterTransition = {
+            androidx.compose.animation.fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 220,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                )
+            ) + androidx.compose.animation.slideInHorizontally(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 220,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                initialOffsetX = { fullWidth -> -fullWidth / 14 }
+            )
+        },
+        popExitTransition = {
+            androidx.compose.animation.fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 180,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                )
+            )
+        },
         modifier = modifier
     ) {
         // Top-level destinations: Home, Files, Media, Tools, Settings
@@ -355,7 +399,8 @@ private fun ShareFlowNavHost(
             TransferProgressScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenSend = { navigateToRoute(ShareFlowRoutes.SEND) },
-                onOpenHistory = { navigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) }
+                onOpenHistory = { navigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.APPLICATION_SHARING) {

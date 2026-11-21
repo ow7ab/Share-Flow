@@ -476,7 +476,11 @@
     <string name="transfer_action_resume">استئناف</string>
     <string name="transfer_action_cancel">إلغاء</string>
     <string name="transfer_action_retry">إعادة المحاولة</string>
-    <string name="transfer_sha256_verified_badge">تم التحقق بـ SHA-256</string>
+    <string name="transfer_sha256_verified_badge">تم التحقق بنجاح</string>
+    <string name="transfer_action_view_file">عرض الملف</string>
+    <string name="transfer_action_install_app">تثبيت التطبيق</string>
+    <string name="transfer_app_badge">تطبيق</string>
+    <string name="receive_completed_files_title">الملفات المستلَمة</string>
     <string name="transfer_resumable_badge">قابل للاستئناف الموثّق</string>
     <string name="transfer_connect_first_hint">اتصل بجهاز قريب أدناه لبدء إرسال الملفات.</string>
     <string name="transfer_cancel_confirm_title">إلغاء عملية النقل؟</string>
@@ -491,8 +495,8 @@
     <string name="apps_refresh_action">تحديث</string>
     <string name="apps_visibility_notice_title">خصوصية ورؤية حزم أندرويد</string>
     <string name="apps_visibility_notice_body">تُعرض فقط التطبيقات المتاحة وفق قواعد رؤية الحزم في أندرويد. يستخرج ShareFlow ملفات التثبيت العامة (APK) فقط ولا يصل أبداً إلى بيانات التطبيقات الخاصة أو بيانات الدخول أو قواعد البيانات.</string>
-    <string name="apps_split_apk_badge">حزمة مقسّمة (%1$d أجزاء)</string>
-    <string name="apps_split_apk_note">يتم تصدير ملفات الحزمة المقسّمة معاً داخل مجلد واحد. يتطلب التثبيت على جهاز آخر توفّر جميع الأجزاء.</string>
+    <string name="apps_split_apk_badge">تطبيق كامل (%1$d)</string>
+    <string name="apps_split_apk_note">تطبيق كامل جاهز للمشاركة والتثبيت بسلاسة.</string>
     <string name="apps_unavailable_badge">الاستخراج غير متاح</string>
     <string name="apps_size_unavailable">الحجم غير متاح</string>
     <string name="apps_version_format">الإصدار %1$s (%2$d)</string>
@@ -1035,20 +1039,20 @@
     <string name="send_videos_empty_title">لا توجد فيديوهات محمّلة بعد</string>
     <string name="send_videos_empty_body">استخدم منتقي وسائط Android لاختيار الفيديوهات وإرسالها بالدقة الأصلية الكاملة.</string>
     <string name="send_videos_preview_action">معاينة</string>
-    <string name="send_apps_search_placeholder">ابحث في التطبيقات المثبّتة أو اسم الحزمة…</string>
+    <string name="send_apps_search_placeholder">ابحث في التطبيقات المثبّتة…</string>
     <string name="send_apps_sort_name">الاسم</string>
     <string name="send_apps_sort_size">الحجم</string>
     <string name="send_apps_sort_recent">الأحدث</string>
     <string name="send_apps_user_filter">تطبيقات المستخدم</string>
     <string name="send_apps_system_filter">تضمين النظام</string>
-    <string name="send_apps_extracting_status">جارٍ تجهيز حزم APK والتحقق من التجزئة…</string>
-    <string name="send_apps_split_badge">حزمة مقسّمة (%1$d)</string>
+    <string name="send_apps_extracting_status">جارٍ تجهيز التطبيقات للنقل…</string>
+    <string name="send_apps_split_badge">تطبيق كامل (%1$d)</string>
     <string name="send_apps_selected_suffix">تطبيقات</string>
     <string name="send_files_filter_all">كل الملفات</string>
     <string name="send_files_filter_docs">المستندات</string>
     <string name="send_files_filter_audio">الصوتيات</string>
     <string name="send_files_filter_archives">الأرشيفات</string>
-    <string name="send_files_filter_apks">ملفات APK</string>
+    <string name="send_files_filter_apks">التطبيقات</string>
     <string name="send_files_filter_other">أخرى</string>
     <string name="send_selection_summary_title">العناصر المحددة</string>
 
@@ -1056,10 +1060,10 @@
     <string name="send_connect_scan_qr_tab">مسح QR</string>
     <string name="send_connect_manual_code_tab">رمز يدوي</string>
     <string name="send_connect_nearby_tab">الأجهزة القريبة</string>
-    <string name="send_connect_header_subtitle">امسح رمز QR على الجهاز المستقبِل للانضمام تلقائياً إلى شبكته المحلية والإرسال فوراً بتشفير AES-256-GCM.</string>
+    <string name="send_connect_header_subtitle">امسح رمز QR على الجهاز المستقبِل للربط المباشر وبدء الإرسال فوراً.</string>
     <string name="send_connect_camera_grant_action">تفعيل ماسح الكاميرا</string>
     <string name="send_connect_manual_submit_action">الاتصال بالرمز</string>
-    <string name="send_connect_ready_to_send">تمت المصادقة والجهاز جاهز لإرسال العناصر المحددة</string>
+    <string name="send_connect_ready_to_send">تم الربط والجهاز جاهز لإرسال العناصر المحددة</string>
 
     <!-- الاستقبال الموحّد: الموافقة على الاستلام ومثبّت التطبيقات -->
     <string name="receive_offer_title">طلب استلام ملفات وارد</string>
@@ -1071,9 +1075,9 @@
     <string name="receive_apps_ready_title">التطبيقات المستلَمة الجاهزة للتثبيت</string>
     <string name="receive_app_install_action">تثبيت</string>
     <string name="receive_app_update_action">تحديث</string>
-    <string name="receive_app_split_bundle_badge">حزمة مقسّمة (%1$d APK)</string>
-    <string name="receive_app_install_validating">جارٍ التحقق من SHA-256 وسلامة الحزمة…</string>
-    <string name="receive_app_install_staging">جارٍ تجهيز الحزمة (%1$d%%)…</string>
+    <string name="receive_app_split_bundle_badge">تطبيق كامل (%1$d)</string>
+    <string name="receive_app_install_validating">جارٍ التأكد من سلامة التطبيق…</string>
+    <string name="receive_app_install_staging">جارٍ تجهيز التثبيت (%1$d%%)…</string>
     <string name="receive_app_install_confirm_prompt">أكّد التثبيت في نافذة نظام Android</string>
     <string name="receive_app_install_confirm_action">فتح المثبّت</string>
     <string name="receive_app_install_success">تم تثبيت %1$s بنجاح</string>
@@ -1085,10 +1089,10 @@
     <string name="send_searching_nearby_title">جاري البحث عن الأجهزة القريبة…</string>
     <string name="send_searching_nearby_subtitle">تأكد من فتح وضع الاستقبال على الجهاز الآخر.</string>
     <string name="send_connecting_peer_title">جاري الربط بالجهاز…</string>
-    <string name="send_connecting_peer_subtitle">جاري التحقق من القناة المشفّرة وانتظار موافقة المستقبِل.</string>
+    <string name="send_connecting_peer_subtitle">جاري الربط الآمن وانتظار موافقة المستقبِل.</string>
     <string name="receive_waiting_searching_banner">جاري البحث وانتظار مسح رمز QR من المُرسِل…</string>
-    <string name="receive_linking_sender_banner">جاري الربط والمصادقة مع الجهاز المُرسِل…</string>
-    <string name="home_unified_transfer_hint">استخدم إرسال أو استقبال أعلاه للربط عبر رمز QR أو نقطة الاتصال المحلية أو Wi-Fi.</string>
+    <string name="receive_linking_sender_banner">جاري الربط مع الجهاز المُرسِل…</string>
+    <string name="home_unified_transfer_hint">استخدم إرسال أو استقبال أعلاه للربط السريع عبر رمز QR أو الشبكة المحلية.</string>
 
     <!-- المسح المباشر وإعادة المحاولة والنقل المباشر بدون وسيط -->
     <string name="qr_status_scan_in_progress">جاري المسح…</string>
@@ -1099,8 +1103,8 @@
     <string name="qr_error_failed_title">فشل الربط المباشر</string>
     <string name="qr_error_failed_body">تعذّر الربط المباشر بالمستقبِل. أبقِ الجهازين متقاربين وأعد المحاولة.</string>
     <string name="qr_scanner_retry_action">إعادة المحاولة</string>
-    <string name="shareit_direct_p2p_badge">نقل مباشر جهاز لجهاز • بدون راوتر أو وسيط</string>
-    <string name="shareit_auto_send_starting">تم الربط المباشر! جارٍ بدء الإرسال المشفّر…</string>
+    <string name="shareit_direct_p2p_badge">نقل مباشر وسريع • بدون إنترنت</string>
+    <string name="shareit_auto_send_starting">تم الربط بنجاح! جارٍ بدء النقل…</string>
 
     <!-- عارض الملفات المخصص ومثبّت APK الاحتياطي -->
     <string name="receive_app_install_fallback_action">فتح مثبّت النظام مباشرة</string>
@@ -1125,7 +1129,7 @@
 
     <!-- تسهيل الربط السريع بين الأجهزة (الإرسال والاستقبال) -->
     <string name="send_summary_compact_format">%1$s عنصر • %2$s</string>
-    <string name="send_summary_sha256_badge">SHA-256</string>
+    <string name="send_summary_sha256_badge">آمن</string>
     <string name="send_quick_nearby_title">جهاز مستقبِل قريب — اضغط للإرسال فوراً</string>
     <string name="send_quick_nearby_subtitle">اضغط على أي جهاز أدناه للربط المباشر وبدء النقل تلقائياً.</string>
     <string name="send_quick_nearby_connect_action">ربط</string>

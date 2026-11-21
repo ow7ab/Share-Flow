@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -104,13 +105,21 @@ fun IncomingTransferOfferDialog(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                offer.items.take(5).forEach { item ->
+                val displayItems = androidx.compose.runtime.remember(offer.items) {
+                    com.example.shareflow.ui.common.TransferDisplayPresentation.groupTransferItemsForDisplay(offer.items)
+                }
+                displayItems.take(5).forEach { item ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        com.example.shareflow.ui.common.TransferItemVisualAvatar(
+                            item = item,
+                            size = 32.dp
+                        )
                         Text(
-                            text = item.fileName,
+                            text = item.displayTitle,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -119,14 +128,13 @@ fun IncomingTransferOfferDialog(
                         Text(
                             text = ShareFlowFormatters.formatBytes(item.fileSizeBytes, locale),
                             style = ShareFlowMonoStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 8.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                if (offer.items.size > 5) {
+                if (displayItems.size > 5) {
                     Text(
-                        text = stringResource(R.string.receive_offer_more_items_format, offer.items.size - 5),
+                        text = stringResource(R.string.receive_offer_more_items_format, displayItems.size - 5),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -341,20 +349,39 @@ fun ReceivedAppsInstallerCard(
             }
 
             installable.take(5).forEach { apk ->
+                val apkIcon = com.example.shareflow.ui.common.rememberAppIconBitmap(apkPathOrUri = apk.filePath)
+                val cleanLabel = apk.appLabel?.takeIf { it.isNotBlank() }
+                    ?: com.example.shareflow.ui.common.TransferDisplayPresentation.cleanAppDisplayName(apk.fileName)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Android,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                            if (apkIcon != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = apkIcon,
+                                    contentDescription = cleanLabel,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.Android,
+                                    contentDescription = cleanLabel,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = apk.appLabel ?: apk.fileName,
+                            text = cleanLabel,
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -368,16 +395,6 @@ fun ReceivedAppsInstallerCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (apk.isSplitBundle) {
-                            StatusPill(
-                                label = stringResource(
-                                    R.string.receive_app_split_bundle_badge,
-                                    apk.splitBundleApkPaths.size
-                                ),
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
                     }
                     SecondaryActionButton(
                         text = stringResource(R.string.receive_app_install_action),
@@ -389,6 +406,74 @@ fun ReceivedAppsInstallerCard(
                         outlined = false,
                         leadingIcon = Icons.Filled.InstallMobile,
                         modifier = Modifier.testTag("receive_install_apk_${apk.id}")
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Receiver-side quick access card showing recently received non-APK files with a direct 1-tap
+ * "View File" button that opens the built-in Custom File Viewer.
+ */
+@Composable
+fun ReceivedFilesQuickActionCard(
+    receivedFiles: List<com.example.shareflow.ui.common.TransferDisplayItem>,
+    onViewFile: (com.example.shareflow.ui.common.TransferDisplayItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val viewable = receivedFiles.filter { !it.isApp && !it.localUri.isNullOrBlank() }
+    if (viewable.isEmpty()) return
+
+    val spacing = ShareFlowDesign.spacing
+    val locale = ShareFlowDesign.locale
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("receive_completed_files_section"),
+        shape = ShareFlowDesign.shapes.card,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            SectionHeader(title = stringResource(R.string.receive_completed_files_title))
+
+            viewable.take(5).forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                ) {
+                    com.example.shareflow.ui.common.TransferItemVisualAvatar(
+                        item = item,
+                        size = 42.dp
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.displayTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = ShareFlowFormatters.formatBytes(item.fileSizeBytes, locale),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    SecondaryActionButton(
+                        text = stringResource(R.string.transfer_action_view_file),
+                        onClick = { onViewFile(item) },
+                        outlined = false,
+                        leadingIcon = Icons.Filled.Visibility,
+                        modifier = Modifier.testTag("receive_view_file_${item.key}")
                     )
                 }
             }

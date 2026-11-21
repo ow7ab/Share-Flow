@@ -580,11 +580,7 @@ private fun InstalledAppSelectionCard(
 ) {
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
-    val iconBitmap = remember(app.packageName) {
-        runCatching {
-            appSharingRepository.loadAppIcon(app.packageName)?.toBitmap(96, 96)?.asImageBitmap()
-        }.getOrNull()
-    }
+    val iconBitmap = com.example.shareflow.ui.common.rememberAppIconBitmap(packageName = app.packageName)
 
     Surface(
         modifier = Modifier
@@ -610,14 +606,14 @@ private fun InstalledAppSelectionCard(
                     bitmap = iconBitmap,
                     contentDescription = app.appName,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(46.dp)
                         .clip(MaterialTheme.shapes.small)
                 )
             } else {
                 Surface(
                     shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(46.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -638,33 +634,18 @@ private fun InstalledAppSelectionCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                val sizeStr = app.totalApkSizeBytes?.let { ShareFlowFormatters.formatBytes(it, locale) } ?: "—"
+                val cleanMeta = listOfNotNull(
+                    app.versionName.takeIf { it.isNotBlank() }?.let { "v$it" },
+                    sizeStr
+                ).joinToString(" • ")
                 Text(
-                    text = app.packageName,
-                    style = ShareFlowMonoStyle,
+                    text = cleanMeta,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val sizeStr = app.totalApkSizeBytes?.let { ShareFlowFormatters.formatBytes(it, locale) } ?: "—"
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "v${app.versionName} (${app.versionCode}) • $sizeStr",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (app.isSplitApk) {
-                        StatusPill(
-                            label = stringResource(R.string.send_apps_split_badge, app.apkPartCount),
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
                 if (!app.isExtractable && !app.unavailableReason.isNullOrBlank()) {
                     Text(
                         text = app.unavailableReason,

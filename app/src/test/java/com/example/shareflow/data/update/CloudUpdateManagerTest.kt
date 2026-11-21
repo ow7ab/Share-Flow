@@ -59,9 +59,9 @@ class CloudUpdateManagerTest {
     """.trimIndent()
 
     @Test
-    fun `version metadata is incremented to 1_0_2 versionCode 3 with default GitHub release manifest`() {
-        assertEquals(3, BuildConfig.VERSION_CODE)
-        assertEquals("1.0.2", BuildConfig.VERSION_NAME)
+    fun `version metadata is incremented to 1_0_3 versionCode 4 with default GitHub release manifest`() {
+        assertEquals(4, BuildConfig.VERSION_CODE)
+        assertEquals("1.0.3", BuildConfig.VERSION_NAME)
         assertEquals(
             "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
