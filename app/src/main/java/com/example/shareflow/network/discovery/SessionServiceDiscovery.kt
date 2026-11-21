@@ -156,6 +156,23 @@ class AndroidSessionServiceDiscovery(
     ): AppResult<DiscoveredReceiverEndpoint> = withContext(dispatchers.io) {
         _statusLabel.value = "DISCOVERING_NSD_AND_UDP"
 
+        // Direct LocalOnlyHotspot fast-path: on a temporary AP hosted by the receiver phone,
+        // the sender's hotspot gateway IP (from Android LinkProperties) IS the receiver phone.
+        if (boundNetwork?.isLocalOnlyHotspot == true) {
+            val hotspotGateway = boundNetwork.gatewayIpv4Address?.takeIf { it.isNotBlank() }
+            if (hotspotGateway != null && verifyTcpReachability(hotspotGateway, payload.servicePort, boundNetwork)) {
+                _statusLabel.value = "RESOLVED_DIRECT_HOTSPOT_GATEWAY"
+                return@withContext AppResult.Success(
+                    DiscoveredReceiverEndpoint(
+                        hostAddress = hotspotGateway,
+                        port = payload.servicePort,
+                        serviceName = payload.serviceName,
+                        method = ReceiverDiscoveryMethod.QR_HOST_HINT_VERIFIED
+                    )
+                )
+            }
+        }
+
         val found = withTimeoutOrNull(timeoutMillis) {
             coroutineScope {
                 val udpDeferred = async {
@@ -181,15 +198,18 @@ class AndroidSessionServiceDiscovery(
             return@withContext AppResult.Success(found)
         }
 
-        // Final dynamic fallback: verify hostAddressHint from the signed QR via direct TCP connect on bound network
-        val hintIp = payload.hostAddressHint?.takeIf { it.isNotBlank() }
-        if (hintIp != null) {
-            val reachable = verifyTcpReachability(hintIp, payload.servicePort, boundNetwork)
+        // Dynamic fallback: verify hotspot gateway or signed QR hostAddressHint via direct TCP connect on bound network
+        val fallbackHosts = listOfNotNull(
+            boundNetwork?.gatewayIpv4Address?.takeIf { it.isNotBlank() && boundNetwork.isLocalOnlyHotspot },
+            payload.hostAddressHint?.takeIf { it.isNotBlank() }
+        ).distinct()
+        for (candidateHost in fallbackHosts) {
+            val reachable = verifyTcpReachability(candidateHost, payload.servicePort, boundNetwork)
             if (reachable) {
                 _statusLabel.value = "RESOLVED_QR_HINT_VERIFIED"
                 return@withContext AppResult.Success(
                     DiscoveredReceiverEndpoint(
-                        hostAddress = hintIp,
+                        hostAddress = candidateHost,
                         port = payload.servicePort,
                         serviceName = payload.serviceName,
                         method = ReceiverDiscoveryMethod.QR_HOST_HINT_VERIFIED

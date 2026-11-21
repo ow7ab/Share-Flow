@@ -309,6 +309,10 @@ fun QrScannerScreen(
                             onQrDecoded = { decoded ->
                                 manualUri = decoded
                                 submitQrUri(decoded)
+                            },
+                            onRetryScan = {
+                                errorMessage = null
+                                scannerState = QrScannerUiState.SCANNING
                             }
                         )
                     } else {

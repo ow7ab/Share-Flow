@@ -749,16 +749,22 @@ class SendViewModel(
                 }
                 is AppResult.Failure -> {
                     val code = unifiedConnectionManager?.smartError?.value?.code
-                    scannerUiState.value = when (code) {
-                        SmartConnectionErrorCode.STALE_OR_EXPIRED_QR,
-                        SmartConnectionErrorCode.SESSION_EXPIRED -> QrScannerUiState.EXPIRED_QR
-                        SmartConnectionErrorCode.INVALID_QR,
-                        SmartConnectionErrorCode.TAMPERED_QR,
-                        SmartConnectionErrorCode.REPLAYED_QR,
-                        SmartConnectionErrorCode.SELF_PAIRING -> QrScannerUiState.INVALID_QR
+                    val msg = result.error.message
+                    scannerUiState.value = when {
+                        code == SmartConnectionErrorCode.STALE_OR_EXPIRED_QR ||
+                            code == SmartConnectionErrorCode.SESSION_EXPIRED ||
+                            msg.contains("expired", ignoreCase = true) -> QrScannerUiState.EXPIRED_QR
+                        code == SmartConnectionErrorCode.INVALID_QR ||
+                            code == SmartConnectionErrorCode.TAMPERED_QR ||
+                            code == SmartConnectionErrorCode.REPLAYED_QR ||
+                            code == SmartConnectionErrorCode.SELF_PAIRING ||
+                            msg.contains("invalid", ignoreCase = true) ||
+                            msg.contains("malformed", ignoreCase = true) ||
+                            msg.contains("unsupported", ignoreCase = true) ||
+                            msg.contains("qr", ignoreCase = true) -> QrScannerUiState.INVALID_QR
                         else -> QrScannerUiState.FAILURE
                     }
-                    feedbackState.value = result.error.message
+                    feedbackState.value = msg
                 }
             }
         }

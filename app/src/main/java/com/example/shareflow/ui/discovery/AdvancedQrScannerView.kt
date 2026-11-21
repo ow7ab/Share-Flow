@@ -34,9 +34,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +64,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -93,6 +97,7 @@ import kotlinx.coroutines.withContext
 fun AdvancedQrScannerView(
     scannerState: QrScannerUiState,
     onQrDecoded: (String) -> Unit,
+    onRetryScan: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -119,17 +124,19 @@ fun AdvancedQrScannerView(
     val lastDeliveredTime = remember { AtomicLong(0L) }
     val lastAutoZoomTime = remember { AtomicLong(0L) }
 
-    // Unlock scanner automatically whenever state returns to SCANNING, INVALID_QR, EXPIRED_QR, or FAILURE
+    // Unlock scanner strictly when in SCANNING state; pause on LOADING/SUCCESS/error until Retry
     LaunchedEffect(scannerState) {
         when (scannerState) {
-            QrScannerUiState.SCANNING,
-            QrScannerUiState.INVALID_QR,
-            QrScannerUiState.EXPIRED_QR,
-            QrScannerUiState.FAILURE -> {
+            QrScannerUiState.SCANNING -> {
+                lastDeliveredText.value = null
+                lastDeliveredTime.set(0L)
                 scanLocked.set(false)
             }
             QrScannerUiState.LOADING,
-            QrScannerUiState.SUCCESS -> {
+            QrScannerUiState.SUCCESS,
+            QrScannerUiState.INVALID_QR,
+            QrScannerUiState.EXPIRED_QR,
+            QrScannerUiState.FAILURE -> {
                 scanLocked.set(true)
             }
         }
@@ -155,7 +162,7 @@ fun AdvancedQrScannerView(
     }
 
     val stateLabelRes = when (scannerState) {
-        QrScannerUiState.SCANNING -> R.string.qr_status_searching_camera
+        QrScannerUiState.SCANNING -> R.string.qr_status_scan_in_progress
         QrScannerUiState.LOADING -> R.string.smart_scanner_state_loading
         QrScannerUiState.SUCCESS -> R.string.smart_scanner_state_success
         QrScannerUiState.INVALID_QR -> R.string.smart_scanner_state_invalid
@@ -424,13 +431,82 @@ fun AdvancedQrScannerView(
                     Text(
                         text = stringResource(R.string.qr_status_connecting_overlay),
                         style = MaterialTheme.typography.titleSmall,
-                        color = Color.White
+                        color = Color.White,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
         }
 
-        // Top overlay: Scanner status pill, auto-zoom badge, and flash toggle
+        // Immediate inline Retry overlay for Invalid / Expired / Failed QR codes inside the same scanning view
+        val isErrorOverlayState = scannerState == QrScannerUiState.INVALID_QR ||
+            scannerState == QrScannerUiState.EXPIRED_QR ||
+            scannerState == QrScannerUiState.FAILURE
+        AnimatedVisibility(
+            visible = isErrorOverlayState,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val (errorTitleRes, errorBodyRes) = when (scannerState) {
+                QrScannerUiState.EXPIRED_QR -> R.string.qr_error_expired_title to R.string.qr_error_expired_body
+                QrScannerUiState.INVALID_QR -> R.string.qr_error_invalid_title to R.string.qr_error_invalid_body
+                else -> R.string.qr_error_failed_title to R.string.qr_error_failed_body
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.80f))
+                    .testTag("qr_scanner_error_overlay"),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Text(
+                        text = stringResource(errorTitleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = stringResource(errorBodyRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.88f),
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = {
+                            lastDeliveredText.value = null
+                            lastDeliveredTime.set(0L)
+                            scanLocked.set(false)
+                            onRetryScan()
+                        },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("qr_scanner_retry_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.qr_scanner_retry_action),
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Top overlay: Live "Scan in progress" pill with active spinner, auto-zoom badge, and flash toggle
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -440,12 +516,37 @@ fun AdvancedQrScannerView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                StatusPill(
-                    label = stringResource(stateLabelRes),
-                    containerColor = Color.Black.copy(alpha = 0.72f),
-                    contentColor = Color.White,
-                    modifier = Modifier.testTag("qr_scanner_state_badge")
-                )
+                if (scannerState == QrScannerUiState.SCANNING) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.74f),
+                        modifier = Modifier.testTag("qr_scanner_state_badge")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = stringResource(stateLabelRes),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White
+                            )
+                        }
+                    }
+                } else {
+                    StatusPill(
+                        label = stringResource(stateLabelRes),
+                        containerColor = Color.Black.copy(alpha = 0.72f),
+                        contentColor = Color.White,
+                        modifier = Modifier.testTag("qr_scanner_state_badge")
+                    )
+                }
                 AnimatedVisibility(visible = activeZoomRatio > 1.05f) {
                     StatusPill(
                         label = stringResource(R.string.smart_scanner_auto_zoom_badge, activeZoomRatio),

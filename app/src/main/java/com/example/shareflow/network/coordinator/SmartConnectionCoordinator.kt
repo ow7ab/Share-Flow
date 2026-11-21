@@ -572,13 +572,24 @@ class SmartConnectionCoordinator(
                 val endpoint: DiscoveredReceiverEndpoint = when (discoveryResult) {
                     is AppResult.Success -> discoveryResult.data
                     is AppResult.Failure -> {
-                        val hintHost = payload.hostAddressHint?.trim()
-                        if (!hintHost.isNullOrBlank() && payload.servicePort in 1024..65535) {
+                        val directHotspotGateway = boundHandle
+                            ?.takeIf { it.isLocalOnlyHotspot }
+                            ?.gatewayIpv4Address
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                        val directHost = directHotspotGateway ?: payload.hostAddressHint?.trim()?.takeIf { it.isNotBlank() }
+                        if (directHost != null && payload.servicePort in 1024..65535) {
                             updateDiagnostics {
-                                it.copy(nsdDiscoveryStatus = "DIRECT_QR_HOST_FALLBACK")
+                                it.copy(
+                                    nsdDiscoveryStatus = if (directHotspotGateway != null) {
+                                        "DIRECT_HOTSPOT_GATEWAY_FALLBACK"
+                                    } else {
+                                        "DIRECT_QR_HOST_FALLBACK"
+                                    }
+                                )
                             }
                             DiscoveredReceiverEndpoint(
-                                hostAddress = hintHost,
+                                hostAddress = directHost,
                                 port = payload.servicePort,
                                 serviceName = payload.serviceName,
                                 method = ReceiverDiscoveryMethod.QR_HOST_HINT_VERIFIED

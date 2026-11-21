@@ -512,6 +512,10 @@ fun QrPairingScreen(
                                 onQrDecoded = { decodedUri ->
                                     manualUriInput = decodedUri
                                     viewModel.connectViaQrUri(decodedUri)
+                                },
+                                onRetryScan = {
+                                    viewModel.clearSmartError()
+                                    viewModel.resetScannerState()
                                 }
                             )
                         }

@@ -80,6 +80,7 @@ class SmartConnectionUiRobolectricTest {
                 .isEmpty()
         )
         composeTestRule.onNodeWithTag("receive_toggle_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("receive_direct_p2p_badge").assertIsDisplayed()
 
         // Navigate back to Home -> Tools -> verify no duplicate standalone QR scanner, diagnostics opens cleanly
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()

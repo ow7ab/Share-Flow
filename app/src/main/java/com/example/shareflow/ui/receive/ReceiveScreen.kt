@@ -362,6 +362,13 @@ fun ReceiveScreen(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
+                            } else if (uiState.enableLocalHotspot) {
+                                StatusPill(
+                                    label = stringResource(R.string.shareit_direct_p2p_badge),
+                                    containerColor = semantic.verifiedContainer,
+                                    contentColor = semantic.verifiedBadge,
+                                    modifier = Modifier.testTag("receive_direct_p2p_badge")
+                                )
                             }
 
                             Row(

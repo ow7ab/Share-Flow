@@ -1089,6 +1089,18 @@
     <string name="receive_waiting_searching_banner">جاري البحث وانتظار مسح رمز QR من المُرسِل…</string>
     <string name="receive_linking_sender_banner">جاري الربط والمصادقة مع الجهاز المُرسِل…</string>
     <string name="home_unified_transfer_hint">استخدم إرسال أو استقبال أعلاه للربط عبر رمز QR أو نقطة الاتصال المحلية أو Wi-Fi.</string>
+
+    <!-- المسح المباشر وإعادة المحاولة والنقل المباشر بدون وسيط -->
+    <string name="qr_status_scan_in_progress">جاري المسح…</string>
+    <string name="qr_error_invalid_title">رمز QR غير صالح</string>
+    <string name="qr_error_invalid_body">وجّه الكاميرا نحو رمز QR المباشر في شاشة الاستقبال على الجهاز الآخر.</string>
+    <string name="qr_error_expired_title">انتهت صلاحية رمز QR</string>
+    <string name="qr_error_expired_body">حدّث رمز QR على الجهاز المستقبِل ثم اضغط إعادة المحاولة.</string>
+    <string name="qr_error_failed_title">فشل الربط المباشر</string>
+    <string name="qr_error_failed_body">تعذّر الربط المباشر بالمستقبِل. أبقِ الجهازين متقاربين وأعد المحاولة.</string>
+    <string name="qr_scanner_retry_action">إعادة المحاولة</string>
+    <string name="shareit_direct_p2p_badge">نقل مباشر جهاز لجهاز • بدون راوتر أو وسيط</string>
+    <string name="shareit_auto_send_starting">تم الربط المباشر! جارٍ بدء الإرسال المشفّر…</string>
 </resources>
 
 

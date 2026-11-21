@@ -1089,6 +1089,18 @@
     <string name="receive_waiting_searching_banner">Searching &amp; waiting for sender to scan QR…</string>
     <string name="receive_linking_sender_banner">Connecting &amp; authenticating with sender…</string>
     <string name="home_unified_transfer_hint">Use Send or Receive above to connect via QR code, local hotspot, or Wi-Fi.</string>
+
+    <!-- SHAREit Direct QR Scanning & Inline Retry Feedback -->
+    <string name="qr_status_scan_in_progress">Scan in progress…</string>
+    <string name="qr_error_invalid_title">Invalid QR Code</string>
+    <string name="qr_error_invalid_body">Point the camera at the live ShareFlow Receive QR code on the other device.</string>
+    <string name="qr_error_expired_title">QR Code Expired</string>
+    <string name="qr_error_expired_body">Refresh the QR code on the receiving device, then tap Retry.</string>
+    <string name="qr_error_failed_title">Direct Connection Failed</string>
+    <string name="qr_error_failed_body">Could not link directly to the receiver. Keep both devices close and retry.</string>
+    <string name="qr_scanner_retry_action">Retry</string>
+    <string name="shareit_direct_p2p_badge">Direct P2P • No Router Needed</string>
+    <string name="shareit_auto_send_starting">Connected directly! Starting encrypted transfer…</string>
 </resources>
 
 

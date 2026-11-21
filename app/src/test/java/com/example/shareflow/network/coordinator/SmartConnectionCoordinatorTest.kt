@@ -474,4 +474,52 @@ class SmartConnectionCoordinatorTest {
             recBase.shutdown()
         }
     }
+
+    @Test
+    fun `direct local-only hotspot QR pairing connects via hotspot gateway IP with zero router or multicast`() = runBlocking {
+        val clock = FakeClock()
+        val receiverHotspot = FakeReceiverHotspotController(
+            ssid = "AndroidShare_DirectP2P",
+            passphrase = "DirectZeroRouterPass!2026"
+        )
+        val (recBase, recSmart) = buildNode(clock = clock, hotspotController = receiverHotspot)
+
+        val blockedMulticastDiscovery = object : SessionServiceDiscovery {
+            private val _status = MutableStateFlow("MULTICAST_BLOCKED")
+            override val statusLabel: StateFlow<String> = _status.asStateFlow()
+            override suspend fun startSessionAdvertising(payload: SmartQrPairingPayload, ephemeralKeyHash: String) = Unit
+            override suspend fun stopSessionAdvertising() = Unit
+            override suspend fun discoverReceiverForSession(
+                payload: SmartQrPairingPayload,
+                boundNetwork: BoundWifiNetworkHandle?,
+                timeoutMillis: Long
+            ): AppResult<DiscoveredReceiverEndpoint> = AppResult.Failure(
+                AppError.Network("UDP/NSD unavailable on direct AP")
+            )
+        }
+
+        val (sendBase, sendSmart) = buildNode(
+            clock = clock,
+            sessionDiscovery = blockedMulticastDiscovery
+        )
+
+        try {
+            val startRes = recSmart.startSmartReceiving("Direct P2P Receiver", preferredPort = 0, preferHotspot = true)
+            assertTrue("Expected receiver start success, got $startRes", startRes is AppResult.Success)
+            val qrUri = recSmart.activeQrUri.value
+
+            val connectRes = sendSmart.connectViaSmartQr(qrUri, "Direct P2P Sender")
+            assertTrue("Expected direct hotspot gateway connect success, got $connectRes", connectRes is AppResult.Success)
+            assertEquals(SmartConnectionPhase.CONNECTED, sendSmart.phase.value)
+            assertEquals(SmartStrategyType.WIFI_NETWORK_SPECIFIER, sendSmart.activeStrategy.value)
+            assertEquals("DIRECT_HOTSPOT_GATEWAY_FALLBACK", sendSmart.diagnostics.value.nsdDiscoveryStatus)
+        } finally {
+            sendSmart.cancelOrDisconnect(markCancelled = false)
+            recSmart.cancelOrDisconnect(markCancelled = false)
+            sendSmart.shutdown()
+            recSmart.shutdown()
+            sendBase.shutdown()
+            recBase.shutdown()
+        }
+    }
 }

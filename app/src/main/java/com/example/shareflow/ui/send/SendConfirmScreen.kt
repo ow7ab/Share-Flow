@@ -70,6 +70,7 @@ import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
+import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -169,6 +170,27 @@ fun SendConfirmScreen(
         if (msg != null) {
             snackbarHostState.showSnackbar(msg)
             viewModel.consumeFeedback()
+        }
+    }
+
+    var autoStartedPeerSession by rememberSaveable { mutableStateOf<String?>(null) }
+    val autoSendStartingMsg = stringResource(R.string.shareit_auto_send_starting)
+
+    // SHAREit-style zero-intermediary workflow: once QR direct link + AES-256-GCM auth succeeds,
+    // immediately start sending the selected items without an extra manual confirmation tap.
+    LaunchedEffect(uiState.connectionState, uiState.scannerState, uiState.selectedCount) {
+        val connected = uiState.connectionState as? ConnectionState.Connected
+        if (connected != null &&
+            uiState.scannerState == QrScannerUiState.SUCCESS &&
+            uiState.selectedCount > 0 &&
+            !uiState.isStartingTransfer
+        ) {
+            val sessionKey = "${connected.peer.deviceId}:${connected.sasVerificationCode}"
+            if (autoStartedPeerSession != sessionKey) {
+                autoStartedPeerSession = sessionKey
+                viewModel.showFeedback(autoSendStartingMsg)
+                viewModel.startEncryptedTransfer(onStarted = onOpenTransferProgress)
+            }
         }
     }
 
@@ -493,6 +515,12 @@ fun SendConfirmScreen(
                         SendConnectMode.SCAN_QR -> {
                             item(key = "inline_qr_scanner") {
                                 Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                                    StatusPill(
+                                        label = stringResource(R.string.shareit_direct_p2p_badge),
+                                        containerColor = semantic.verifiedContainer,
+                                        contentColor = semantic.verifiedBadge,
+                                        modifier = Modifier.testTag("send_direct_p2p_badge")
+                                    )
                                     if (hasCameraPermission && container.networkPermissionHelper.isCameraHardwareSupported()) {
                                         Surface(
                                             shape = ShareFlowDesign.shapes.featuredCard,
@@ -508,6 +536,10 @@ fun SendConfirmScreen(
                                                     if (uiState.scannerState == QrScannerUiState.SCANNING) {
                                                         viewModel.connectViaQrOrCode(raw)
                                                     }
+                                                },
+                                                onRetryScan = {
+                                                    viewModel.clearSmartError()
+                                                    viewModel.resetScannerState()
                                                 },
                                                 modifier = Modifier.fillMaxSize()
                                             )
