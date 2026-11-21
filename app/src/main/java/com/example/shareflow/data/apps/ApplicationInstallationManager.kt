@@ -7,6 +7,7 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.StatFs
+import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
@@ -21,6 +22,7 @@ import com.example.shareflow.network.transfer.ChunkProcessor
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
+import java.util.zip.ZipFile
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,7 +105,8 @@ sealed interface AppInstallSessionState {
         val packageName: String,
         val appName: String,
         val reason: String,
-        val wasCancelledByUser: Boolean = false
+        val wasCancelledByUser: Boolean = false,
+        val fallbackApkFile: File? = null
     ) : AppInstallSessionState
 }
 
@@ -193,16 +196,68 @@ class ApplicationInstallationManager(
         )
         val validated = when (val res = validateReceivedAppForInstall(receivedApk)) {
             is AppResult.Failure -> {
+                val primary = File(receivedApk.filePath).takeIf {
+                    !receivedApk.isSplitBundle && it.exists() && it.isFile
+                }
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = receivedApk.packageName.orEmpty(),
                     appName = receivedApk.appLabel ?: receivedApk.fileName,
-                    reason = res.error.message
+                    reason = res.error.message,
+                    fallbackApkFile = primary
                 )
                 return res
             }
             is AppResult.Success -> res.data
         }
         return installValidatedBundle(validated)
+    }
+
+    /**
+     * Direct file-based installation entry point (e.g., from Custom File Viewer or Transfer History).
+     * Automatically detects companion `shareflow_app_manifest.json` for split APK bundles.
+     */
+    suspend fun startInstallationFromFile(
+        apkFile: File,
+        expectedSha256: String? = null
+    ): AppResult<ValidatedInstallBundle> {
+        _installState.value = AppInstallSessionState.Validating(displayName = apkFile.name)
+        val manifestFile = apkFile.parentFile?.let {
+            File(it, AndroidAppSharingRepository.BUNDLE_MANIFEST_FILE_NAME)
+        }?.takeIf { it.exists() && it.isFile }
+
+        val validated = when (val res = validateApkFiles(apkFile, expectedSha256, manifestFile)) {
+            is AppResult.Failure -> {
+                _installState.value = AppInstallSessionState.Failed(
+                    packageName = "",
+                    appName = apkFile.name,
+                    reason = res.error.message,
+                    fallbackApkFile = apkFile.takeIf { manifestFile == null && it.exists() && it.isFile }
+                )
+                return res
+            }
+            is AppResult.Success -> res.data
+        }
+        return installValidatedBundle(validated)
+    }
+
+    /**
+     * Creates a scoped [FileProvider] `Intent.ACTION_VIEW` fallback for single-APK installation
+     * strictly confined inside ShareFlow's verified receive directory. Useful on OEM ROMs where
+     * `PackageInstaller.Session` is restricted.
+     */
+    fun createSystemInstallerFallbackIntent(apkFile: File): Intent? {
+        val canonicalRoot = runCatching { receiveRootProvider().canonicalFile }.getOrNull() ?: return null
+        val rootPrefix = canonicalRoot.path.trimEnd(File.separatorChar) + File.separator
+        val canonicalApk = validateFileInsideRoot(apkFile, rootPrefix) ?: return null
+        if (!canonicalApk.extension.equals("apk", ignoreCase = true)) return null
+        val uri = runCatching {
+            FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", canonicalApk)
+        }.getOrNull() ?: return null
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, AndroidAppSharingRepository.APK_MIME_TYPE)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     }
 
     /**
@@ -241,6 +296,9 @@ class ApplicationInstallationManager(
             ).apply {
                 setSize(bundle.totalSizeBytes)
                 setAppPackageName(bundle.packageName)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
+                }
             }
 
             sessionId = packageInstaller.createSession(params)
@@ -304,7 +362,8 @@ class ApplicationInstallationManager(
             _installState.value = AppInstallSessionState.Failed(
                 packageName = bundle.packageName,
                 appName = bundle.appName,
-                reason = message
+                reason = message,
+                fallbackApkFile = bundle.apkFiles.singleOrNull().takeIf { !bundle.isSplitBundle }
             )
             AppResult.Failure(AppError.Storage(message, t))
         }
@@ -328,6 +387,8 @@ class ApplicationInstallationManager(
         val pkgName = event.packageName.ifBlank { bundle?.packageName.orEmpty() }
         val appName = bundle?.appName ?: pkgName.ifBlank { "Application" }
 
+        val fallbackSingleApk = bundle?.apkFiles?.singleOrNull()?.takeIf { bundle.isSplitBundle.not() }
+
         when (event.status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirm = event.confirmationIntent
@@ -343,7 +404,8 @@ class ApplicationInstallationManager(
                     _installState.value = AppInstallSessionState.Failed(
                         packageName = pkgName,
                         appName = appName,
-                        reason = "Android installer did not provide a confirmation dialog."
+                        reason = "Android installer did not provide a confirmation dialog.",
+                        fallbackApkFile = fallbackSingleApk
                     )
                 }
             }
@@ -371,7 +433,8 @@ class ApplicationInstallationManager(
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = pkgName,
                     appName = appName,
-                    reason = "Package conflicts with an existing installed app (different signing key)."
+                    reason = "Package conflicts with an existing installed app (different signing key).",
+                    fallbackApkFile = fallbackSingleApk
                 )
             }
 
@@ -380,7 +443,8 @@ class ApplicationInstallationManager(
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = pkgName,
                     appName = appName,
-                    reason = "This application package is incompatible with this device ABI or Android version."
+                    reason = "This application package is incompatible with this device ABI or Android version.",
+                    fallbackApkFile = fallbackSingleApk
                 )
             }
 
@@ -389,7 +453,8 @@ class ApplicationInstallationManager(
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = pkgName,
                     appName = appName,
-                    reason = "Invalid or incomplete APK package. Verify all split APK parts were received."
+                    reason = "Invalid or incomplete APK package. Verify all split APK parts were received.",
+                    fallbackApkFile = fallbackSingleApk
                 )
             }
 
@@ -407,7 +472,8 @@ class ApplicationInstallationManager(
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = pkgName,
                     appName = appName,
-                    reason = "Installation was blocked by Android device policy or Play Protect."
+                    reason = "Installation was blocked by Android device policy or Play Protect.",
+                    fallbackApkFile = fallbackSingleApk
                 )
             }
 
@@ -416,7 +482,8 @@ class ApplicationInstallationManager(
                 _installState.value = AppInstallSessionState.Failed(
                     packageName = pkgName,
                     appName = appName,
-                    reason = event.statusMessage.ifBlank { "Android package installation failed (code ${event.status})." }
+                    reason = event.statusMessage.ifBlank { "Android package installation failed (code ${event.status})." },
+                    fallbackApkFile = fallbackSingleApk
                 )
             }
         }
@@ -557,15 +624,37 @@ class ApplicationInstallationManager(
             }
 
             val parsedPart = apkArchiveInspector.inspectApkArchive(canonicalPart)
-                ?: return AppResult.Failure(
-                    AppError.Validation("Split APK '${part.fileName}' is not a valid Android APK archive.")
-                )
-            if (parsedPart.packageName != manifest.packageName) {
-                return AppResult.Failure(
-                    AppError.Security(
-                        "Split APK package mismatch: '${part.fileName}' belongs to '${parsedPart.packageName}' instead of '${manifest.packageName}'."
+            if (part.isBase) {
+                if (parsedPart == null) {
+                    return AppResult.Failure(
+                        AppError.Validation("Base APK '${part.fileName}' is not a valid Android APK archive.")
                     )
-                )
+                }
+                if (parsedPart.packageName != manifest.packageName) {
+                    return AppResult.Failure(
+                        AppError.Security(
+                            "Split APK package mismatch: '${part.fileName}' belongs to '${parsedPart.packageName}' instead of '${manifest.packageName}'."
+                        )
+                    )
+                }
+            } else {
+                // Android's PackageManager.getPackageArchiveInfo often returns null for config-only splits
+                // (e.g. split_config.xxhdpi.apk / split_config.ar.apk / split_config.arm64_v8a.apk).
+                // When metadata is available, enforce strict packageName equality; otherwise verify
+                // the split is a valid APK ZIP archive containing AndroidManifest.xml (in addition to SHA-256).
+                if (parsedPart != null) {
+                    if (parsedPart.packageName != manifest.packageName) {
+                        return AppResult.Failure(
+                            AppError.Security(
+                                "Split APK package mismatch: '${part.fileName}' belongs to '${parsedPart.packageName}' instead of '${manifest.packageName}'."
+                            )
+                        )
+                    }
+                } else if (!isValidApkZipArchive(canonicalPart)) {
+                    return AppResult.Failure(
+                        AppError.Validation("Split APK '${part.fileName}' is not a valid Android APK archive.")
+                    )
+                }
             }
 
             if (part.isBase) {
@@ -610,6 +699,12 @@ class ApplicationInstallationManager(
         val canonical = runCatching { file.canonicalFile }.getOrNull() ?: return null
         return if (canonical.path.startsWith(rootPrefix)) canonical else null
     }
+
+    private fun isValidApkZipArchive(file: File): Boolean = runCatching {
+        ZipFile(file).use { zip ->
+            zip.getEntry("AndroidManifest.xml") != null
+        }
+    }.getOrDefault(false)
 
     private fun hasEnoughStorage(rootDir: File, totalApkBytes: Long): Boolean {
         val required = totalApkBytes * 2L + STORAGE_HEADROOM_BYTES

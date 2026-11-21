@@ -85,11 +85,26 @@ import com.example.shareflow.domain.model.SortDirection
  */
 object FileSharesheetHelper {
 
+    private fun resolveShareableUri(context: Context, rawUri: String): Uri? {
+        val parsed = runCatching { Uri.parse(rawUri) }.getOrNull() ?: return null
+        if (!parsed.scheme.equals("file", ignoreCase = true)) return parsed
+        val path = parsed.path ?: return null
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        return runCatching {
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+        }.getOrNull()
+    }
+
     fun shareFiles(context: Context, entries: List<LocalFileEntry>, chooserTitle: String): Boolean {
         val fileEntries = entries.filterNot { it.isDirectory }
         if (fileEntries.isEmpty()) return false
 
-        val uris = fileEntries.mapNotNull { runCatching { Uri.parse(it.uriString) }.getOrNull() }
+        val uris = fileEntries.mapNotNull { resolveShareableUri(context, it.uriString) }
         if (uris.isEmpty()) return false
 
         val intent = if (uris.size == 1) {
@@ -124,7 +139,7 @@ object FileSharesheetHelper {
     }
 
     fun openExternally(context: Context, entry: LocalFileEntry): Boolean {
-        val uri = runCatching { Uri.parse(entry.uriString) }.getOrNull() ?: return false
+        val uri = resolveShareableUri(context, entry.uriString) ?: return false
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, entry.mimeType.ifBlank { "*/*" })
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)

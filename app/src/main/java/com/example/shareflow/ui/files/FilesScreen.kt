@@ -100,6 +100,8 @@ import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.FileSource
 import com.example.shareflow.domain.model.GrantedDirectory
 import com.example.shareflow.domain.model.LocalFileEntry
+import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import kotlinx.coroutines.launch
 
 /**
  * All 8 required ShareFlow File Manager categories.
@@ -124,6 +126,7 @@ fun FilesScreen(
     onOpenCategory: (FilesHubCategory) -> Unit,
     onNavigateToSend: () -> Unit = {},
     onNavigateToStorageAnalyzer: () -> Unit = {},
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -146,6 +149,7 @@ fun FilesScreen(
         onNavigateBack = null,
         onNavigateToSend = onNavigateToSend,
         onNavigateToStorageAnalyzer = onNavigateToStorageAnalyzer,
+        onOpenVault = onOpenVault,
         modifier = modifier
     )
 }
@@ -155,6 +159,7 @@ fun FileCategoryDetailScreen(
     category: FilesHubCategory,
     onNavigateBack: () -> Unit,
     onNavigateToSend: () -> Unit,
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -177,6 +182,7 @@ fun FileCategoryDetailScreen(
         onNavigateBack = onNavigateBack,
         onNavigateToSend = onNavigateToSend,
         onNavigateToStorageAnalyzer = {},
+        onOpenVault = onOpenVault,
         modifier = modifier
     )
 }
@@ -189,9 +195,12 @@ internal fun FileManagerHost(
     onNavigateBack: (() -> Unit)?,
     onNavigateToSend: () -> Unit,
     onNavigateToStorageAnalyzer: () -> Unit,
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val container = LocalAppContainer.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pagedFiles = viewModel.pagedFiles.collectAsLazyPagingItems()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -326,12 +335,44 @@ internal fun FileManagerHost(
     }
 
     uiState.previewTarget?.let { previewFile ->
-        FileMediaPreviewDialog(
+        val isApkFile = previewFile.category == FileCategory.APKS ||
+            previewFile.displayName.endsWith(".apk", ignoreCase = true)
+        CustomFileViewerDialog(
             file = previewFile,
             textPreview = uiState.previewTextContent,
             isLoadingText = uiState.isPreviewLoading,
-            onShare = { triggerShare(listOf(previewFile)) },
+            onSendWithShareFlow = {
+                viewModel.closePreview()
+                viewModel.queueSingleForShareFlowSend(previewFile)
+                onNavigateToSend()
+            },
+            onShareExternal = { triggerShare(listOf(previewFile)) },
             onOpenExternal = { FileSharesheetHelper.openExternally(context, previewFile) },
+            onMoveToVaultSuccess = { message -> viewModel.showFeedback(message) },
+            onOpenVaultSetup = {
+                viewModel.closePreview()
+                onOpenVault()
+            },
+            onInstallApk = if (isApkFile) {
+                {
+                    val parsedUri = runCatching { android.net.Uri.parse(previewFile.uriString) }.getOrNull()
+                    val directFile = if (parsedUri?.scheme.equals("file", ignoreCase = true)) {
+                        parsedUri?.path?.let { java.io.File(it) }
+                    } else {
+                        val root = com.example.shareflow.network.transfer.ChunkProcessor.defaultReceiveRoot(context)
+                        java.io.File(root, previewFile.displayName).takeIf { it.exists() && it.isFile }
+                    }
+                    if (directFile != null && directFile.exists()) {
+                        scope.launch {
+                            container.applicationInstallationManager.startInstallationFromFile(directFile)
+                        }
+                    } else {
+                        FileSharesheetHelper.openExternally(context, previewFile)
+                    }
+                }
+            } else {
+                null
+            },
             onDismiss = viewModel::closePreview
         )
     }

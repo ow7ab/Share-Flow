@@ -1101,6 +1101,27 @@
     <string name="qr_scanner_retry_action">Retry</string>
     <string name="shareit_direct_p2p_badge">Direct P2P • No Router Needed</string>
     <string name="shareit_auto_send_starting">Connected directly! Starting encrypted transfer…</string>
+
+    <!-- Custom File Viewer & APK Fallback Installer -->
+    <string name="receive_app_install_fallback_action">Open System Installer</string>
+    <string name="viewer_preview_action">Preview</string>
+    <string name="viewer_action_send_shareflow">Send</string>
+    <string name="viewer_action_move_to_vault">Move to Vault</string>
+    <string name="viewer_action_install_apk">Install App</string>
+    <string name="viewer_action_select_send">Select to Send</string>
+    <string name="viewer_action_remove_send">Remove from Send</string>
+    <string name="viewer_action_reset_zoom">Reset zoom</string>
+    <string name="viewer_speed_label">Speed %1$s</string>
+    <string name="viewer_video_error">Unable to play this video format on this device.</string>
+    <string name="viewer_vault_moving">Encrypting…</string>
+    <string name="viewer_vault_moved_success">Encrypted and moved %1$s to Private Vault.</string>
+    <string name="viewer_vault_locked_title">Unlock Private Vault</string>
+    <string name="viewer_vault_locked_body">Enter your Private Vault PIN to encrypt and move this file securely.</string>
+    <string name="viewer_vault_pin_label">Vault PIN</string>
+    <string name="viewer_vault_unlock_and_move">Unlock &amp; Move</string>
+    <string name="viewer_vault_not_setup_title">Set Up Private Vault</string>
+    <string name="viewer_vault_not_setup_body">Create a PIN-protected AES-256-GCM Private Vault first to move files into encrypted storage.</string>
+    <string name="viewer_vault_setup_action">Set Up Vault</string>
 </resources>
 
 

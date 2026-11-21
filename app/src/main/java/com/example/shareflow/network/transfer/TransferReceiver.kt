@@ -5,9 +5,11 @@ import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.core.common.Clock
 import com.example.shareflow.core.common.SystemClock
+import com.example.shareflow.data.files.ReceivedFilePublisher
 import com.example.shareflow.domain.model.IncomingTransferOffer
 import com.example.shareflow.domain.model.TransferConfig
 import com.example.shareflow.domain.model.TransferDirection
+import com.example.shareflow.domain.model.TransferFileType
 import com.example.shareflow.domain.model.TransferItem
 import com.example.shareflow.domain.model.TransferRecord
 import com.example.shareflow.domain.model.TransferSession
@@ -39,7 +41,9 @@ class TransferReceiver(
     private val verifier: TransferVerifier,
     private val recoveryManager: TransferRecoveryManager,
     private val transferRepository: TransferRepository,
-    private val clock: Clock = SystemClock()
+    private val clock: Clock = SystemClock(),
+    private val receivedFilePublisher: ReceivedFilePublisher? = null,
+    private val onFilePublished: () -> Unit = {}
 ) {
     /**
      * Handles a single incoming transfer session starting from an already-received [offerPayload]
@@ -542,6 +546,27 @@ class TransferReceiver(
         }
         val verifiedHash = (verifyRes as AppResult.Success).data
 
+        // Step 3b: Publish verified file to public Android MediaStore (Gallery, Movies, Music, Downloads)
+        // so it appears immediately in Android's system Gallery and File Manager.
+        val published = runCatching {
+            receivedFilePublisher?.publishVerifiedFile(
+                localFile = finalizedFile,
+                displayName = finalizedFile.name,
+                mimeType = item.mimeType,
+                fileType = item.fileType
+            )
+        }.getOrNull()
+
+        // Keep file:// URI inside ShareFlowReceived for APKs so PackageInstaller canonical-root checks pass;
+        // for photos/videos/audio/documents prefer the public MediaStore content:// URI when available.
+        val isApkFile = item.fileType == TransferFileType.APK ||
+            finalizedFile.extension.equals("apk", ignoreCase = true)
+        val resolvedDestinationUri = if (isApkFile) {
+            Uri.fromFile(finalizedFile).toString()
+        } else {
+            published?.publicContentUri ?: Uri.fromFile(finalizedFile).toString()
+        }
+
         // Step 4: Atomic Room DB transaction (item COMPLETED + verified TransferHistory record)
         val now = clock.nowEpochMillis()
         val completedItem = item.copy(
@@ -549,7 +574,7 @@ class TransferReceiver(
             bytesTransferred = item.fileSizeBytes,
             nextChunkIndex = item.totalChunks,
             verifiedSha256 = verifiedHash,
-            destinationUri = Uri.fromFile(finalizedFile).toString(),
+            destinationUri = resolvedDestinationUri,
             tempFilePath = null,
             state = TransferState.COMPLETED,
             errorMessage = null,
@@ -585,7 +610,8 @@ class TransferReceiver(
             return commitRes
         }
 
-        // All 4 preconditions succeeded -> notify sender & update UI
+        // All 4 preconditions succeeded -> notify storage observers, sender & UI
+        runCatching { onFilePublished() }
         onUpdateItem(completedItem)
         sendFileVerified(channel, item.itemId, true, verifiedHash, "")
         return AppResult.Success(completedItem)

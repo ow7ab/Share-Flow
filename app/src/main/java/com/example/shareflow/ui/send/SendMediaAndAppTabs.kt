@@ -690,6 +690,7 @@ internal fun LazyListScope.sendFilesTabItems(
     onPickFolder: () -> Unit,
     onToggleSelectAll: () -> Unit,
     onToggleFile: (LocalFileEntry) -> Unit,
+    onPreviewFile: (LocalFileEntry) -> Unit = {},
     onRemoveSelectedFile: (String) -> Unit
 ) {
     item(key = "files_category_chips") {
@@ -760,11 +761,22 @@ internal fun LazyListScope.sendFilesTabItems(
                 file = file,
                 onClick = { onToggleFile(file) },
                 trailingContent = {
-                    Checkbox(
-                        checked = selected,
-                        onCheckedChange = { onToggleFile(file) },
-                        modifier = Modifier.minimumInteractiveComponentSize()
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { onPreviewFile(file) },
+                            modifier = Modifier.minimumInteractiveComponentSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Visibility,
+                                contentDescription = stringResource(R.string.viewer_preview_action)
+                            )
+                        }
+                        Checkbox(
+                            checked = selected,
+                            onCheckedChange = { onToggleFile(file) },
+                            modifier = Modifier.minimumInteractiveComponentSize()
+                        )
+                    }
                 },
                 modifier = Modifier.testTag("send_browsed_file_${file.displayName}")
             )
@@ -782,16 +794,27 @@ internal fun LazyListScope.sendFilesTabItems(
         items(items = uiState.filteredFiles, key = { "sel_${it.uriString}" }) { file ->
             FileItem(
                 file = file,
-                onClick = {},
+                onClick = { onPreviewFile(file) },
                 trailingContent = {
-                    IconButton(
-                        onClick = { onRemoveSelectedFile(file.uriString) },
-                        modifier = Modifier.minimumInteractiveComponentSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = stringResource(R.string.send_clear_selection)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { onPreviewFile(file) },
+                            modifier = Modifier.minimumInteractiveComponentSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Visibility,
+                                contentDescription = stringResource(R.string.viewer_preview_action)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onRemoveSelectedFile(file.uriString) },
+                            modifier = Modifier.minimumInteractiveComponentSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.send_clear_selection)
+                            )
+                        }
                     }
                 },
                 modifier = Modifier.testTag("send_selected_file_${file.displayName}")

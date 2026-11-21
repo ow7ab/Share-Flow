@@ -47,9 +47,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import android.content.Intent
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,8 +64,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
+import com.example.shareflow.data.apps.AppInstallSessionState
+import kotlinx.coroutines.launch
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.ConfirmationDialog
@@ -99,6 +108,58 @@ fun AppSharingScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val hostActivity = LocalShareFlowHostActivity.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val installState by container.applicationInstallationManager.installState.collectAsStateWithLifecycle()
+
+    fun launchSafely(intent: Intent) {
+        val launcher = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed } ?: context
+        val safeIntent = if (launcher === hostActivity) intent else Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { launcher.startActivity(safeIntent) }
+            .onFailure { err ->
+                viewModel.reportInstallLaunchFailure(
+                    context.getString(
+                        R.string.apps_install_launch_failed,
+                        err.localizedMessage ?: err.javaClass.simpleName
+                    )
+                )
+            }
+    }
+
+    LaunchedEffect(installState) {
+        when (val state = installState) {
+            is AppInstallSessionState.AwaitingUserConfirmation -> {
+                launchSafely(state.confirmationIntent)
+            }
+            is AppInstallSessionState.NeedsUnknownSourcesPermission -> {
+                launchSafely(container.permissionManager.createManageUnknownSourcesIntent())
+            }
+            is AppInstallSessionState.Failed -> {
+                val fallback = state.fallbackApkFile?.let {
+                    container.applicationInstallationManager.createSystemInstallerFallbackIntent(it)
+                }
+                if (fallback != null && !state.wasCancelledByUser) {
+                    launchSafely(fallback)
+                } else {
+                    viewModel.reportInstallLaunchFailure(state.reason)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    container.applicationInstallationManager.resumePendingInstallIfPermitted()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     AppSharingContent(
         uiState = uiState,
@@ -118,16 +179,11 @@ fun AppSharingScreen(
         onRequestInstallReview = viewModel::requestInstallReview,
         onDismissInstallReview = viewModel::dismissInstallReview,
         onConfirmInstall = {
-            viewModel.confirmSystemInstall { installIntent ->
-                runCatching {
-                    context.startActivity(installIntent)
-                }.onFailure { err ->
-                    viewModel.reportInstallLaunchFailure(
-                        context.getString(
-                            R.string.apps_install_launch_failed,
-                            err.localizedMessage ?: err.javaClass.simpleName
-                        )
-                    )
+            val targetApk = uiState.pendingInstallApk
+            if (targetApk != null) {
+                viewModel.dismissInstallReview()
+                scope.launch {
+                    container.applicationInstallationManager.startInstallation(targetApk)
                 }
             }
         },

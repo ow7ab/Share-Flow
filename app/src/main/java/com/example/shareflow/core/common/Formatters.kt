@@ -13,6 +13,61 @@ object ShareFlowFormatters {
     private val latinUnits = arrayOf("B", "KB", "MB", "GB", "TB")
     private val arabicUnits = arrayOf("بايت", "ك.ب", "م.ب", "ج.ب", "ت.ب")
 
+    private val oneDecimalFormatterCache = ThreadLocal.withInitial { HashMap<String, NumberFormat>(4) }
+    private val integerNoGroupCache = ThreadLocal.withInitial { HashMap<String, NumberFormat>(4) }
+    private val integerGroupedCache = ThreadLocal.withInitial { HashMap<String, NumberFormat>(4) }
+    private val percentFormatterCache = ThreadLocal.withInitial { HashMap<String, NumberFormat>(4) }
+    private val dateTimeFormatterCache = ThreadLocal.withInitial { HashMap<String, java.text.DateFormat>(4) }
+
+    private fun localeKey(locale: Locale): String = locale.toLanguageTag().ifBlank { locale.language }
+
+    private fun oneDecimalFormatter(locale: Locale): NumberFormat {
+        val map = oneDecimalFormatterCache.get() ?: HashMap<String, NumberFormat>(4).also { oneDecimalFormatterCache.set(it) }
+        return map.getOrPut(localeKey(locale)) {
+            NumberFormat.getNumberInstance(locale).apply {
+                minimumFractionDigits = 1
+                maximumFractionDigits = 1
+                isGroupingUsed = false
+            }
+        }
+    }
+
+    private fun integerNoGroupFormatter(locale: Locale): NumberFormat {
+        val map = integerNoGroupCache.get() ?: HashMap<String, NumberFormat>(4).also { integerNoGroupCache.set(it) }
+        return map.getOrPut(localeKey(locale)) {
+            NumberFormat.getIntegerInstance(locale).apply {
+                isGroupingUsed = false
+            }
+        }
+    }
+
+    private fun integerGroupedFormatter(locale: Locale): NumberFormat {
+        val map = integerGroupedCache.get() ?: HashMap<String, NumberFormat>(4).also { integerGroupedCache.set(it) }
+        return map.getOrPut(localeKey(locale)) {
+            NumberFormat.getIntegerInstance(locale)
+        }
+    }
+
+    private fun percentFormatter(locale: Locale): NumberFormat {
+        val map = percentFormatterCache.get() ?: HashMap<String, NumberFormat>(4).also { percentFormatterCache.set(it) }
+        return map.getOrPut(localeKey(locale)) {
+            NumberFormat.getPercentInstance(locale).apply {
+                maximumFractionDigits = 0
+            }
+        }
+    }
+
+    private fun dateTimeFormatter(locale: Locale): java.text.DateFormat {
+        val map = dateTimeFormatterCache.get() ?: HashMap<String, java.text.DateFormat>(4).also { dateTimeFormatterCache.set(it) }
+        return map.getOrPut(localeKey(locale)) {
+            java.text.DateFormat.getDateTimeInstance(
+                java.text.DateFormat.MEDIUM,
+                java.text.DateFormat.SHORT,
+                locale
+            )
+        }
+    }
+
     fun formatBytes(bytes: Long, locale: Locale = Locale.US): String {
         val units = if (locale.language == "ar") arabicUnits else latinUnits
         val safeBytes = bytes.coerceAtLeast(0L)
@@ -21,12 +76,9 @@ object ShareFlowFormatters {
         }
         val exp = (ln(safeBytes.toDouble()) / ln(1024.0)).toInt().coerceAtMost(units.lastIndex)
         val value = safeBytes / 1024.0.pow(exp.toDouble())
-        val numberFormatter = NumberFormat.getNumberInstance(locale).apply {
-            minimumFractionDigits = 1
-            maximumFractionDigits = 1
-            isGroupingUsed = false
-        }
-        return "${numberFormatter.format(value)} ${units[exp]}"
+        val formatted = runCatching { oneDecimalFormatter(locale).format(value) }
+            .getOrElse { String.format(Locale.US, "%.1f", value) }
+        return "$formatted ${units[exp]}"
     }
 
     fun formatTransferSpeed(bytesPerSecond: Long, locale: Locale = Locale.US): String {
@@ -35,22 +87,16 @@ object ShareFlowFormatters {
         return "${formatBytes(safeSpeed, locale)}$suffix"
     }
 
-    fun formatInteger(value: Long, locale: Locale = Locale.US): String {
-        val formatter = NumberFormat.getIntegerInstance(locale).apply {
-            isGroupingUsed = false
-        }
-        return formatter.format(value)
-    }
+    fun formatInteger(value: Long, locale: Locale = Locale.US): String =
+        runCatching { integerNoGroupFormatter(locale).format(value) }.getOrElse { value.toString() }
 
     fun formatCount(value: Int, locale: Locale = Locale.US): String =
-        NumberFormat.getIntegerInstance(locale).format(value)
+        runCatching { integerGroupedFormatter(locale).format(value) }.getOrElse { value.toString() }
 
     fun formatPercentage(fraction: Float, locale: Locale = Locale.US): String {
         val clamped = fraction.coerceIn(0f, 1f).toDouble()
-        val formatter = NumberFormat.getPercentInstance(locale).apply {
-            maximumFractionDigits = 0
-        }
-        return formatter.format(clamped)
+        return runCatching { percentFormatter(locale).format(clamped) }
+            .getOrElse { "${(clamped * 100.0).toInt()}%" }
     }
 
     fun formatShortHash(sha256: String): String {
@@ -61,12 +107,8 @@ object ShareFlowFormatters {
 
     fun formatTimestamp(epochMillis: Long, locale: Locale = Locale.US): String {
         if (epochMillis <= 0L) return "—"
-        val formatter = java.text.DateFormat.getDateTimeInstance(
-            java.text.DateFormat.MEDIUM,
-            java.text.DateFormat.SHORT,
-            locale
-        )
-        return formatter.format(java.util.Date(epochMillis))
+        return runCatching { dateTimeFormatter(locale).format(java.util.Date(epochMillis)) }
+            .getOrElse { "—" }
     }
 
     fun formatRemainingTime(remainingSeconds: Long?, locale: Locale = Locale.US): String {

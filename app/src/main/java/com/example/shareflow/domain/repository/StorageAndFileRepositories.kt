@@ -20,8 +20,11 @@ import kotlinx.coroutines.flow.Flow
  * Operates strictly on Android content URIs without assuming unrestricted filesystem access.
  */
 interface FileManagerRepository {
-    /** Emits a signal whenever MediaStore collections or persisted SAF permissions change. */
+    /** Emits a signal whenever MediaStore collections, received files, or persisted SAF permissions change. */
     fun observeStorageChanges(): Flow<Unit>
+
+    /** Signals observers (Files Hub, Media Center) that new received files were saved to disk/MediaStore. */
+    fun notifyStorageChanged() {}
 
     /** Emits persisted user-granted SAF directories with current accessibility & write status. */
     fun observeGrantedDirectories(): Flow<List<GrantedDirectory>>

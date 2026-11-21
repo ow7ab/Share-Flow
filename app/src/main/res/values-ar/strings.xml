@@ -1101,6 +1101,27 @@
     <string name="qr_scanner_retry_action">إعادة المحاولة</string>
     <string name="shareit_direct_p2p_badge">نقل مباشر جهاز لجهاز • بدون راوتر أو وسيط</string>
     <string name="shareit_auto_send_starting">تم الربط المباشر! جارٍ بدء الإرسال المشفّر…</string>
+
+    <!-- عارض الملفات المخصص ومثبّت APK الاحتياطي -->
+    <string name="receive_app_install_fallback_action">فتح مثبّت النظام مباشرة</string>
+    <string name="viewer_preview_action">معاينة</string>
+    <string name="viewer_action_send_shareflow">إرسال</string>
+    <string name="viewer_action_move_to_vault">نقل للخزنة</string>
+    <string name="viewer_action_install_apk">تثبيت التطبيق</string>
+    <string name="viewer_action_select_send">تحديد للإرسال</string>
+    <string name="viewer_action_remove_send">إزالة من الإرسال</string>
+    <string name="viewer_action_reset_zoom">إعادة ضبط التكبير</string>
+    <string name="viewer_speed_label">السرعة %1$s</string>
+    <string name="viewer_video_error">تعذّر تشغيل صيغة هذا الفيديو على هذا الجهاز.</string>
+    <string name="viewer_vault_moving">جارٍ التشفير…</string>
+    <string name="viewer_vault_moved_success">تم تشفير %1$s ونقله إلى الخزنة الخاصة بنجاح.</string>
+    <string name="viewer_vault_locked_title">فتح الخزنة الخاصة</string>
+    <string name="viewer_vault_locked_body">أدخل رمز PIN للخزنة الخاصة لتشفير هذا الملف ونقله بأمان.</string>
+    <string name="viewer_vault_pin_label">رمز PIN للخزنة</string>
+    <string name="viewer_vault_unlock_and_move">فتح ونقل</string>
+    <string name="viewer_vault_not_setup_title">إعداد الخزنة الخاصة</string>
+    <string name="viewer_vault_not_setup_body">أنشئ خزنة خاصة محمية برمز PIN وتشفير AES-256-GCM أولاً لنقل الملفات إليها بأمان.</string>
+    <string name="viewer_vault_setup_action">إعداد الخزنة</string>
 </resources>
 
 

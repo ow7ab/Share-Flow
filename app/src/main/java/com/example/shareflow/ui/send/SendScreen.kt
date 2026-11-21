@@ -66,9 +66,13 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
+import com.example.shareflow.domain.model.LocalFileEntry
 import com.example.shareflow.domain.model.MediaImageItem
 import com.example.shareflow.domain.model.MediaVideoItem
 import com.example.shareflow.network.transfer.TransferQueue
+import com.example.shareflow.ui.files.FileSharesheetHelper
+import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import com.example.shareflow.ui.viewer.toViewerFileEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,6 +83,7 @@ fun SendScreen(
     onNavigateBack: () -> Unit,
     onContinueToConfirm: () -> Unit,
     onOpenAppSharing: (() -> Unit)? = null,
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -105,6 +110,7 @@ fun SendScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var previewPhoto by remember { mutableStateOf<MediaImageItem?>(null) }
     var previewVideo by remember { mutableStateOf<MediaVideoItem?>(null) }
+    var previewFileEntry by remember { mutableStateOf<LocalFileEntry?>(null) }
 
     LaunchedEffect(uiState.feedbackMessage) {
         val msg = uiState.feedbackMessage
@@ -157,20 +163,73 @@ fun SendScreen(
 
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
+    val shareChooserTitle = stringResource(R.string.files_share_chooser_title)
 
     previewPhoto?.let { photo ->
-        PhotoPreviewDialog(
-            photo = photo,
-            selected = photo.uriString in uiState.selectedUriSet,
-            onToggleSelect = { viewModel.togglePhotoSelection(photo) },
+        val entry = remember(photo) { photo.toViewerFileEntry() }
+        val isSelected = photo.uriString in uiState.selectedUriSet
+        CustomFileViewerDialog(
+            file = entry,
+            primaryShareLabel = stringResource(
+                if (isSelected) R.string.viewer_action_remove_send else R.string.viewer_action_select_send
+            ),
+            onSendWithShareFlow = {
+                viewModel.togglePhotoSelection(photo)
+                previewPhoto = null
+            },
+            onShareExternal = { FileSharesheetHelper.shareFiles(context, listOf(entry), shareChooserTitle) },
+            onOpenExternal = { FileSharesheetHelper.openExternally(context, entry) },
+            onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenVaultSetup = {
+                previewPhoto = null
+                onOpenVault()
+            },
             onDismiss = { previewPhoto = null }
         )
     }
 
     previewVideo?.let { video ->
-        VideoPreviewDialog(
-            video = video,
+        val entry = remember(video) { video.toViewerFileEntry() }
+        val isSelected = video.uriString in uiState.selectedUriSet
+        CustomFileViewerDialog(
+            file = entry,
+            primaryShareLabel = stringResource(
+                if (isSelected) R.string.viewer_action_remove_send else R.string.viewer_action_select_send
+            ),
+            onSendWithShareFlow = {
+                viewModel.toggleVideoSelection(video)
+                previewVideo = null
+            },
+            onShareExternal = { FileSharesheetHelper.shareFiles(context, listOf(entry), shareChooserTitle) },
+            onOpenExternal = { FileSharesheetHelper.openExternally(context, entry) },
+            onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenVaultSetup = {
+                previewVideo = null
+                onOpenVault()
+            },
             onDismiss = { previewVideo = null }
+        )
+    }
+
+    previewFileEntry?.let { entry ->
+        val isSelected = entry.uriString in uiState.selectedUriSet
+        CustomFileViewerDialog(
+            file = entry,
+            primaryShareLabel = stringResource(
+                if (isSelected) R.string.viewer_action_remove_send else R.string.viewer_action_select_send
+            ),
+            onSendWithShareFlow = {
+                viewModel.toggleFileSelection(entry)
+                previewFileEntry = null
+            },
+            onShareExternal = { FileSharesheetHelper.shareFiles(context, listOf(entry), shareChooserTitle) },
+            onOpenExternal = { FileSharesheetHelper.openExternally(context, entry) },
+            onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenVaultSetup = {
+                previewFileEntry = null
+                onOpenVault()
+            },
+            onDismiss = { previewFileEntry = null }
         )
     }
 
@@ -392,6 +451,7 @@ fun SendScreen(
                                 onPickFolder = { folderPickerLauncher.launch(null) },
                                 onToggleSelectAll = viewModel::toggleSelectAllVisibleFiles,
                                 onToggleFile = viewModel::toggleFileSelection,
+                                onPreviewFile = { previewFileEntry = it },
                                 onRemoveSelectedFile = viewModel::removeSelectedFile
                             )
                         }

@@ -27,6 +27,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import android.content.Intent
+import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
@@ -36,8 +38,46 @@ import java.util.Locale
 val LocalShareFlowLocale = staticCompositionLocalOf<Locale> { Locale.US }
 val LocalShareFlowHostActivity = staticCompositionLocalOf<Activity?> { null }
 
+private val DefaultShareFlowSpacing = ShareFlowSpacing()
+private val DefaultShareFlowElevation = ShareFlowElevation()
+private val DefaultShareFlowShapeTokens = ShareFlowShapeTokens()
+
+/**
+ * Locale-overridden [ContextWrapper] that preserves access to the hosting [Activity] and prevents
+ * `AndroidRuntimeException: Calling startActivity() from outside of an Activity context` crashes
+ * when switching the UI locale at runtime (e.g., switching to Arabic RTL).
+ */
+class ShareFlowLocalizedContextWrapper(
+    localizedBase: Context,
+    val hostActivity: Activity?
+) : ContextWrapper(localizedBase) {
+
+    override fun startActivity(intent: Intent?) {
+        if (intent == null) return
+        val activity = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed }
+        if (activity != null) {
+            activity.startActivity(intent)
+        } else {
+            val safeIntent = Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            super.startActivity(safeIntent)
+        }
+    }
+
+    override fun startActivity(intent: Intent?, options: Bundle?) {
+        if (intent == null) return
+        val activity = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed }
+        if (activity != null) {
+            activity.startActivity(intent, options)
+        } else {
+            val safeIntent = Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            super.startActivity(safeIntent, options)
+        }
+    }
+}
+
 tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
+    is ShareFlowLocalizedContextWrapper -> hostActivity ?: baseContext.findActivity()
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
@@ -87,7 +127,7 @@ fun resolveShareFlowLocale(appLanguage: AppLanguage, systemLocale: Locale): Loca
  * - Android 12+ Dynamic Color
  * - User-selected Accent Colors
  * - Smooth theme color transitions
- * - Live English (LTR) and Arabic (RTL) localization & typography switching
+ * - Live English (LTR) and Arabic (RTL) localization & typography switching without Activity context loss
  */
 @Composable
 fun ShareFlowTheme(
@@ -105,16 +145,27 @@ fun ShareFlowTheme(
 
     val baseContext = LocalContext.current
     val baseConfig = LocalConfiguration.current
-    val systemLocale = remember(baseConfig) {
-        baseConfig.locales[0] ?: Locale.getDefault()
+    val hostActivity = LocalShareFlowHostActivity.current ?: remember(baseContext) { baseContext.findActivity() }
+    val systemLocale = remember(baseConfig.locales) {
+        if (!baseConfig.locales.isEmpty) baseConfig.locales[0] ?: Locale.getDefault() else Locale.getDefault()
     }
-    val activeLocale = remember(appLanguage, systemLocale) {
+    val activeLocale = remember(appLanguage, systemLocale.language) {
         resolveShareFlowLocale(appLanguage, systemLocale)
     }
     val needsLocaleOverride = appLanguage != AppLanguage.SYSTEM &&
         activeLocale.language != systemLocale.language
 
-    val localizedConfig = remember(baseConfig, activeLocale, needsLocaleOverride) {
+    // Key strictly on stable configuration dimensions so animations or minor recompositions
+    // never recreate Configuration/ContextImpl or trigger full-tree static CompositionLocal resets.
+    val localizedConfig = remember(
+        activeLocale.language,
+        needsLocaleOverride,
+        baseConfig.uiMode,
+        baseConfig.fontScale,
+        baseConfig.orientation,
+        baseConfig.screenWidthDp,
+        baseConfig.screenHeightDp
+    ) {
         if (needsLocaleOverride) {
             Configuration(baseConfig).apply {
                 setLocale(activeLocale)
@@ -124,25 +175,40 @@ fun ShareFlowTheme(
             baseConfig
         }
     }
-    val localizedContext = remember(baseContext, localizedConfig, needsLocaleOverride) {
+    val localizedContext = remember(
+        baseContext,
+        hostActivity,
+        activeLocale.language,
+        needsLocaleOverride,
+        baseConfig.uiMode,
+        baseConfig.fontScale
+    ) {
         if (needsLocaleOverride) {
-            baseContext.createConfigurationContext(localizedConfig)
+            val configContext = runCatching {
+                baseContext.createConfigurationContext(localizedConfig)
+            }.getOrDefault(baseContext)
+            ShareFlowLocalizedContextWrapper(
+                localizedBase = configContext,
+                hostActivity = hostActivity
+            )
         } else {
             baseContext
         }
     }
-    val layoutDirection = if (localizedConfig.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
+    val layoutDirection = if (activeLocale.language == "ar" || localizedConfig.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
         LayoutDirection.Rtl
     } else {
         LayoutDirection.Ltr
     }
 
-    val targetColorScheme = when {
-        useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(baseContext) else dynamicLightColorScheme(baseContext)
+    val targetColorScheme = remember(darkTheme, useDynamicColor, accentColor, baseContext) {
+        when {
+            useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (darkTheme) dynamicDarkColorScheme(baseContext) else dynamicLightColorScheme(baseContext)
+            }
+            darkTheme -> shareFlowDarkColorScheme(accentColor)
+            else -> shareFlowLightColorScheme(accentColor)
         }
-        darkTheme -> shareFlowDarkColorScheme(accentColor)
-        else -> shareFlowLightColorScheme(accentColor)
     }
 
     val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme)
@@ -153,7 +219,6 @@ fun ShareFlowTheme(
         ShareFlowTypography
     }
 
-    val hostActivity = LocalShareFlowHostActivity.current ?: remember(baseContext) { baseContext.findActivity() }
     val activityResultRegistryOwner = LocalActivityResultRegistryOwner.current
     val onBackPressedDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
 
@@ -163,9 +228,9 @@ fun ShareFlowTheme(
         add(LocalLayoutDirection provides layoutDirection)
         add(LocalShareFlowLocale provides activeLocale)
         add(LocalShareFlowHostActivity provides hostActivity)
-        add(LocalShareFlowSpacing provides ShareFlowSpacing())
-        add(LocalShareFlowElevation provides ShareFlowElevation())
-        add(LocalShareFlowShapeTokens provides ShareFlowShapeTokens())
+        add(LocalShareFlowSpacing provides DefaultShareFlowSpacing)
+        add(LocalShareFlowElevation provides DefaultShareFlowElevation)
+        add(LocalShareFlowShapeTokens provides DefaultShareFlowShapeTokens)
         add(LocalShareFlowSemanticColors provides semanticColors)
         if (activityResultRegistryOwner != null) {
             add(LocalActivityResultRegistryOwner provides activityResultRegistryOwner)

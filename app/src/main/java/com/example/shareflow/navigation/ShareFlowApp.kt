@@ -258,7 +258,8 @@ private fun ShareFlowNavHost(
                     navigateToRoute(ShareFlowRoutes.fileCategoryRoute(category))
                 },
                 onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
-                onNavigateToStorageAnalyzer = { navigateToRoute(ShareFlowRoutes.STORAGE_ANALYZER) }
+                onNavigateToStorageAnalyzer = { navigateToRoute(ShareFlowRoutes.STORAGE_ANALYZER) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.MEDIA_HUB) {
@@ -278,7 +279,8 @@ private fun ShareFlowNavHost(
             SendScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onContinueToConfirm = { navigateToRoute(ShareFlowRoutes.SEND_CONFIRM) },
-                onOpenAppSharing = { navigateToRoute(ShareFlowRoutes.APPLICATION_SHARING) }
+                onOpenAppSharing = { navigateToRoute(ShareFlowRoutes.APPLICATION_SHARING) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.SEND_CONFIRM) {
@@ -330,7 +332,8 @@ private fun ShareFlowNavHost(
             FileCategoryDetailScreen(
                 category = category,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) }
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
 
@@ -343,7 +346,9 @@ private fun ShareFlowNavHost(
         }
         composable(route = ShareFlowRoutes.TRANSFER_HISTORY) {
             TransferHistoryScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.TRANSFER_PROGRESS) {
@@ -362,12 +367,16 @@ private fun ShareFlowNavHost(
         }
         composable(route = ShareFlowRoutes.IMAGE_GALLERY) {
             ImageGalleryScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.VIDEO_PLAYER) {
             VideoPlayerScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
             )
         }
         composable(route = ShareFlowRoutes.MUSIC_PLAYER) {

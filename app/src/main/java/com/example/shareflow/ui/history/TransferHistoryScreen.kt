@@ -22,6 +22,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,10 +31,13 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,14 +58,29 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.AppSettings
+import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.TransferDirection
+import com.example.shareflow.domain.model.TransferRecord
+import com.example.shareflow.domain.model.TransferStatus
+import com.example.shareflow.ui.files.FileSharesheetHelper
+import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import com.example.shareflow.ui.viewer.toViewerFileEntry
+import kotlinx.coroutines.launch
 
 @Composable
 fun TransferHistoryScreen(
     onNavigateBack: (() -> Unit)? = null,
+    onNavigateToSend: () -> Unit = {},
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val shareChooserTitle = stringResource(R.string.files_share_chooser_title)
+    var previewRecord by remember { mutableStateOf<TransferRecord?>(null) }
+
     val settings by container.settingsRepository.settings.collectAsStateWithLifecycle(
         initialValue = AppSettings()
     )
@@ -74,6 +94,52 @@ fun TransferHistoryScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    previewRecord?.let { record ->
+        val entry = remember(record) { record.toViewerFileEntry() }
+        if (entry != null) {
+            val isApk = entry.category == FileCategory.APKS || entry.displayName.endsWith(".apk", ignoreCase = true)
+            CustomFileViewerDialog(
+                file = entry,
+                onSendWithShareFlow = {
+                    previewRecord = null
+                    container.localSessionController.addSelectedFiles(listOf(entry))
+                    onNavigateToSend()
+                },
+                onShareExternal = { FileSharesheetHelper.shareFiles(context, listOf(entry), shareChooserTitle) },
+                onOpenExternal = { FileSharesheetHelper.openExternally(context, entry) },
+                onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+                onOpenVaultSetup = {
+                    previewRecord = null
+                    onOpenVault()
+                },
+                onInstallApk = if (isApk) {
+                    {
+                        val parsed = runCatching { android.net.Uri.parse(entry.uriString) }.getOrNull()
+                        val directFile = if (parsed?.scheme.equals("file", ignoreCase = true)) {
+                            parsed?.path?.let { java.io.File(it) }
+                        } else {
+                            val root = com.example.shareflow.network.transfer.ChunkProcessor.defaultReceiveRoot(context)
+                            java.io.File(root, entry.displayName).takeIf { it.exists() && it.isFile }
+                        }
+                        if (directFile != null && directFile.exists()) {
+                            scope.launch {
+                                container.applicationInstallationManager.startInstallationFromFile(
+                                    apkFile = directFile,
+                                    expectedSha256 = record.sha256Checksum
+                                )
+                            }
+                        } else {
+                            FileSharesheetHelper.openExternally(context, entry)
+                        }
+                    }
+                } else {
+                    null
+                },
+                onDismiss = { previewRecord = null }
+            )
+        }
+    }
+
     TransferHistoryContent(
         uiState = uiState,
         onClearHistory = viewModel::clearHistory,
@@ -81,6 +147,12 @@ fun TransferHistoryScreen(
         onFilterSelected = viewModel::selectFilter,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onDismissError = viewModel::dismissError,
+        onPreviewRecord = { record ->
+            if (!record.localUri.isNullOrBlank()) {
+                previewRecord = record
+            }
+        },
+        snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
         modifier = modifier
     )
@@ -94,6 +166,8 @@ fun TransferHistoryContent(
     onFilterSelected: (HistoryFilter) -> Unit = {},
     onSearchQueryChange: (String) -> Unit = {},
     onDismissError: () -> Unit = {},
+    onPreviewRecord: ((TransferRecord) -> Unit)? = null,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -120,6 +194,7 @@ fun TransferHistoryContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             if (onNavigateBack != null) {
                 ShareFlowTopBar(
@@ -288,9 +363,13 @@ fun TransferHistoryContent(
                                         uiState.localDeviceName
                                     )
                                 }
+                                val canPreview = onPreviewRecord != null &&
+                                    record.status == TransferStatus.COMPLETED_VERIFIED &&
+                                    !record.localUri.isNullOrBlank()
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     TransferCard(
                                         record = record,
+                                        onClick = if (canPreview) ({ onPreviewRecord?.invoke(record) }) else null,
                                         onDelete = { onDeleteRecord(record.id) },
                                         modifier = Modifier.testTag("history_record_${record.id}")
                                     )

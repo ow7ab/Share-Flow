@@ -69,10 +69,12 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
+import com.example.shareflow.domain.model.ReceivedApkInfo
 import com.example.shareflow.domain.model.TransferDirection
 import com.example.shareflow.domain.model.TransferItem
 import com.example.shareflow.domain.model.TransferSession
 import com.example.shareflow.domain.model.TransferState
+import com.example.shareflow.ui.receive.ReceivedAppsInstallerCard
 
 @Composable
 fun TransferProgressScreen(
@@ -91,6 +93,12 @@ fun TransferProgressScreen(
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val receivedApks by container.appSharingRepository.observeReceivedApks()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+
+    val hasCompletedReceivedSession = uiState.recentCompletedSessions.any {
+        it.direction == TransferDirection.RECEIVED && it.state == TransferState.COMPLETED
+    }
 
     TransferProgressContent(
         uiState = uiState,
@@ -102,6 +110,17 @@ fun TransferProgressScreen(
         onRetrySession = viewModel::retrySession,
         onCancelSession = viewModel::cancelSession,
         onConsumeFeedback = viewModel::consumeFeedback,
+        receivedApksSection = if (hasCompletedReceivedSession && receivedApks.any { it.canLaunchSystemInstaller }) {
+            {
+                ReceivedAppsInstallerCard(
+                    receivedApks = receivedApks,
+                    installationManager = container.applicationInstallationManager,
+                    permissionManager = container.permissionManager
+                )
+            }
+        } else {
+            null
+        },
         modifier = modifier
     )
 }
@@ -117,6 +136,7 @@ fun TransferProgressContent(
     onRetrySession: (String) -> Unit,
     onCancelSession: (String) -> Unit,
     onConsumeFeedback: () -> Unit,
+    receivedApksSection: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -235,6 +255,12 @@ fun TransferProgressContent(
                             onRetry = { onRetrySession(session.sessionId) },
                             onRequestCancel = { pendingCancelSessionId = session.sessionId }
                         )
+                    }
+                }
+
+                if (receivedApksSection != null) {
+                    item(key = "received_apks_installer") {
+                        receivedApksSection()
                     }
                 }
             }

@@ -26,11 +26,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.ClosedCaptionDisabled
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -49,6 +51,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -59,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,12 +102,17 @@ import com.example.shareflow.core.designsystem.theme.findActivity
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.MediaVideoItem
+import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import com.example.shareflow.ui.viewer.toViewerFileEntry
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun VideoPlayerScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSend: () -> Unit = {},
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier,
     providedViewModel: VideoPlayerViewModel? = null
 ) {
@@ -116,6 +126,8 @@ fun VideoPlayerScreen(
     val context = LocalContext.current
     val activity = LocalShareFlowHostActivity.current ?: context.findActivity()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
@@ -123,6 +135,7 @@ fun VideoPlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
+    var inspectVideoForVault by remember { mutableStateOf<MediaVideoItem?>(null) }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 25)
@@ -284,16 +297,66 @@ fun VideoPlayerScreen(
         BackHandler { viewModel.setFullScreen(false) }
     }
 
+    inspectVideoForVault?.let { vid ->
+        val entry = remember(vid) { vid.toViewerFileEntry() }
+        CustomFileViewerDialog(
+            file = entry,
+            onSendWithShareFlow = {
+                inspectVideoForVault = null
+                container.localSessionController.addSelectedFiles(listOf(entry))
+                onNavigateToSend()
+            },
+            onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenVaultSetup = {
+                inspectVideoForVault = null
+                onOpenVault()
+            },
+            onDismiss = { inspectVideoForVault = null }
+        )
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("video_player_screen"),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (!uiState.isFullScreen) {
                 ShareFlowTopBar(
                     title = stringResource(R.string.media_video_title),
                     onNavigateBack = onNavigateBack,
                     actions = {
+                        uiState.currentVideo?.let { activeVideo ->
+                            IconButton(
+                                onClick = {
+                                    exoPlayer.pause()
+                                    inspectVideoForVault = activeVideo
+                                },
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("video_move_to_vault_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = stringResource(R.string.viewer_action_move_to_vault)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    exoPlayer.pause()
+                                    container.localSessionController.addSelectedFiles(listOf(activeVideo.toViewerFileEntry()))
+                                    onNavigateToSend()
+                                },
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("video_send_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = stringResource(R.string.viewer_action_send_shareflow)
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = {
                                 videoPickerLauncher.launch(

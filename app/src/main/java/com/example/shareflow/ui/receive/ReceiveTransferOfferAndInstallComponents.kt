@@ -44,6 +44,8 @@ import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.StatusPill
+import android.content.Intent
+import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.permissions.PermissionManager
@@ -165,6 +167,7 @@ fun ReceivedAppsInstallerCard(
     if (installable.isEmpty()) return
 
     val context = LocalContext.current
+    val hostActivity = LocalShareFlowHostActivity.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val installState by installationManager.installState.collectAsStateWithLifecycle()
@@ -172,11 +175,17 @@ fun ReceivedAppsInstallerCard(
     val locale = ShareFlowDesign.locale
     val semantic = ShareFlowDesign.semanticColors
 
+    fun launchSafely(intent: Intent) {
+        val launcher = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed } ?: context
+        val safeIntent = if (launcher === hostActivity) intent else Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { launcher.startActivity(safeIntent) }
+    }
+
     // Automatically launch Android's system installation confirmation Intent when PackageInstaller signals STATUS_PENDING_USER_ACTION
     LaunchedEffect(installState) {
         val state = installState
         if (state is AppInstallSessionState.AwaitingUserConfirmation) {
-            runCatching { context.startActivity(state.confirmationIntent) }
+            launchSafely(state.confirmationIntent)
         }
     }
 
@@ -246,9 +255,7 @@ fun ReceivedAppsInstallerCard(
                         PrimaryActionButton(
                             text = stringResource(R.string.perm_open_settings_action),
                             onClick = {
-                                runCatching {
-                                    context.startActivity(permissionManager.createManageUnknownSourcesIntent())
-                                }
+                                launchSafely(permissionManager.createManageUnknownSourcesIntent())
                             },
                             leadingIcon = Icons.Filled.InstallMobile,
                             modifier = Modifier
@@ -271,9 +278,7 @@ fun ReceivedAppsInstallerCard(
                             modifier = Modifier.weight(1f)
                         )
                         TextButton(
-                            onClick = {
-                                runCatching { context.startActivity(state.confirmationIntent) }
-                            }
+                            onClick = { launchSafely(state.confirmationIntent) }
                         ) {
                             Text(stringResource(R.string.receive_app_install_confirm_action))
                         }
@@ -300,21 +305,37 @@ fun ReceivedAppsInstallerCard(
                 }
 
                 is AppInstallSessionState.Failed -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.receive_app_install_failed, state.reason),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.receive_app_install_failed, state.reason),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        state.fallbackApkFile?.let { fallbackApk ->
+                            SecondaryActionButton(
+                                text = stringResource(R.string.receive_app_install_fallback_action),
+                                onClick = {
+                                    installationManager.createSystemInstallerFallbackIntent(fallbackApk)
+                                        ?.let(::launchSafely)
+                                },
+                                outlined = true,
+                                leadingIcon = Icons.Filled.InstallMobile,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("receive_install_fallback_button")
+                            )
+                        }
                     }
                 }
             }

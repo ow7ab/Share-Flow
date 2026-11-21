@@ -32,14 +32,18 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,11 +91,16 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.MediaImageItem
+import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import com.example.shareflow.ui.viewer.toViewerFileEntry
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImageGalleryScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSend: () -> Unit = {},
+    onOpenVault: () -> Unit = {},
     modifier: Modifier = Modifier,
     providedViewModel: ImageGalleryViewModel? = null
 ) {
@@ -102,10 +112,12 @@ fun ImageGalleryScreen(
             }
         )
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
+    var vaultInspectImage by remember { mutableStateOf<MediaImageItem?>(null) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 50)
@@ -132,6 +144,27 @@ fun ImageGalleryScreen(
         }
     }
 
+    vaultInspectImage?.let { img ->
+        val entry = remember(img) { img.toViewerFileEntry() }
+        CustomFileViewerDialog(
+            file = entry,
+            onSendWithShareFlow = {
+                vaultInspectImage = null
+                viewModel.closeViewer()
+                container.localSessionController.addSelectedFiles(listOf(entry))
+                onNavigateToSend()
+            },
+            onShareExternal = { shareImage(img) },
+            onMoveToVaultSuccess = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenVaultSetup = {
+                vaultInspectImage = null
+                viewModel.closeViewer()
+                onOpenVault()
+            },
+            onDismiss = { vaultInspectImage = null }
+        )
+    }
+
     val viewerIdx = uiState.viewerIndex
     if (viewerIdx != null && uiState.visibleImages.isNotEmpty()) {
         BackHandler { viewModel.closeViewer() }
@@ -143,6 +176,12 @@ fun ImageGalleryScreen(
             onClose = viewModel::closeViewer,
             onToggleMetadata = viewModel::toggleMetadataSheet,
             onShare = ::shareImage,
+            onSendWithShareFlow = { image ->
+                viewModel.closeViewer()
+                container.localSessionController.addSelectedFiles(listOf(image.toViewerFileEntry()))
+                onNavigateToSend()
+            },
+            onMoveToVault = { image -> vaultInspectImage = image },
             onRequestDelete = viewModel::requestDelete
         )
     } else {
@@ -361,6 +400,8 @@ private fun FullScreenImageViewer(
     onClose: () -> Unit,
     onToggleMetadata: (Boolean) -> Unit,
     onShare: (MediaImageItem) -> Unit,
+    onSendWithShareFlow: (MediaImageItem) -> Unit,
+    onMoveToVault: (MediaImageItem) -> Unit,
     onRequestDelete: (MediaImageItem) -> Unit
 ) {
     val pagerState = rememberPagerState(
@@ -458,6 +499,58 @@ private fun FullScreenImageViewer(
                         imageVector = Icons.Filled.DeleteOutline,
                         contentDescription = stringResource(R.string.action_delete),
                         tint = Color.White
+                    )
+                }
+            }
+        }
+
+        // Bottom Send + Move to Private Vault action dock
+        if (activeImage != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .align(Alignment.BottomCenter),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(
+                    onClick = { onMoveToVault(activeImage) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("gallery_viewer_vault_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(
+                        text = stringResource(R.string.viewer_action_move_to_vault),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Button(
+                    onClick = { onSendWithShareFlow(activeImage) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("gallery_viewer_send_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(
+                        text = stringResource(R.string.viewer_action_send_shareflow),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

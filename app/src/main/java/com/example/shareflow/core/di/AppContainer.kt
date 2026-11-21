@@ -14,6 +14,7 @@ import com.example.shareflow.core.security.ChecksumVerifier
 import com.example.shareflow.core.security.KeystoreCipher
 import com.example.shareflow.core.security.Sha256ChecksumVerifier
 import com.example.shareflow.data.apps.ApplicationInstallationManager
+import com.example.shareflow.data.files.ReceivedMediaStorePublisher
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
 import com.example.shareflow.data.repository.AndroidAppSharingRepository
@@ -366,7 +367,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
                 verifier = transferVerifier,
                 recoveryManager = transferRecoveryManager,
                 transferRepository = transferRepository,
-                clock = clock
+                clock = clock,
+                receivedFilePublisher = ReceivedMediaStorePublisher(appContext),
+                onFilePublished = { fileManagerRepository.notifyStorageChanged() }
             ),
             recoveryManager = transferRecoveryManager,
             destinationRootProvider = { ChunkProcessor.defaultReceiveRoot(appContext) },

@@ -234,4 +234,77 @@ class ApplicationInstallationManagerTest {
 
         manager.dispose()
     }
+
+    @Test
+    fun `accepts valid config split APK ZIP when PackageManager returns null metadata and rejects corrupt split`() = runTest {
+        val bundleDir = File(tempReceiveRoot, "ConfigSplit_split_apk").apply { mkdirs() }
+        val baseBytes = createMinimalApkZipBytes("base")
+        val configSplitBytes = createMinimalApkZipBytes("split_config_xxhdpi")
+        val baseFile = File(bundleDir, "base.apk").apply { writeBytes(baseBytes) }
+        val configSplitFile = File(bundleDir, "split_config.xxhdpi.apk").apply { writeBytes(configSplitBytes) }
+
+        val manifest = ShareFlowAppBundleManifest(
+            packageName = "com.example.configsplit",
+            appName = "Config Split App",
+            versionName = "1.2.0",
+            versionCode = 12L,
+            baseApkFileName = "base.apk",
+            parts = listOf(
+                ShareFlowApkPartManifest("base.apk", baseBytes.size.toLong(), sha256Of(baseBytes), isBase = true),
+                ShareFlowApkPartManifest("split_config.xxhdpi.apk", configSplitBytes.size.toLong(), sha256Of(configSplitBytes), isBase = false)
+            )
+        )
+        val manifestFile = File(bundleDir, "shareflow_app_manifest.json").apply {
+            writeText(manifest.toJsonString(), Charsets.UTF_8)
+        }
+
+        // Real Android PackageManager.getPackageArchiveInfo often returns null for resource/ABI config splits
+        val inspectorWithNullSplit = FakeApkInspector(
+            mapOf(
+                "base.apk" to ApkArchiveMetadata("com.example.configsplit", "Config Split App", "1.2.0", 12L),
+                "split_config.xxhdpi.apk" to null
+            )
+        )
+        val permManager = PermissionManager(context, canInstallPackagesChecker = { true })
+        val manager = ApplicationInstallationManager(
+            context = context,
+            checksumVerifier = verifier,
+            permissionManager = permManager,
+            apkArchiveInspector = inspectorWithNullSplit,
+            receiveRootProvider = { tempReceiveRoot },
+            availableStorageBytesProvider = { 500L * 1024L * 1024L }
+        )
+
+        val validResult = manager.validateApkFiles(baseFile, manifestFile = manifestFile)
+        assertTrue("Valid config split ZIP must pass validation", validResult is AppResult.Success)
+        val validated = (validResult as AppResult.Success).data
+        assertEquals(2, validated.apkFiles.size)
+        assertEquals("base.apk", validated.apkFiles.first().name)
+
+        // Now corrupt the config split with non-ZIP bytes and update manifest hash to match corrupt bytes
+        val corruptBytes = "NOT_A_VALID_ZIP_ARCHIVE".toByteArray()
+        configSplitFile.writeBytes(corruptBytes)
+        val corruptManifest = manifest.copy(
+            parts = listOf(
+                ShareFlowApkPartManifest("base.apk", baseBytes.size.toLong(), sha256Of(baseBytes), isBase = true),
+                ShareFlowApkPartManifest("split_config.xxhdpi.apk", corruptBytes.size.toLong(), sha256Of(corruptBytes), isBase = false)
+            )
+        )
+        manifestFile.writeText(corruptManifest.toJsonString(), Charsets.UTF_8)
+
+        val corruptResult = manager.validateApkFiles(baseFile, manifestFile = manifestFile)
+        assertTrue("Corrupt non-ZIP split must still be rejected", corruptResult is AppResult.Failure)
+
+        manager.dispose()
+    }
+
+    private fun createMinimalApkZipBytes(marker: String): ByteArray {
+        val baos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(baos).use { zos ->
+            zos.putNextEntry(java.util.zip.ZipEntry("AndroidManifest.xml"))
+            zos.write("binary_manifest_$marker".toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
+        }
+        return baos.toByteArray()
+    }
 }

@@ -384,6 +384,15 @@ class AndroidAppSharingRepository(
                         )
                         continue
                     }
+                    // For split APK bundles, represent the entire bundle via base.apk instead of showing
+                    // separate entries for resource/ABI config splits (which PackageManager cannot parse standalone).
+                    val parentHasManifest = resolvedFile.parentFile?.let {
+                        File(it, BUNDLE_MANIFEST_FILE_NAME).exists()
+                    } == true
+                    if (parentHasManifest && !resolvedFile.name.equals("base.apk", ignoreCase = true)) {
+                        runCatching { resolvedFile.canonicalPath }.getOrNull()?.let { seenCanonicalPaths.add(it) }
+                        continue
+                    }
                     runCatching { resolvedFile.canonicalPath }.getOrNull()?.let { seenCanonicalPaths.add(it) }
                     results.add(
                         verifyReceivedApkInternal(
@@ -403,9 +412,15 @@ class AndroidAppSharingRepository(
                     receiveRoot.walkTopDown()
                         .maxDepth(3)
                         .filter { file ->
-                            file.isFile &&
-                                file.extension.equals("apk", ignoreCase = true) &&
-                                !file.absolutePath.contains(".shareflow_staging")
+                            if (!file.isFile || !file.extension.equals("apk", ignoreCase = true)) return@filter false
+                            if (file.absolutePath.contains(".shareflow_staging")) return@filter false
+                            val parentHasManifest = file.parentFile?.let {
+                                File(it, BUNDLE_MANIFEST_FILE_NAME).exists()
+                            } == true
+                            if (parentHasManifest && !file.name.equals("base.apk", ignoreCase = true)) {
+                                return@filter false
+                            }
+                            true
                         }
                         .forEach { file ->
                             val canonical = runCatching { file.canonicalPath }.getOrDefault(file.absolutePath)
