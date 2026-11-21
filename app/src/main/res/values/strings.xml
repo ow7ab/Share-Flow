@@ -1078,6 +1078,17 @@
     <string name="receive_app_install_confirm_action">Open Installer</string>
     <string name="receive_app_install_success">Installed %1$s successfully</string>
     <string name="receive_app_install_failed">Installation failed: %1$s</string>
+
+    <!-- Live Searching & Linking Status Indicators -->
+    <string name="qr_status_searching_camera">Searching for QR code…</string>
+    <string name="qr_status_connecting_overlay">Connecting to receiver…</string>
+    <string name="send_searching_nearby_title">Searching for nearby devices…</string>
+    <string name="send_searching_nearby_subtitle">Make sure Receive mode is open on the other device.</string>
+    <string name="send_connecting_peer_title">Connecting to device…</string>
+    <string name="send_connecting_peer_subtitle">Verifying encrypted channel and waiting for receiver approval.</string>
+    <string name="receive_waiting_searching_banner">Searching &amp; waiting for sender to scan QR…</string>
+    <string name="receive_linking_sender_banner">Connecting &amp; authenticating with sender…</string>
+    <string name="home_unified_transfer_hint">Use Send or Receive above to connect via QR code, local hotspot, or Wi-Fi.</string>
 </resources>
 
 

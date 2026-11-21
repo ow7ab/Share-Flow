@@ -228,7 +228,7 @@ class SmartConnectionCoordinatorTest {
         hotspotController: FakeReceiverHotspotController = FakeReceiverHotspotController(),
         senderConnector: FakeSenderWifiConnector = FakeSenderWifiConnector(),
         existingWifiProvider: FakeExistingWifiProvider = FakeExistingWifiProvider(),
-        sessionDiscovery: FakeSessionDiscovery = FakeSessionDiscovery()
+        sessionDiscovery: SessionServiceDiscovery = FakeSessionDiscovery()
     ): Pair<DefaultConnectionCoordinator, SmartConnectionCoordinator> {
         val context = RuntimeEnvironment.getApplication()
         val identity = AndroidDeviceIdentityManager(preferAndroidKeystore = false)
@@ -413,6 +413,61 @@ class SmartConnectionCoordinatorTest {
         } finally {
             sendSmart.cancelOrDisconnect()
             recSmart.cancelOrDisconnect()
+            sendSmart.shutdown()
+            recSmart.shutdown()
+            sendBase.shutdown()
+            recBase.shutdown()
+        }
+    }
+
+    @Test
+    fun `qr pairing falls back to existing local wifi and direct QR host hint when hotspot join and multicast discovery fail`() = runBlocking {
+        val clock = FakeClock()
+        val receiverHotspot = FakeReceiverHotspotController(
+            ssid = "AndroidShare_Fallback",
+            passphrase = "FallbackSecretPassword!11"
+        )
+        val (recBase, recSmart) = buildNode(clock = clock, hotspotController = receiverHotspot)
+
+        val timeoutSenderConnector = FakeSenderWifiConnector(
+            failOutcome = WifiJoinOutcome.Failed(
+                SmartConnectionErrorCode.WIFI_JOIN_TIMEOUT,
+                "Simulated OEM hotspot join timeout"
+            )
+        )
+        val failingDiscovery = object : SessionServiceDiscovery {
+            private val _status = MutableStateFlow("DISCOVERY_BLOCKED")
+            override val statusLabel: StateFlow<String> = _status.asStateFlow()
+            override suspend fun startSessionAdvertising(payload: SmartQrPairingPayload, ephemeralKeyHash: String) = Unit
+            override suspend fun stopSessionAdvertising() = Unit
+            override suspend fun discoverReceiverForSession(
+                payload: SmartQrPairingPayload,
+                boundNetwork: BoundWifiNetworkHandle?,
+                timeoutMillis: Long
+            ): AppResult<DiscoveredReceiverEndpoint> = AppResult.Failure(
+                AppError.Network("Multicast blocked by router")
+            )
+        }
+
+        val (sendBase, sendSmart) = buildNode(
+            clock = clock,
+            senderConnector = timeoutSenderConnector,
+            sessionDiscovery = failingDiscovery
+        )
+
+        try {
+            val startRes = recSmart.startSmartReceiving("Fallback Receiver", preferredPort = 0, preferHotspot = true)
+            assertTrue("Expected receiver start success, got $startRes", startRes is AppResult.Success)
+            val qrUri = recSmart.activeQrUri.value
+
+            val connectRes = sendSmart.connectViaSmartQr(qrUri, "Sender Fallback")
+            assertTrue("Expected QR fallback connect success, got $connectRes", connectRes is AppResult.Success)
+            assertEquals(SmartConnectionPhase.CONNECTED, sendSmart.phase.value)
+            assertEquals(SmartStrategyType.EXISTING_LOCAL_WIFI, sendSmart.activeStrategy.value)
+            assertEquals("DIRECT_QR_HOST_FALLBACK", sendSmart.diagnostics.value.nsdDiscoveryStatus)
+        } finally {
+            sendSmart.cancelOrDisconnect(markCancelled = false)
+            recSmart.cancelOrDisconnect(markCancelled = false)
             sendSmart.shutdown()
             recSmart.shutdown()
             sendBase.shutdown()

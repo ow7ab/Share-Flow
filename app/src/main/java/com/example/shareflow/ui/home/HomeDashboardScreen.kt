@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapVert
@@ -60,7 +59,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
-import com.example.shareflow.core.designsystem.components.DeviceCard
 import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.FileItem
 import com.example.shareflow.core.designsystem.components.LoadingState
@@ -74,7 +72,6 @@ import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.ConnectionState
 import com.example.shareflow.domain.model.LocalFileEntry
-import com.example.shareflow.domain.model.ShareFlowModuleId
 import com.example.shareflow.navigation.ShareFlowRoutes
 import com.example.shareflow.network.DeviceNetworkStatus
 
@@ -160,31 +157,41 @@ fun HomeDashboardContent(
                         )
                     }
 
-                    // 2. Main Actions: Send & Receive
+                    // 2. Main Actions: Dedicated Send & Receive Only
                     item(key = "primary_actions") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                        ) {
-                            PrimaryActionTile(
-                                title = stringResource(R.string.home_action_send),
-                                subtitle = stringResource(R.string.home_action_send_sub),
-                                icon = Icons.AutoMirrored.Filled.Send,
-                                containerColor = semantic.sendAccent,
-                                contentColor = semantic.onSendAccent,
-                                testTag = "home_send_button",
-                                onClick = { onNavigateToRoute(ShareFlowRoutes.SEND) },
-                                modifier = Modifier.weight(1f)
-                            )
-                            PrimaryActionTile(
-                                title = stringResource(R.string.home_action_receive),
-                                subtitle = stringResource(R.string.home_action_receive_sub),
-                                icon = Icons.Filled.CloudDownload,
-                                containerColor = semantic.receiveAccent,
-                                contentColor = semantic.onReceiveAccent,
-                                testTag = "home_receive_button",
-                                onClick = { onNavigateToRoute(ShareFlowRoutes.RECEIVE) },
-                                modifier = Modifier.weight(1f)
+                        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                PrimaryActionTile(
+                                    title = stringResource(R.string.home_action_send),
+                                    subtitle = stringResource(R.string.home_action_send_sub),
+                                    icon = Icons.AutoMirrored.Filled.Send,
+                                    containerColor = semantic.sendAccent,
+                                    contentColor = semantic.onSendAccent,
+                                    testTag = "home_send_button",
+                                    onClick = { onNavigateToRoute(ShareFlowRoutes.SEND) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                PrimaryActionTile(
+                                    title = stringResource(R.string.home_action_receive),
+                                    subtitle = stringResource(R.string.home_action_receive_sub),
+                                    icon = Icons.Filled.CloudDownload,
+                                    containerColor = semantic.receiveAccent,
+                                    contentColor = semantic.onReceiveAccent,
+                                    testTag = "home_receive_button",
+                                    onClick = { onNavigateToRoute(ShareFlowRoutes.RECEIVE) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.home_unified_transfer_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .testTag("home_unified_transfer_hint")
                             )
                         }
                     }
@@ -232,42 +239,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    // 3. Nearby Devices Section
-                    item(key = "nearby_devices_header") {
-                        HomeSectionRow(
-                            title = stringResource(R.string.home_section_nearby_devices),
-                            actionLabel = stringResource(R.string.home_section_nearby_action),
-                            onActionClick = { onNavigateToRoute(ShareFlowRoutes.DISCOVERY) },
-                            sectionTestTag = "home_section_nearby_devices",
-                            actionTestTag = "home_nearby_action"
-                        )
-                    }
-
-                    if (uiState.nearbyDevices.isEmpty()) {
-                        item(key = "nearby_devices_empty") {
-                            EmptyState(
-                                icon = Icons.Filled.Radar,
-                                title = stringResource(R.string.home_section_nearby_empty_title),
-                                body = stringResource(R.string.home_section_nearby_empty_body),
-                                actionLabel = stringResource(R.string.home_section_nearby_action),
-                                onAction = { onNavigateToRoute(ShareFlowRoutes.DISCOVERY) },
-                                modifier = Modifier.testTag("home_nearby_empty_state")
-                            )
-                        }
-                    } else {
-                        items(
-                            items = uiState.nearbyDevices,
-                            key = { "nearby_${it.deviceId}" }
-                        ) { peer ->
-                            DeviceCard(
-                                device = peer,
-                                onClick = { onNavigateToRoute(ShareFlowRoutes.DISCOVERY) },
-                                modifier = Modifier.testTag("home_nearby_device_${peer.deviceId}")
-                            )
-                        }
-                    }
-
-                    // 4. Recent Transfers Section
+                    // 3. Recent Transfers Section
                     item(key = "recent_transfers_header") {
                         HomeSectionRow(
                             title = stringResource(R.string.home_section_recent_transfers),
@@ -381,11 +353,7 @@ fun HomeDashboardContent(
                                 QuickToolTile(
                                     title = stringResource(R.string.module_private_vault_title),
                                     icon = Icons.Filled.Lock,
-                                    onClick = {
-                                        onNavigateToRoute(
-                                            ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.PRIVATE_VAULT)
-                                        )
-                                    },
+                                    onClick = { onNavigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
                                     testTag = "home_quick_tool_vault",
                                     modifier = Modifier.weight(1f)
                                 )
@@ -404,11 +372,7 @@ fun HomeDashboardContent(
                                 QuickToolTile(
                                     title = stringResource(R.string.module_file_compression_title),
                                     icon = Icons.Filled.Archive,
-                                    onClick = {
-                                        onNavigateToRoute(
-                                            ShareFlowRoutes.moduleDetailRoute(ShareFlowModuleId.FILE_COMPRESSION)
-                                        )
-                                    },
+                                    onClick = { onNavigateToRoute(ShareFlowRoutes.COMPRESSION) },
                                     testTag = "home_quick_tool_compression",
                                     modifier = Modifier.weight(1f)
                                 )

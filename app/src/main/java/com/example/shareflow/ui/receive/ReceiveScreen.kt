@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -27,6 +26,7 @@ import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -245,6 +245,45 @@ fun ReceiveScreen(
                                 .fillMaxWidth()
                                 .testTag("receive_open_transfer_progress_button")
                         )
+                    }
+                }
+
+                // Live linking/authenticating progress banner when sender connects
+                if (connState is ConnectionState.AwaitingApproval ||
+                    uiState.smartPhase == SmartConnectionPhase.AUTHENTICATING
+                ) {
+                    item(key = "receive_linking_banner") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receive_linking_sender_banner"),
+                            shape = ShareFlowDesign.shapes.featuredCard,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.cardPadding),
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                ) {
+                                    CircularProgressIndicator(
+                                        strokeWidth = 2.5.dp,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.receive_linking_sender_banner),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                        }
                     }
                 }
 
@@ -514,6 +553,27 @@ fun ReceiveScreen(
                                     textAlign = TextAlign.Center
                                 )
 
+                                if (!isExpired && uiState.smartPhase == SmartConnectionPhase.WAITING_FOR_QR) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("receive_waiting_searching_banner"),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = semantic.verifiedBadge
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.receive_waiting_searching_banner),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = semantic.verifiedBadge,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+
                                 Surface(
                                     shape = ShareFlowDesign.shapes.featuredCard,
                                     color = Color.White,
@@ -644,56 +704,6 @@ fun ReceiveScreen(
                         isActive = uiState.isReceiving,
                         testTag = "receive_discovery_status_card"
                     )
-                }
-
-                // QR Pairing & Scanner Entry Card
-                item(key = "qr_pairing_entry") {
-                    Surface(
-                        shape = ShareFlowDesign.shapes.card,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.testTag("receive_qr_card")
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(spacing.cardPadding),
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.QrCode2,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(R.string.receive_qr_card_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.receive_qr_card_desc),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            SecondaryActionButton(
-                                text = stringResource(R.string.receive_qr_open_action),
-                                onClick = onOpenQrPairing,
-                                outlined = false,
-                                leadingIcon = Icons.Filled.QrCode2,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("receive_open_qr_button")
-                            )
-                        }
-                    }
                 }
             }
         }

@@ -9,8 +9,10 @@ import com.example.shareflow.domain.model.ActiveLocalHotspotSession
 import com.example.shareflow.domain.model.BoundWifiNetworkHandle
 import com.example.shareflow.domain.model.ConnectionState
 import com.example.shareflow.domain.model.ConnectionType
+import com.example.shareflow.domain.model.DiscoveredReceiverEndpoint
 import com.example.shareflow.domain.model.HotspotSecurityType
 import com.example.shareflow.domain.model.PeerDevice
+import com.example.shareflow.domain.model.ReceiverDiscoveryMethod
 import com.example.shareflow.domain.model.SmartConnectionDiagnostics
 import com.example.shareflow.domain.model.SmartConnectionError
 import com.example.shareflow.domain.model.SmartConnectionErrorCode
@@ -455,8 +457,8 @@ class SmartConnectionCoordinator(
                     )
                 }
 
-                val boundHandle: BoundWifiNetworkHandle?
-                val effectiveStrategy: SmartStrategyType
+                var boundHandle: BoundWifiNetworkHandle?
+                var effectiveStrategy: SmartStrategyType
 
                 if (payload.hasHotspotCredentials() && senderWifiConnector.isSupportedOnDevice()) {
                     effectiveStrategy = SmartStrategyType.WIFI_NETWORK_SPECIFIER
@@ -498,10 +500,28 @@ class SmartConnectionCoordinator(
                                     overridePhase = SmartConnectionPhase.CANCELLED
                                 )
                             }
-                            return@withLock failLocked(
-                                code = joinOutcome.errorCode,
-                                detail = joinOutcome.message
-                            )
+                            // Fallback to an active shared local Wi-Fi network if the temporary hotspot join timed out
+                            val fallbackWifiHandle = existingWifiProvider.getActiveWifiNetworkHandle()
+                            if (fallbackWifiHandle != null && !payload.hostAddressHint.isNullOrBlank()) {
+                                recordNonFatalNotice(joinOutcome.errorCode, joinOutcome.message)
+                                effectiveStrategy = SmartStrategyType.EXISTING_LOCAL_WIFI
+                                boundHandle = fallbackWifiHandle
+                                activeBoundNetwork = fallbackWifiHandle
+                                updatePhase(SmartConnectionPhase.JOINING_NETWORK, effectiveStrategy)
+                                updateDiagnostics {
+                                    it.copy(
+                                        activeStrategy = effectiveStrategy,
+                                        activeNetworkId = fallbackWifiHandle.networkId,
+                                        activeNetworkInterface = fallbackWifiHandle.interfaceName,
+                                        localIp = fallbackWifiHandle.localIpv4Address
+                                    )
+                                }
+                            } else {
+                                return@withLock failLocked(
+                                    code = joinOutcome.errorCode,
+                                    detail = joinOutcome.message
+                                )
+                            }
                         }
                     }
                 } else {
@@ -549,15 +569,30 @@ class SmartConnectionCoordinator(
                     it.copy(nsdDiscoveryStatus = sessionDiscovery.statusLabel.value)
                 }
 
-                if (discoveryResult is AppResult.Failure) {
-                    senderWifiConnector.releaseNetwork()
-                    activeBoundNetwork = null
-                    return@withLock failLocked(
-                        code = SmartConnectionErrorCode.WRONG_NETWORK,
-                        detail = discoveryResult.error.message
-                    )
+                val endpoint: DiscoveredReceiverEndpoint = when (discoveryResult) {
+                    is AppResult.Success -> discoveryResult.data
+                    is AppResult.Failure -> {
+                        val hintHost = payload.hostAddressHint?.trim()
+                        if (!hintHost.isNullOrBlank() && payload.servicePort in 1024..65535) {
+                            updateDiagnostics {
+                                it.copy(nsdDiscoveryStatus = "DIRECT_QR_HOST_FALLBACK")
+                            }
+                            DiscoveredReceiverEndpoint(
+                                hostAddress = hintHost,
+                                port = payload.servicePort,
+                                serviceName = payload.serviceName,
+                                method = ReceiverDiscoveryMethod.QR_HOST_HINT_VERIFIED
+                            )
+                        } else {
+                            senderWifiConnector.releaseNetwork()
+                            activeBoundNetwork = null
+                            return@withLock failLocked(
+                                code = SmartConnectionErrorCode.WRONG_NETWORK,
+                                detail = discoveryResult.error.message
+                            )
+                        }
+                    }
                 }
-                val endpoint = (discoveryResult as AppResult.Success).data
                 updateDiagnostics {
                     it.copy(
                         remoteIp = endpoint.hostAddress,

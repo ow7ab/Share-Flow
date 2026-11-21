@@ -15,7 +15,14 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -100,10 +108,12 @@ fun AdvancedQrScannerView(
     }
 
     var cameraRef by remember { mutableStateOf<Camera?>(null) }
+    var cameraProviderRef by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var hasFlashUnit by remember { mutableStateOf(false) }
     var torchEnabled by remember { mutableStateOf(false) }
     var activeZoomRatio by remember { mutableFloatStateOf(1.0f) }
 
+    val isDisposed = remember { AtomicBoolean(false) }
     val scanLocked = remember { AtomicBoolean(false) }
     val lastDeliveredText = remember { mutableStateOf<String?>(null) }
     val lastDeliveredTime = remember { AtomicLong(0L) }
@@ -127,9 +137,11 @@ fun AdvancedQrScannerView(
 
     DisposableEffect(Unit) {
         onDispose {
+            isDisposed.set(true)
             runCatching { cameraRef?.cameraControl?.enableTorch(false) }
+            runCatching { cameraProviderRef?.unbindAll() }
             runCatching { barcodeScanner.close() }
-            runCatching { analysisExecutor.shutdownNow() }
+            runCatching { analysisExecutor.shutdown() }
         }
     }
 
@@ -143,13 +155,24 @@ fun AdvancedQrScannerView(
     }
 
     val stateLabelRes = when (scannerState) {
-        QrScannerUiState.SCANNING -> R.string.smart_scanner_state_scanning
+        QrScannerUiState.SCANNING -> R.string.qr_status_searching_camera
         QrScannerUiState.LOADING -> R.string.smart_scanner_state_loading
         QrScannerUiState.SUCCESS -> R.string.smart_scanner_state_success
         QrScannerUiState.INVALID_QR -> R.string.smart_scanner_state_invalid
         QrScannerUiState.EXPIRED_QR -> R.string.smart_scanner_state_expired
         QrScannerUiState.FAILURE -> R.string.smart_scanner_state_failure
     }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "qr_scan_beam_transition")
+    val scanLineFraction by infiniteTransition.animateFloat(
+        initialValue = 0.08f,
+        targetValue = 0.92f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "qr_scan_beam_fraction"
+    )
 
     Box(
         modifier = modifier
@@ -185,7 +208,9 @@ fun AdvancedQrScannerView(
                 providerFuture.addListener(
                     {
                         runCatching {
+                            if (isDisposed.get()) return@runCatching
                             val cameraProvider = providerFuture.get()
+                            cameraProviderRef = cameraProvider
                             val preview = Preview.Builder().build().also {
                                 it.setSurfaceProvider(previewView.surfaceProvider)
                             }
@@ -196,6 +221,7 @@ fun AdvancedQrScannerView(
                                 .build()
 
                             fun deliverCandidate(rawText: String) {
+                                if (isDisposed.get()) return
                                 val normalized = rawText.trim()
                                 if (normalized.isBlank()) return
                                 val now = System.currentTimeMillis()
@@ -205,73 +231,108 @@ fun AdvancedQrScannerView(
                                 lastDeliveredText.value = normalized
                                 lastDeliveredTime.set(now)
                                 ContextCompat.getMainExecutor(ctx).execute {
-                                    onQrDecoded(normalized)
+                                    if (!isDisposed.get()) {
+                                        onQrDecoded(normalized)
+                                    }
                                 }
                             }
 
                             analysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                                if (scanLocked.get()) {
-                                    imageProxy.close()
+                                if (isDisposed.get() || scanLocked.get()) {
+                                    runCatching { imageProxy.close() }
                                     return@setAnalyzer
                                 }
-                                val mediaImage = imageProxy.image
+                                val mediaImage = runCatching { imageProxy.image }.getOrNull()
                                 if (mediaImage == null) {
-                                    imageProxy.close()
+                                    runCatching { imageProxy.close() }
                                     return@setAnalyzer
                                 }
 
-                                val inputImage = InputImage.fromMediaImage(
-                                    mediaImage,
-                                    imageProxy.imageInfo.rotationDegrees
-                                )
                                 val frameWidth = imageProxy.width.coerceAtLeast(1)
+                                val frameHeight = imageProxy.height.coerceAtLeast(1)
+                                val inputImage = runCatching {
+                                    InputImage.fromMediaImage(
+                                        mediaImage,
+                                        imageProxy.imageInfo.rotationDegrees
+                                    )
+                                }.getOrNull()
+                                if (inputImage == null) {
+                                    runCatching { imageProxy.close() }
+                                    return@setAnalyzer
+                                }
 
-                                barcodeScanner.process(inputImage)
-                                    .addOnSuccessListener(analysisExecutor) { barcodes ->
-                                        val match = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }
-                                        if (match != null) {
-                                            val box = match.boundingBox
-                                            if (box != null) {
-                                                val boxWidthFraction = box.width().toFloat() / frameWidth.toFloat()
-                                                val now = System.currentTimeMillis()
-                                                if (boxWidthFraction in 0.01f..0.20f &&
-                                                    (now - lastAutoZoomTime.get()) > 900L
-                                                ) {
-                                                    lastAutoZoomTime.set(now)
-                                                    val cam = cameraRef
-                                                    if (cam != null) {
-                                                        val maxZoom = cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 2.0f
-                                                        val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
-                                                        val nextZoom = (currentZoom * 1.35f).coerceAtMost(minOf(maxZoom, 2.5f))
-                                                        ContextCompat.getMainExecutor(ctx).execute {
+                                val processTask = runCatching {
+                                    barcodeScanner.process(inputImage)
+                                }.getOrElse {
+                                    runCatching { imageProxy.close() }
+                                    return@setAnalyzer
+                                }
+
+                                // Single completion callback guarantees ImageProxy is NEVER closed
+                                // before Y-plane bytes are copied; ZXing CPU decoding runs on
+                                // analysisExecutor using only the detached ByteArray snapshot.
+                                processTask.addOnCompleteListener { task ->
+                                    var fallbackYData: ByteArray? = null
+                                    try {
+                                        if (!isDisposed.get() && task.isSuccessful) {
+                                            val barcodes = task.result.orEmpty()
+                                            val match = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }
+                                            if (match != null) {
+                                                val box = match.boundingBox
+                                                if (box != null) {
+                                                    val boxWidthFraction = box.width().toFloat() / frameWidth.toFloat()
+                                                    val now = System.currentTimeMillis()
+                                                    if (boxWidthFraction in 0.01f..0.20f &&
+                                                        (now - lastAutoZoomTime.get()) > 900L
+                                                    ) {
+                                                        lastAutoZoomTime.set(now)
+                                                        val cam = cameraRef
+                                                        if (cam != null) {
+                                                            val maxZoom = cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 2.0f
+                                                            val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
+                                                            val nextZoom = (currentZoom * 1.35f).coerceAtMost(minOf(maxZoom, 2.5f))
                                                             runCatching { cam.cameraControl.setZoomRatio(nextZoom) }
                                                             activeZoomRatio = nextZoom
                                                         }
                                                     }
                                                 }
+                                                match.rawValue?.let(::deliverCandidate)
+                                            } else if (!scanLocked.get()) {
+                                                // Snapshot Y-plane bytes strictly before closing ImageProxy
+                                                runCatching {
+                                                    val yPlane = imageProxy.planes.firstOrNull()
+                                                    if (yPlane != null) {
+                                                        val readOnly = yPlane.buffer.asReadOnlyBuffer()
+                                                        readOnly.rewind()
+                                                        val copy = ByteArray(readOnly.remaining())
+                                                        readOnly.get(copy)
+                                                        fallbackYData = copy
+                                                    }
+                                                }
                                             }
-                                            match.rawValue?.let(::deliverCandidate)
-                                        } else if (!scanLocked.get()) {
-                                            // Fast ZXing YUV fallback when ML Kit finds no barcode on low-contrast frames
-                                            val yPlane = imageProxy.planes.firstOrNull()
-                                            if (yPlane != null) {
-                                                val buffer = yPlane.buffer
-                                                val data = ByteArray(buffer.remaining())
-                                                buffer.get(data)
-                                                val zxingText = QrCodeCodec.decodeFromYuvLuminance(
-                                                    yPlaneData = data,
-                                                    width = imageProxy.width,
-                                                    height = imageProxy.height
-                                                )
-                                                if (!zxingText.isNullOrBlank()) {
-                                                    deliverCandidate(zxingText)
+                                        }
+                                    } finally {
+                                        runCatching { imageProxy.close() }
+                                    }
+
+                                    val detachedY = fallbackYData
+                                    if (detachedY != null && !isDisposed.get() && !scanLocked.get() && !analysisExecutor.isShutdown) {
+                                        runCatching {
+                                            analysisExecutor.execute {
+                                                if (!isDisposed.get() && !scanLocked.get()) {
+                                                    val zxingText = QrCodeCodec.decodeFromYuvLuminance(
+                                                        yPlaneData = detachedY,
+                                                        width = frameWidth,
+                                                        height = frameHeight
+                                                    )
+                                                    if (!zxingText.isNullOrBlank()) {
+                                                        deliverCandidate(zxingText)
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                    .addOnCompleteListener {
-                                        imageProxy.close()
-                                    }
+                                }
                             }
 
                             cameraProvider.unbindAll()
@@ -303,7 +364,7 @@ fun AdvancedQrScannerView(
             }
         )
 
-        // Crisp Material 3 corner viewfinder overlay
+        // Crisp Material 3 corner viewfinder overlay + live animated scan beam
         Canvas(modifier = Modifier.fillMaxSize()) {
             val frameSize = minOf(size.width, size.height) * 0.62f
             val left = (size.width - frameSize) / 2f
@@ -325,6 +386,48 @@ fun AdvancedQrScannerView(
             // Bottom-right
             drawLine(frameAccentColor, Offset(right, bottom), Offset(right - corner, bottom), stroke, StrokeCap.Round)
             drawLine(frameAccentColor, Offset(right, bottom), Offset(right, bottom - corner), stroke, StrokeCap.Round)
+
+            if (scannerState == QrScannerUiState.SCANNING) {
+                val beamY = top + frameSize * scanLineFraction
+                drawLine(
+                    color = frameAccentColor.copy(alpha = 0.85f),
+                    start = Offset(left + 12.dp.toPx(), beamY),
+                    end = Offset(right - 12.dp.toPx(), beamY),
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+
+        // Translucent connecting overlay when QR is decoded and device link is in progress
+        AnimatedVisibility(
+            visible = scannerState == QrScannerUiState.LOADING,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .testTag("qr_scanner_connecting_overlay"),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.qr_status_connecting_overlay),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.White
+                    )
+                }
+            }
         }
 
         // Top overlay: Scanner status pill, auto-zoom badge, and flash toggle

@@ -67,41 +67,31 @@ class SmartConnectionUiRobolectricTest {
     }
 
     @Test
-    fun `qr pairing scan tab shows gallery import and manual SF3 code entry and tools exposes diagnostics`() {
+    fun `unified receive keeps QR inline and tools exposes connection diagnostics without duplicate qr scanner`() {
         waitForTag("home_receive_button")
         composeTestRule.onNodeWithTag("home_receive_button").performClick()
         waitForTag("receive_screen_list")
         composeTestRule.waitForIdle()
 
-        val receiveList = composeTestRule.onNodeWithTag("receive_screen_list")
-        receiveList.performScrollToNode(hasTestTag("receive_open_qr_button"))
-        composeTestRule.onNodeWithTag("receive_open_qr_button").performClick()
-        waitForTag("qr_pairing_screen")
-        composeTestRule.waitForIdle()
+        // Redundant bottom QR jump-out card must be absent; all receiving stays inline
+        assertTrue(
+            composeTestRule.onAllNodesWithTag("receive_qr_card", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+        composeTestRule.onNodeWithTag("receive_toggle_button").assertIsDisplayed()
 
-        // Show tab preserves PIN & Share QR actions
-        val qrList = composeTestRule.onNodeWithTag("qr_pairing_screen")
-        qrList.performScrollToNode(hasTestTag("qr_pairing_pin_value"))
-        composeTestRule.onNodeWithTag("qr_pairing_pin_value").assertIsDisplayed()
-
-        // Switch to Scan tab -> gallery import & manual code entry present
-        qrList.performScrollToNode(hasTestTag("qr_tab_scan_button"))
-        composeTestRule.onNodeWithTag("qr_tab_scan_button").performClick()
-        composeTestRule.waitForIdle()
-
-        qrList.performScrollToNode(hasTestTag("qr_import_gallery_button"))
-        composeTestRule.onNodeWithTag("qr_import_gallery_button").assertIsDisplayed()
-        qrList.performScrollToNode(hasTestTag("qr_manual_uri_input"))
-        composeTestRule.onNodeWithTag("qr_manual_uri_input").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("qr_manual_connect_button").assertIsDisplayed()
-
-        // Navigate back to Home -> Tools -> Connection Diagnostics card
-        composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
-        waitForTag("receive_screen_list")
+        // Navigate back to Home -> Tools -> verify no duplicate standalone QR scanner, diagnostics opens cleanly
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
         waitForTag("nav_item_tools")
         composeTestRule.onNodeWithTag("nav_item_tools").performClick()
         waitForTag("tools_screen_list")
+
+        assertTrue(
+            composeTestRule.onAllNodesWithTag("tools_card_qr_scanner", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
 
         val toolsList = composeTestRule.onNodeWithTag("tools_screen_list")
         toolsList.performScrollToNode(hasTestTag("tools_card_connection_diagnostics"))

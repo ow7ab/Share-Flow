@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Star
@@ -194,18 +193,6 @@ fun ToolsScreen(
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.FAVORITES) },
                     testTag = "tools_card_favorites"
-                )
-            }
-
-            item(key = "tool_qr_scanner") {
-                ModuleDirectoryCard(
-                    title = stringResource(R.string.module_qr_scanner_title),
-                    description = stringResource(R.string.module_qr_scanner_desc),
-                    icon = Icons.Filled.QrCodeScanner,
-                    statusLabel = stringResource(R.string.status_ready),
-                    isReady = true,
-                    onClick = { onNavigateToRoute(ShareFlowRoutes.QR_SCANNER) },
-                    testTag = "tools_card_qr_scanner"
                 )
             }
 

@@ -41,15 +41,20 @@ class ShareFlowNavigationRobolectricTest {
         composeTestRule.onNodeWithTag("home_connection_status").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_settings_shortcut").assertIsDisplayed()
 
-        // Main actions: Send & Receive
+        // Main actions: Dedicated Send & Receive + unified hint
         composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_receive_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_unified_transfer_hint").assertIsDisplayed()
 
-        // Scroll through all 5 Home Dashboard sections
+        // Disconnected Nearby section must NOT exist on Home — sending/receiving live strictly in SEND & RECEIVE
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("home_section_nearby_devices", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+
+        // Scroll through Home Dashboard sections
         val list = composeTestRule.onNodeWithTag("home_dashboard_list")
-        list.performScrollToNode(hasTestTag("home_section_nearby_devices"))
-        composeTestRule.onNodeWithTag("home_section_nearby_devices").assertIsDisplayed()
-
         list.performScrollToNode(hasTestTag("home_section_recent_transfers"))
         composeTestRule.onNodeWithTag("home_section_recent_transfers").assertIsDisplayed()
 
@@ -171,7 +176,7 @@ class ShareFlowNavigationRobolectricTest {
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
         waitForTag("home_hero_card")
 
-        // Receive screen & QR pairing entry
+        // Unified Receive screen (inline controls only — no disconnected bottom QR jump-out card)
         composeTestRule.onNodeWithTag("home_receive_button").performClick()
         waitForTag("receive_screen_list")
         val receiveList = composeTestRule.onNodeWithTag("receive_screen_list")
@@ -180,22 +185,13 @@ class ShareFlowNavigationRobolectricTest {
         composeTestRule.onNodeWithTag("receive_connection_status_card").assertIsDisplayed()
         receiveList.performScrollToNode(hasTestTag("receive_discovery_status_card"))
         composeTestRule.onNodeWithTag("receive_discovery_status_card").assertIsDisplayed()
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("receive_qr_card", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
 
-        // Open QR Pairing
-        receiveList.performScrollToNode(hasTestTag("receive_qr_card"))
-        composeTestRule.onNodeWithTag("receive_open_qr_button").performClick()
-        waitForTag("qr_pairing_screen")
-        val qrList = composeTestRule.onNodeWithTag("qr_pairing_screen")
-        qrList.performScrollToNode(hasTestTag("qr_pairing_pin_value"))
-        composeTestRule.onNodeWithTag("qr_pairing_pin_value").assertIsDisplayed()
-        qrList.performScrollToNode(hasTestTag("qr_regenerate_pin_button"))
-        composeTestRule.onNodeWithTag("qr_regenerate_pin_button").performClick()
-        qrList.performScrollToNode(hasTestTag("qr_pairing_pin_value"))
-        composeTestRule.onNodeWithTag("qr_pairing_pin_value").assertIsDisplayed()
-
-        // Navigate back to Receive -> Home
-        composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
-        waitForTag("receive_screen_list")
+        // Navigate back to Home
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
         waitForTag("home_hero_card")
 

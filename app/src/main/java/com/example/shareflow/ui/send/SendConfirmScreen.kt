@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
@@ -29,7 +30,9 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -74,6 +77,7 @@ import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.core.permissions.ShareFlowPermissionFeature
 import com.example.shareflow.core.permissions.rememberPermissionRequestCoordinator
 import com.example.shareflow.domain.model.ConnectionState
+import com.example.shareflow.domain.model.DiscoveryStatus
 import com.example.shareflow.domain.model.QrScannerUiState
 import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
@@ -168,6 +172,16 @@ fun SendConfirmScreen(
         }
     }
 
+    // Automatically start searching for nearby receivers when user selects Nearby tab
+    LaunchedEffect(connectMode) {
+        if (connectMode == SendConnectMode.NEARBY &&
+            uiState.connectionState !is ConnectionState.Connected &&
+            uiState.discoveryStatus !is DiscoveryStatus.Discovering
+        ) {
+            viewModel.startPeerDiscovery()
+        }
+    }
+
     val isSmartJoining = uiState.smartPhase in setOf(
         SmartConnectionPhase.QR_SCANNED,
         SmartConnectionPhase.REQUESTING_WIFI,
@@ -230,7 +244,18 @@ fun SendConfirmScreen(
                     }
                 }
 
-                // 2. Live Smart Wi-Fi Auto-Join / Discovery / Auth Progress
+                // 2. Live Smart Wi-Fi Auto-Join / Discovery / Auth / Searching Progress
+                val isDirectConnecting = !isSmartJoining && (
+                    uiState.scannerState == QrScannerUiState.LOADING ||
+                        connState is ConnectionState.Connecting ||
+                        connState is ConnectionState.AwaitingApproval
+                    )
+                val isSearchingNearby = !isSmartJoining &&
+                    !isDirectConnecting &&
+                    connState !is ConnectionState.Connected &&
+                    connectMode == SendConnectMode.NEARBY &&
+                    uiState.discoveryStatus is DiscoveryStatus.Discovering
+
                 if (isSmartJoining) {
                     item(key = "smart_sender_progress") {
                         SmartSenderProgressCard(
@@ -238,6 +263,102 @@ fun SendConfirmScreen(
                             strategy = uiState.smartStrategy,
                             onCancel = viewModel::cancelSmartConnect
                         )
+                    }
+                } else if (isDirectConnecting) {
+                    item(key = "direct_connecting_progress") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_live_connection_progress_card"),
+                            shape = ShareFlowDesign.shapes.featuredCard,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.cardPadding),
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                ) {
+                                    CircularProgressIndicator(
+                                        strokeWidth = 2.5.dp,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(R.string.send_connecting_peer_title),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.send_connecting_peer_subtitle),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                SecondaryActionButton(
+                                    text = stringResource(R.string.smart_sender_cancel_action),
+                                    onClick = viewModel::cancelSmartConnect,
+                                    isDestructive = true,
+                                    outlined = true,
+                                    leadingIcon = Icons.Filled.Close,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("send_live_cancel_button")
+                                )
+                            }
+                        }
+                    }
+                } else if (isSearchingNearby) {
+                    item(key = "nearby_searching_progress") {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("send_live_searching_progress_card"),
+                            shape = ShareFlowDesign.shapes.featuredCard,
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(spacing.cardPadding),
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                ) {
+                                    CircularProgressIndicator(
+                                        strokeWidth = 2.5.dp,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(R.string.send_searching_nearby_title),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.send_searching_nearby_subtitle),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                LinearProgressIndicator(
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
                 }
 

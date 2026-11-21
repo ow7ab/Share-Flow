@@ -1078,6 +1078,17 @@
     <string name="receive_app_install_confirm_action">فتح المثبّت</string>
     <string name="receive_app_install_success">تم تثبيت %1$s بنجاح</string>
     <string name="receive_app_install_failed">فشل التثبيت: %1$s</string>
+
+    <!-- مؤشرات حالة البحث والربط المباشرة -->
+    <string name="qr_status_searching_camera">جاري البحث عن رمز QR…</string>
+    <string name="qr_status_connecting_overlay">جاري الربط مع الجهاز المستقبِل…</string>
+    <string name="send_searching_nearby_title">جاري البحث عن الأجهزة القريبة…</string>
+    <string name="send_searching_nearby_subtitle">تأكد من فتح وضع الاستقبال على الجهاز الآخر.</string>
+    <string name="send_connecting_peer_title">جاري الربط بالجهاز…</string>
+    <string name="send_connecting_peer_subtitle">جاري التحقق من القناة المشفّرة وانتظار موافقة المستقبِل.</string>
+    <string name="receive_waiting_searching_banner">جاري البحث وانتظار مسح رمز QR من المُرسِل…</string>
+    <string name="receive_linking_sender_banner">جاري الربط والمصادقة مع الجهاز المُرسِل…</string>
+    <string name="home_unified_transfer_hint">استخدم إرسال أو استقبال أعلاه للربط عبر رمز QR أو نقطة الاتصال المحلية أو Wi-Fi.</string>
 </resources>
 
 
