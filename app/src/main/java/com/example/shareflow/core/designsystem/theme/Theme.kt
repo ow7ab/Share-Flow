@@ -10,11 +10,8 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidedValue
@@ -100,6 +97,12 @@ object ShareFlowDesign {
         @ReadOnlyComposable
         get() = LocalShareFlowSemanticColors.current
 
+    val brandColors: ShareFlowBrandColors
+        get() = ShareFlowBrandColors
+
+    val brandGradients: ShareFlowBrandGradients
+        get() = ShareFlowBrandGradients
+
     val shapes: ShareFlowShapeTokens
         @Composable
         @ReadOnlyComposable
@@ -137,12 +140,6 @@ fun ShareFlowTheme(
     appLanguage: AppLanguage = AppLanguage.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-
     val baseContext = LocalContext.current
     val baseConfig = LocalConfiguration.current
     val hostActivity = LocalShareFlowHostActivity.current ?: remember(baseContext) { baseContext.findActivity() }
@@ -201,18 +198,10 @@ fun ShareFlowTheme(
         LayoutDirection.Ltr
     }
 
-    val targetColorScheme = remember(darkTheme, useDynamicColor, accentColor, baseContext) {
-        when {
-            useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                if (darkTheme) dynamicDarkColorScheme(baseContext) else dynamicLightColorScheme(baseContext)
-            }
-            darkTheme -> shareFlowDarkColorScheme(accentColor)
-            else -> shareFlowLightColorScheme(accentColor)
-        }
-    }
-
+    // Enforce the mandatory Official Share Flow Brand Color System consistently across all screens.
+    val targetColorScheme = ShareFlowBrandColorScheme
     val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme)
-    val semanticColors = if (darkTheme) DarkShareFlowSemanticColors else LightShareFlowSemanticColors
+    val semanticColors = OfficialShareFlowSemanticColors
     val typography = if (activeLocale.language == "ar") {
         ShareFlowArabicTypography
     } else {

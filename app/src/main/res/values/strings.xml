@@ -1185,6 +1185,12 @@
     <string name="settings_feedback_update_url_saved">Cloud update portal URL saved.</string>
     <string name="settings_feedback_update_install_perm">Allow ShareFlow to install verified updates in Android Settings, then tap Install again.</string>
     <string name="settings_feedback_update_install_failed">Unable to open the Android package installer for this update.</string>
+
+    <!-- Quick Open & App Transfer Visual Progress -->
+    <string name="receive_app_quick_open_action">Quick Open</string>
+    <string name="receive_app_quick_open_not_installed">Install this app first to open it.</string>
+    <string name="receive_app_quick_open_failed">Unable to launch this app right now.</string>
+    <string name="transfer_app_progress_cd">%1$s transfer progress %2$d%%</string>
 </resources>
 
 

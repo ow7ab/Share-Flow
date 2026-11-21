@@ -66,6 +66,8 @@ import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.components.TransferCard
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -170,6 +172,7 @@ fun HomeDashboardContent(
                                     icon = Icons.AutoMirrored.Filled.Send,
                                     containerColor = semantic.sendAccent,
                                     contentColor = semantic.onSendAccent,
+                                    useSignatureBorder = true,
                                     testTag = "home_send_button",
                                     onClick = { onNavigateToRoute(ShareFlowRoutes.SEND) },
                                     modifier = Modifier.weight(1f)
@@ -180,6 +183,7 @@ fun HomeDashboardContent(
                                     icon = Icons.Filled.CloudDownload,
                                     containerColor = semantic.receiveAccent,
                                     contentColor = semantic.onReceiveAccent,
+                                    useSignatureBorder = false,
                                     testTag = "home_receive_button",
                                     onClick = { onNavigateToRoute(ShareFlowRoutes.RECEIVE) },
                                     modifier = Modifier.weight(1f)
@@ -467,6 +471,7 @@ private fun HeroIdentityCard(
             .height(184.dp)
             .testTag("home_hero_card"),
         shape = ShareFlowDesign.shapes.featuredCard,
+        border = BorderStroke(1.dp, ShareFlowBrandGradients.signatureBorder(alpha = 0.45f)),
         elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.raised)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -508,14 +513,15 @@ private fun HeroIdentityCard(
                         )
                         StatusPill(
                             label = statusText,
-                            containerColor = Color(0x334DE0FF),
-                            contentColor = Color(0xFFC5F2FF),
+                            containerColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.78f),
+                            contentColor = ShareFlowBrandColors.SoftCream,
                             modifier = Modifier.testTag("home_connection_status")
                         )
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0x33FFFFFF)
+                        color = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.62f),
+                        border = BorderStroke(1.dp, ShareFlowBrandColors.SkyBlue.copy(alpha = 0.38f))
                     ) {
                         IconButton(
                             onClick = onSettingsClick,
@@ -526,7 +532,7 @@ private fun HeroIdentityCard(
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = stringResource(R.string.cd_open_settings),
-                                tint = Color.White
+                                tint = ShareFlowBrandColors.SoftCream
                             )
                         }
                     }
@@ -540,18 +546,18 @@ private fun HeroIdentityCard(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
-                            color = Color.White
+                            color = ShareFlowBrandColors.InkOnDeepNavy
                         )
                         Text(
                             text = "TCP :${ShareFlowFormatters.formatInteger(port.toLong(), locale)}",
                             style = ShareFlowMonoStyle,
-                            color = Color(0xCCFFFFFF)
+                            color = ShareFlowBrandColors.GoldenYellow
                         )
                     }
                     Text(
                         text = stringResource(R.string.home_device_identity_format, deviceName),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xDCE7EDF8),
+                        color = ShareFlowBrandColors.SoftCream.copy(alpha = 0.92f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.testTag("home_device_name_text")
@@ -569,6 +575,7 @@ private fun PrimaryActionTile(
     icon: ImageVector,
     containerColor: Color,
     contentColor: Color,
+    useSignatureBorder: Boolean,
     testTag: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -583,6 +590,11 @@ private fun PrimaryActionTile(
         shape = MaterialTheme.shapes.large,
         color = containerColor,
         contentColor = contentColor,
+        border = if (useSignatureBorder) {
+            BorderStroke(1.4.dp, ShareFlowBrandGradients.signatureBorder(alpha = 0.9f))
+        } else {
+            BorderStroke(1.dp, ShareFlowBrandColors.SoftCream.copy(alpha = 0.45f))
+        },
         tonalElevation = ShareFlowDesign.elevation.raised
     ) {
         Row(

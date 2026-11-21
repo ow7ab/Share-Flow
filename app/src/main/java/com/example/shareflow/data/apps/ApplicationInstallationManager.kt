@@ -723,6 +723,26 @@ class ApplicationInstallationManager(
         PackageInfoCompat.getLongVersionCode(info)
     }.getOrNull()
 
+    /**
+     * Resolves a safe launch Intent for an installed package so the user can immediately open
+     * a received application right after Android finishes installing it.
+     */
+    fun resolveLaunchIntent(packageName: String?): Intent? {
+        val pkg = packageName?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching {
+            appContext.packageManager.getLaunchIntentForPackage(pkg)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }.getOrNull()
+    }
+
+    fun isAppLaunchable(packageName: String?): Boolean = resolveLaunchIntent(packageName) != null
+
+    fun resolvePackageNameForFile(apkFile: File): String? {
+        if (!apkFile.exists() || !apkFile.isFile) return null
+        return runCatching { apkArchiveInspector.inspectApkArchive(apkFile)?.packageName }.getOrNull()
+    }
+
     private fun computeSha256(file: File): String? = runCatching {
         FileInputStream(file).use { stream ->
             when (val res = checksumVerifier.computeSha256(stream)) {

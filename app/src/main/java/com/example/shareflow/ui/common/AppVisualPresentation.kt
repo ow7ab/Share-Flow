@@ -5,14 +5,25 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.util.LruCache
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
@@ -20,22 +31,43 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.R
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.FileSource
 import com.example.shareflow.domain.model.LocalFileEntry
@@ -44,6 +76,7 @@ import com.example.shareflow.domain.model.TransferItem
 import com.example.shareflow.domain.model.TransferState
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -121,6 +154,31 @@ object AppIconBitmapCache {
                 appInfo.sourceDir = resolvedFile.absolutePath
                 appInfo.publicSourceDir = resolvedFile.absolutePath
                 pm.getApplicationLabel(appInfo)?.toString()?.trim()?.takeIf { it.isNotBlank() }
+            }.getOrNull()
+        }
+    }
+
+    private val packageNameCache = LruCache<String, String>(96)
+
+    @Suppress("DEPRECATION")
+    suspend fun loadPackageNameForApkPathOrUri(context: Context, pathOrUri: String): String? {
+        val resolvedFile = resolveLocalApkFile(pathOrUri) ?: return null
+        val key = "${resolvedFile.absolutePath}:${resolvedFile.lastModified()}"
+        synchronized(packageNameCache) { packageNameCache.get(key) }?.let { return it }
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val pm = context.packageManager
+                val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.getPackageArchiveInfo(
+                        resolvedFile.absolutePath,
+                        PackageManager.PackageInfoFlags.of(0L)
+                    )
+                } else {
+                    pm.getPackageArchiveInfo(resolvedFile.absolutePath, 0)
+                } ?: return@runCatching null
+                val pkg = pkgInfo.packageName?.takeIf { it.isNotBlank() } ?: return@runCatching null
+                synchronized(packageNameCache) { packageNameCache.put(key, pkg) }
+                pkg
             }.getOrNull()
         }
     }
@@ -381,6 +439,8 @@ object TransferDisplayPresentation {
 /**
  * Clean visual avatar for transferring/received items:
  * - Renders actual extracted APK/installed app icon for Android apps.
+ * - Optionally overlays a circular progress indicator directly on top of the app icon during
+ *   active file transfer to visually represent completion percentage.
  * - Renders smooth Coil thumbnail for photos and videos.
  * - Renders crisp Material 3 category icon for documents, audio, archives, and other files.
  */
@@ -388,6 +448,8 @@ object TransferDisplayPresentation {
 fun TransferItemVisualAvatar(
     item: TransferDisplayItem,
     size: Dp = 46.dp,
+    showCircularProgressOverlay: Boolean = false,
+    progressOverlayTestTag: String? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -409,6 +471,21 @@ fun TransferItemVisualAvatar(
     } else {
         null
     }
+
+    val shouldRenderOverlay = showCircularProgressOverlay &&
+        item.isApp &&
+        item.state != TransferState.COMPLETED &&
+        item.state != TransferState.CANCELLED &&
+        item.state != TransferState.FAILED
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = item.progressFraction.coerceIn(0f, 1f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "app_icon_circular_progress_${item.key}"
+    )
 
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -475,6 +552,196 @@ fun TransferItemVisualAvatar(
                             MaterialTheme.colorScheme.primary
                         },
                         modifier = Modifier.size(size * 0.54f)
+                    )
+                }
+            }
+
+            if (shouldRenderOverlay) {
+                val pctInt = (animatedProgress * 100f).toInt().coerceIn(0, 100)
+                val progressCd = stringResource(R.string.transfer_app_progress_cd, item.displayTitle, pctInt)
+                val signatureSweep = Brush.sweepGradient(ShareFlowBrandGradients.SignatureStops)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f))
+                        .semantics {
+                            contentDescription = progressCd
+                            progressBarRangeInfo = ProgressBarRangeInfo(animatedProgress, 0f..1f)
+                        }
+                        .testTag(progressOverlayTestTag ?: "transfer_app_icon_progress_${item.key}")
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(if (size >= 50.dp) 4.dp else 3.dp)
+                    ) {
+                        val strokePx = (if (size >= 50.dp) 3.dp else 2.5.dp).toPx()
+                        val inset = strokePx / 2f
+                        val arcSize = Size(
+                            width = (this.size.width - strokePx).coerceAtLeast(1f),
+                            height = (this.size.height - strokePx).coerceAtLeast(1f)
+                        )
+                        val topLeft = Offset(inset, inset)
+                        // Subtle Sky Blue circular track
+                        drawArc(
+                            color = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.28f),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                        )
+                        // Official Share Flow Signature Gradient arc
+                        val sweep = (animatedProgress * 360f).coerceIn(0f, 360f)
+                        if (sweep > 0.5f) {
+                            drawArc(
+                                brush = signatureSweep,
+                                startAngle = -90f,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                topLeft = topLeft,
+                                size = arcSize,
+                                style = Stroke(width = strokePx + 0.6.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "$pctInt%",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = if (size >= 50.dp) 11.sp else 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 12.sp
+                        ),
+                        color = ShareFlowBrandColors.SoftCream,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Animated application icon for received apps appearing in the receiving device's transfer history.
+ * Plays a crisp spring scale-up entrance animation paired with a subtle radial brand glow halo
+ * (Sky Blue -> Golden Yellow over Deep Navy).
+ */
+@Composable
+fun ReceivedHistoryAppIcon(
+    apkPathOrUri: String?,
+    appDisplayName: String,
+    recordKey: String,
+    iconSize: Dp = 44.dp,
+    modifier: Modifier = Modifier
+) {
+    val appIcon = rememberAppIconBitmap(apkPathOrUri = apkPathOrUri)
+    val glowPrimary = ShareFlowBrandColors.SkyBlue
+    val glowSecondary = ShareFlowBrandColors.GoldenYellow
+
+    val scaleAnim = remember(recordKey) { Animatable(0.76f) }
+    val glowAlphaAnim = remember(recordKey) { Animatable(0f) }
+
+    LaunchedEffect(recordKey) {
+        launch {
+            scaleAnim.animateTo(
+                targetValue = 1.0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        }
+        launch {
+            glowAlphaAnim.animateTo(
+                targetValue = 0.44f,
+                animationSpec = tween(durationMillis = 260)
+            )
+            glowAlphaAnim.animateTo(
+                targetValue = 0.18f,
+                animationSpec = tween(durationMillis = 520)
+            )
+        }
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(iconSize + 10.dp)
+            .drawBehind {
+                val glowAlpha = glowAlphaAnim.value
+                if (glowAlpha > 0.01f) {
+                    val radius = (size.minDimension / 2f) * 1.12f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                glowPrimary.copy(alpha = glowAlpha),
+                                glowSecondary.copy(alpha = glowAlpha * 0.42f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = radius
+                        ),
+                        radius = radius,
+                        center = center
+                    )
+                }
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(iconSize)
+                .graphicsLayer {
+                    scaleX = scaleAnim.value
+                    scaleY = scaleAnim.value
+                }
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = glowPrimary.copy(alpha = (glowAlphaAnim.value * 1.15f).coerceIn(0.16f, 0.52f))
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (appIcon != null) {
+                        Image(
+                            bitmap = appIcon,
+                            contentDescription = appDisplayName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(MaterialTheme.shapes.small)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Android,
+                            contentDescription = appDisplayName,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(iconSize * 0.56f)
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondary,
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.surfaceContainerLow),
+                modifier = Modifier
+                    .size(18.dp)
+                    .align(Alignment.BottomEnd)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDownward,
+                        contentDescription = stringResource(R.string.history_direction_received),
+                        tint = MaterialTheme.colorScheme.onSecondary,
+                        modifier = Modifier.size(11.dp)
                     )
                 }
             }

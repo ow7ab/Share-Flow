@@ -37,8 +37,9 @@ import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.components.TransferCard
 import com.example.shareflow.core.designsystem.components.TransferProgressCard
 import com.example.shareflow.core.designsystem.theme.DarkColorScheme
-import com.example.shareflow.core.designsystem.theme.EmeraldPrimaryLight
 import com.example.shareflow.core.designsystem.theme.LightColorScheme
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
@@ -251,9 +252,12 @@ class ShareFlowDesignSystemTest {
     }
 
     @Test
-    fun `applies Arabic RTL layout direction localized strings and user accent color`() {
+    fun `applies Arabic RTL layout direction localized strings and official Share Flow brand palette`() {
         var capturedDirection: LayoutDirection? = null
         var capturedPrimary: Color? = null
+        var capturedBackground: Color? = null
+        var capturedSecondary: Color? = null
+        var capturedTertiary: Color? = null
 
         composeTestRule.setContent {
             ShareFlowTheme(
@@ -264,6 +268,9 @@ class ShareFlowDesignSystemTest {
             ) {
                 capturedDirection = LocalLayoutDirection.current
                 capturedPrimary = MaterialTheme.colorScheme.primary
+                capturedBackground = MaterialTheme.colorScheme.background
+                capturedSecondary = MaterialTheme.colorScheme.secondary
+                capturedTertiary = MaterialTheme.colorScheme.tertiary
                 Text(
                     text = stringResource(R.string.settings_title),
                     modifier = Modifier.testTag("rtl_settings_title")
@@ -273,8 +280,16 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Rtl, capturedDirection)
-        assertEquals(EmeraldPrimaryLight, capturedPrimary)
-        assertNotEquals(LightColorScheme.primary, DarkColorScheme.primary)
+        assertEquals(Color(0xFF0A1821), capturedBackground)
+        assertEquals(Color(0xFF1D59BB), capturedPrimary)
+        assertEquals(Color(0xFF76B9FF), capturedSecondary)
+        assertEquals(Color(0xFFFEBD19), capturedTertiary)
+        assertEquals(Color(0xFFFEF3B3), ShareFlowBrandColors.SoftCream)
+        assertEquals(
+            listOf(Color(0xFF1D59BB), Color(0xFF76B9FF), Color(0xFFFEF3B3), Color(0xFFFEBD19)),
+            ShareFlowBrandGradients.SignatureStops
+        )
+        assertEquals(LightColorScheme.primary, DarkColorScheme.primary)
         composeTestRule.onNodeWithTag("rtl_settings_title").assertTextEquals("الإعدادات")
 
         val arabicSize = ShareFlowFormatters.formatBytes(2048L, Locale.forLanguageTag("ar"))

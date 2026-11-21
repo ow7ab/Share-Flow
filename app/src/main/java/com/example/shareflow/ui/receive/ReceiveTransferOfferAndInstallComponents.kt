@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
@@ -27,7 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -197,10 +202,13 @@ fun ReceivedAppsInstallerCard(
         }
     }
 
-    // Automatically resume pending install when user returns from Android's Install Unknown Apps Settings
+    var resumeTick by remember { mutableIntStateOf(0) }
+
+    // Automatically resume pending install & refresh Quick Open state when user returns from Android installer
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                resumeTick++
                 scope.launch {
                     installationManager.resumePendingInstallIfPermitted()
                 }
@@ -294,7 +302,11 @@ fun ReceivedAppsInstallerCard(
                 }
 
                 is AppInstallSessionState.Succeeded -> {
+                    val launchIntent = remember(state.packageName, resumeTick) {
+                        installationManager.resolveLaunchIntent(state.packageName)
+                    }
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
                     ) {
@@ -307,8 +319,17 @@ fun ReceivedAppsInstallerCard(
                         Text(
                             text = stringResource(R.string.receive_app_install_success, state.appName),
                             style = MaterialTheme.typography.bodySmall,
-                            color = semantic.verifiedBadge
+                            color = semantic.verifiedBadge,
+                            modifier = Modifier.weight(1f)
                         )
+                        if (launchIntent != null) {
+                            TextButton(
+                                onClick = { launchSafely(launchIntent) },
+                                modifier = Modifier.testTag("receive_install_success_quick_open")
+                            ) {
+                                Text(text = stringResource(R.string.receive_app_quick_open_action))
+                            }
+                        }
                     }
                 }
 
@@ -350,63 +371,109 @@ fun ReceivedAppsInstallerCard(
 
             installable.take(5).forEach { apk ->
                 val apkIcon = com.example.shareflow.ui.common.rememberAppIconBitmap(apkPathOrUri = apk.filePath)
+                val resolvedPackageName by produceState<String?>(
+                    initialValue = apk.packageName?.takeIf { it.isNotBlank() },
+                    key1 = apk.packageName,
+                    key2 = apk.filePath
+                ) {
+                    if (value.isNullOrBlank()) {
+                        value = com.example.shareflow.ui.common.AppIconBitmapCache
+                            .loadPackageNameForApkPathOrUri(context, apk.filePath)
+                    }
+                }
+                val launchIntent = remember(resolvedPackageName, installState, resumeTick) {
+                    installationManager.resolveLaunchIntent(resolvedPackageName)
+                }
+                val isJustInstalled = installState is AppInstallSessionState.Succeeded &&
+                    !resolvedPackageName.isNullOrBlank() &&
+                    (installState as AppInstallSessionState.Succeeded).packageName == resolvedPackageName
+                val canQuickOpen = launchIntent != null || isJustInstalled
+
                 val cleanLabel = apk.appLabel?.takeIf { it.isNotBlank() }
                     ?: com.example.shareflow.ui.common.TransferDisplayPresentation.cleanAppDisplayName(apk.fileName)
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(spacing.xs)
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                        modifier = Modifier.size(44.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
                     ) {
-                        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                            if (apkIcon != null) {
-                                androidx.compose.foundation.Image(
-                                    bitmap = apkIcon,
-                                    contentDescription = cleanLabel,
-                                    modifier = Modifier.size(44.dp)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.Android,
-                                    contentDescription = cleanLabel,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                                if (apkIcon != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = apkIcon,
+                                        contentDescription = cleanLabel,
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.Android,
+                                        contentDescription = cleanLabel,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
                             }
                         }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = cleanLabel,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            val meta = listOfNotNull(
+                                apk.versionName?.let { "v$it" },
+                                ShareFlowFormatters.formatBytes(apk.fileSizeBytes, locale)
+                            ).joinToString(" • ")
+                            Text(
+                                text = meta,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = cleanLabel,
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        SecondaryActionButton(
+                            text = stringResource(R.string.receive_app_install_action),
+                            onClick = {
+                                scope.launch {
+                                    installationManager.startInstallation(apk)
+                                }
+                            },
+                            outlined = canQuickOpen,
+                            leadingIcon = Icons.Filled.InstallMobile,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("receive_install_apk_${apk.id}")
                         )
-                        val meta = listOfNotNull(
-                            apk.versionName?.let { "v$it" },
-                            ShareFlowFormatters.formatBytes(apk.fileSizeBytes, locale)
-                        ).joinToString(" • ")
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        SecondaryActionButton(
+                            text = stringResource(R.string.receive_app_quick_open_action),
+                            onClick = {
+                                val resolvedIntent = installationManager.resolveLaunchIntent(resolvedPackageName)
+                                if (resolvedIntent != null) {
+                                    launchSafely(resolvedIntent)
+                                }
+                            },
+                            enabled = canQuickOpen,
+                            outlined = !canQuickOpen,
+                            leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("receive_quick_open_apk_${apk.id}")
                         )
                     }
-                    SecondaryActionButton(
-                        text = stringResource(R.string.receive_app_install_action),
-                        onClick = {
-                            scope.launch {
-                                installationManager.startInstallation(apk)
-                            }
-                        },
-                        outlined = false,
-                        leadingIcon = Icons.Filled.InstallMobile,
-                        modifier = Modifier.testTag("receive_install_apk_${apk.id}")
-                    )
                 }
             }
         }

@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -62,6 +63,8 @@ import com.example.shareflow.domain.model.PeerDevice
 import com.example.shareflow.domain.model.TransferDirection
 import com.example.shareflow.domain.model.TransferRecord
 import com.example.shareflow.domain.model.TransferStatus
+import com.example.shareflow.ui.common.ReceivedHistoryAppIcon
+import com.example.shareflow.ui.common.TransferDisplayPresentation
 
 /**
  * Reusable Material 3 card displaying a real [TransferRecord] with direction, size, peer, and verification state.
@@ -102,27 +105,41 @@ fun TransferCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = if (isSent) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.secondaryContainer
-                },
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isSent) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                        contentDescription = stringResource(
-                            if (isSent) R.string.history_direction_sent else R.string.history_direction_received
-                        ),
-                        tint = if (isSent) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        }
-                    )
+            val isReceivedApp = !isSent && (
+                record.mimeType.equals("application/vnd.android.package-archive", ignoreCase = true) ||
+                    record.fileName.endsWith(".apk", ignoreCase = true)
+                )
+            if (isReceivedApp) {
+                ReceivedHistoryAppIcon(
+                    apkPathOrUri = record.localUri,
+                    appDisplayName = TransferDisplayPresentation.cleanAppDisplayName(record.fileName),
+                    recordKey = record.id,
+                    iconSize = 44.dp,
+                    modifier = Modifier.testTag("history_received_app_icon_${record.id}")
+                )
+            } else {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = if (isSent) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isSent) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                            contentDescription = stringResource(
+                                if (isSent) R.string.history_direction_sent else R.string.history_direction_received
+                            ),
+                            tint = if (isSent) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            }
+                        )
+                    }
                 }
             }
 

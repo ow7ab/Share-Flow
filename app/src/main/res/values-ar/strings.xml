@@ -1185,6 +1185,12 @@
     <string name="settings_feedback_update_url_saved">تم حفظ رابط بوابة التحديث السحابي.</string>
     <string name="settings_feedback_update_install_perm">اسمح لـ ShareFlow بتثبيت التحديثات الموثّقة في إعدادات Android ثم اضغط تثبيت مجدداً.</string>
     <string name="settings_feedback_update_install_failed">تعذّر فتح مثبّت حزم Android لهذا التحديث.</string>
+
+    <!-- الفتح السريع ومؤشر التقدم الدائري لأيقونة التطبيق -->
+    <string name="receive_app_quick_open_action">فتح سريع</string>
+    <string name="receive_app_quick_open_not_installed">ثبّت التطبيق أولاً لفتحه.</string>
+    <string name="receive_app_quick_open_failed">تعذّر فتح التطبيق حالياً.</string>
+    <string name="transfer_app_progress_cd">تقدّم نقل %1$s: %2$d%%</string>
 </resources>
 
 

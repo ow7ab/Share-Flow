@@ -304,7 +304,11 @@ fun CustomFileViewerDialog(
             modifier = modifier
                 .fillMaxSize()
                 .testTag("custom_file_viewer_dialog"),
-            color = if (isMediaDarkStage) Color(0xFF0E1116) else MaterialTheme.colorScheme.background
+            color = if (isMediaDarkStage) {
+                com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy
+            } else {
+                MaterialTheme.colorScheme.background
+            }
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Top Bar
@@ -500,7 +504,7 @@ fun CustomFileViewerDialog(
                 // Bottom Action Dock: Send via ShareFlow + Move to Private Vault (+ Install APK)
                 Surface(
                     color = if (isMediaDarkStage) {
-                        Color(0xFF141922)
+                        com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.GlassSurfaceLow
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },

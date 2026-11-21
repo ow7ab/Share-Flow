@@ -23,11 +23,15 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 
 /**
- * Primary Material 3 filled action button meeting 48dp accessibility touch-target guidelines.
- * Supports optional leading icon and indeterminate loading feedback.
+ * Primary Material 3 filled action button styled with the Official Share Flow Brand System:
+ * - Royal Blue (#1D59BB) primary container with high-contrast white ink.
+ * - Selective Signature Gradient luminous edge highlight (Royal Blue -> Sky Blue -> Soft Cream -> Golden Yellow).
+ * - Meets 48dp accessibility touch-target guidelines.
  */
 @Composable
 fun PrimaryActionButton(
@@ -36,17 +40,32 @@ fun PrimaryActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     isLoading: Boolean = false,
-    leadingIcon: ImageVector? = null
+    leadingIcon: ImageVector? = null,
+    useSignatureBorder: Boolean = true
 ) {
     val spacing = ShareFlowDesign.spacing
+    val isInteractive = enabled && !isLoading
     Button(
         onClick = onClick,
-        enabled = enabled && !isLoading,
+        enabled = isInteractive,
         shape = ShareFlowDesign.shapes.button,
         contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
+        border = if (useSignatureBorder && isInteractive) {
+            BorderStroke(
+                width = 1.25.dp,
+                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.85f)
+            )
+        } else {
+            BorderStroke(
+                width = 1.dp,
+                color = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.22f)
+            )
+        },
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.36f),
+            disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.65f)
         ),
         modifier = modifier
             .heightIn(min = spacing.minTouchTarget)
@@ -57,13 +76,14 @@ fun PrimaryActionButton(
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onPrimary
+                color = ShareFlowBrandColors.SoftCream
             )
             Spacer(modifier = Modifier.width(spacing.xs))
         } else if (leadingIcon != null) {
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
+                tint = if (isInteractive) ShareFlowBrandColors.SoftCream else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f),
                 modifier = Modifier.size(spacing.iconSmall)
             )
             Spacer(modifier = Modifier.width(spacing.xs))
@@ -78,7 +98,8 @@ fun PrimaryActionButton(
 }
 
 /**
- * Secondary Material 3 action button supporting tonal or outlined styling and destructive emphasis.
+ * Secondary Material 3 action button styled with Sky Blue (#76B9FF) secondary accents,
+ * translucent Liquid Glass depth, and crisp contrast.
  */
 @Composable
 fun SecondaryActionButton(
@@ -94,7 +115,7 @@ fun SecondaryActionButton(
     val contentColor = if (isDestructive) {
         MaterialTheme.colorScheme.error
     } else {
-        MaterialTheme.colorScheme.primary
+        MaterialTheme.colorScheme.secondary
     }
 
     if (outlined) {
@@ -103,13 +124,17 @@ fun SecondaryActionButton(
             enabled = enabled,
             shape = ShareFlowDesign.shapes.button,
             contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = ShareFlowBrandColors.GlassSurfaceLow.copy(alpha = 0.72f),
+                contentColor = contentColor,
+                disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.45f)
+            ),
             border = BorderStroke(
                 width = 1.dp,
-                color = if (isDestructive) {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                } else {
-                    MaterialTheme.colorScheme.outline
+                color = when {
+                    !enabled -> ShareFlowBrandColors.SkyBlue.copy(alpha = 0.16f)
+                    isDestructive -> MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
+                    else -> ShareFlowBrandColors.SkyBlue.copy(alpha = 0.48f)
                 }
             ),
             modifier = modifier
@@ -138,6 +163,14 @@ fun SecondaryActionButton(
             enabled = enabled,
             shape = ShareFlowDesign.shapes.button,
             contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (isDestructive) {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
+                } else {
+                    ShareFlowBrandColors.SkyBlue.copy(alpha = 0.34f)
+                }
+            ),
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = if (isDestructive) {
                     MaterialTheme.colorScheme.errorContainer
@@ -148,7 +181,9 @@ fun SecondaryActionButton(
                     MaterialTheme.colorScheme.onErrorContainer
                 } else {
                     MaterialTheme.colorScheme.onSecondaryContainer
-                }
+                },
+                disabledContainerColor = ShareFlowBrandColors.GlassSurfaceLow.copy(alpha = 0.55f),
+                disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.45f)
             ),
             modifier = modifier
                 .heightIn(min = spacing.minTouchTarget)

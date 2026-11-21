@@ -358,7 +358,7 @@ fun RealQrCodeView(
             Icon(
                 imageVector = Icons.Filled.QrCode2,
                 contentDescription = stringResource(R.string.qr_pairing_title),
-                tint = Color(0xFF0B1A3C),
+                tint = com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy,
                 modifier = Modifier.size(64.dp)
             )
         }
@@ -368,7 +368,7 @@ fun RealQrCodeView(
     Canvas(modifier = modifier.aspectRatio(1f)) {
         val cellW = size.width / matrix.width.toFloat()
         val cellH = size.height / matrix.height.toFloat()
-        val moduleColor = Color(0xFF0B1A3C)
+        val moduleColor = com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy
         drawRect(color = Color.White, size = size)
 
         for (y in 0 until matrix.height) {

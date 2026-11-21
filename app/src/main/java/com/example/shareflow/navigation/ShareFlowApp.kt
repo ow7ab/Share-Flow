@@ -1,26 +1,58 @@
 package com.example.shareflow.navigation
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -33,6 +65,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.AppSettings
@@ -161,12 +195,18 @@ fun ShareFlowApp(
             }
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
             val useNavigationRail = maxWidth >= 600.dp
 
             Row(modifier = Modifier.fillMaxSize()) {
                 if (useNavigationRail && isTopLevel) {
                     NavigationRail(
+                        containerColor = ShareFlowBrandColors.GlassNavBackground,
+                        contentColor = ShareFlowBrandColors.SoftCream,
                         modifier = Modifier.testTag("shareflow_navigation_rail")
                     ) {
                         TopLevelDestination.entries.forEach { destination ->
@@ -174,6 +214,13 @@ fun ShareFlowApp(
                             NavigationRailItem(
                                 selected = selected,
                                 onClick = { navigateTopLevel(destination.route) },
+                                colors = NavigationRailItemDefaults.colors(
+                                    selectedIconColor = ShareFlowBrandColors.SoftCream,
+                                    selectedTextColor = ShareFlowBrandColors.SoftCream,
+                                    indicatorColor = ShareFlowBrandColors.RoyalBlue,
+                                    unselectedIconColor = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.80f),
+                                    unselectedTextColor = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.78f)
+                                ),
                                 icon = {
                                     Icon(
                                         imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
@@ -189,28 +236,14 @@ fun ShareFlowApp(
 
                 Scaffold(
                     modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.background,
                     contentWindowInsets = WindowInsets.safeDrawing,
                     bottomBar = {
                         if (!useNavigationRail && isTopLevel) {
-                            NavigationBar(
-                                modifier = Modifier.testTag("shareflow_navigation_bar")
-                            ) {
-                                TopLevelDestination.entries.forEach { destination ->
-                                    val selected = currentRoute == destination.route
-                                    NavigationBarItem(
-                                        selected = selected,
-                                        onClick = { navigateTopLevel(destination.route) },
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                                                contentDescription = stringResource(destination.labelRes)
-                                            )
-                                        },
-                                        label = { Text(text = stringResource(destination.labelRes)) },
-                                        modifier = Modifier.testTag(destination.testTag)
-                                    )
-                                }
-                            }
+                            ShareFlowFloatingGlassNavBar(
+                                currentRoute = currentRoute,
+                                onNavigateTopLevel = ::navigateTopLevel
+                            )
                         }
                     }
                 ) { innerPadding ->
@@ -221,6 +254,145 @@ fun ShareFlowApp(
                             .fillMaxSize()
                             .padding(innerPadding)
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Floating Liquid Glass bottom navigation capsule implementing the Official Share Flow Brand System:
+ * - Translucent Deep Navy (#0A1821) glass surface
+ * - Subtle Sky Blue (#76B9FF) outer border
+ * - Royal Blue (#1D59BB) active-state pill with Signature Gradient hairline
+ * - Soft Cream (#FEF3B3) selected icon & label accents
+ * - Subtle Golden Yellow (#FEBD19) active highlight dot
+ */
+@Composable
+private fun ShareFlowFloatingGlassNavBar(
+    currentRoute: String?,
+    onNavigateTopLevel: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val capsuleShape = RoundedCornerShape(28.dp)
+    val pillShape = RoundedCornerShape(20.dp)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = capsuleShape,
+            color = ShareFlowBrandColors.GlassNavBackground,
+            border = BorderStroke(1.dp, ShareFlowBrandColors.GlassNavBorder),
+            shadowElevation = 10.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .testTag("shareflow_navigation_bar")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TopLevelDestination.entries.forEach { destination ->
+                    val isSelected = currentRoute == destination.route
+                    val label = stringResource(destination.labelRes)
+                    val iconTint by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            ShareFlowBrandColors.SoftCream
+                        } else {
+                            ShareFlowBrandColors.SkyBlue.copy(alpha = 0.78f)
+                        },
+                        animationSpec = tween(durationMillis = 180),
+                        label = "nav_icon_tint_${destination.route}"
+                    )
+                    val textTint by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            ShareFlowBrandColors.SoftCream
+                        } else {
+                            ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.82f)
+                        },
+                        animationSpec = tween(durationMillis = 180),
+                        label = "nav_text_tint_${destination.route}"
+                    )
+                    val indicatorDotWidth by animateDpAsState(
+                        targetValue = if (isSelected) 16.dp else 0.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "nav_dot_${destination.route}"
+                    )
+
+                    Surface(
+                        shape = pillShape,
+                        color = if (isSelected) {
+                            ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.92f)
+                        } else {
+                            Color.Transparent
+                        },
+                        border = if (isSelected) {
+                            BorderStroke(
+                                width = 1.dp,
+                                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.72f)
+                            )
+                        } else {
+                            null
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(pillShape)
+                            .minimumInteractiveComponentSize()
+                            .semantics { selected = isSelected }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = androidx.compose.material3.ripple(
+                                    color = ShareFlowBrandColors.SkyBlue
+                                ),
+                                role = Role.Tab,
+                                onClick = { onNavigateTopLevel(destination.route) }
+                            )
+                            .testTag(destination.testTag)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 7.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) destination.selectedIcon else destination.unselectedIcon,
+                                contentDescription = label,
+                                tint = iconTint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                ),
+                                color = textTint,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (indicatorDotWidth > 1.dp) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(indicatorDotWidth)
+                                        .height(2.5.dp)
+                                        .clip(CircleShape)
+                                        .background(ShareFlowBrandColors.GoldenYellow)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

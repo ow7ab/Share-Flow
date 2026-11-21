@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
@@ -40,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,8 +49,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,6 +71,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
@@ -75,6 +83,7 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
@@ -123,7 +132,82 @@ fun TransferProgressScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val installState by container.applicationInstallationManager.installState.collectAsStateWithLifecycle()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
     var previewFile by remember { mutableStateOf<LocalFileEntry?>(null) }
+    var resumeTick by remember { mutableIntStateOf(0) }
+    val resolvedPackagesByKey = remember { mutableStateMapOf<String, String>() }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                resumeTick++
+                scope.launch {
+                    container.applicationInstallationManager.resumePendingInstallIfPermitted()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(uiState.recentCompletedSessions, receivedApks) {
+        uiState.recentCompletedSessions
+            .filter { it.direction == TransferDirection.RECEIVED && it.state == TransferState.COMPLETED }
+            .flatMap { TransferDisplayPresentation.groupTransferItemsForDisplay(it.transferItems) }
+            .filter { it.isApp }
+            .forEach { displayItem ->
+                val matchedPkg = receivedApks.firstOrNull { apk ->
+                    val targetFile = displayItem.iconApkPathOrUri?.let(AppIconBitmapCache::resolveLocalApkFile)
+                    (targetFile != null && apk.filePath == targetFile.absolutePath) ||
+                        (!displayItem.bundleFolderName.isNullOrBlank() && apk.filePath.contains(displayItem.bundleFolderName)) ||
+                        apk.fileName.equals(displayItem.rawFileName, ignoreCase = true) ||
+                        apk.appLabel.equals(displayItem.displayTitle, ignoreCase = true)
+                }?.packageName
+
+                val pkg = matchedPkg?.takeIf { it.isNotBlank() }
+                    ?: displayItem.iconApkPathOrUri?.let {
+                        AppIconBitmapCache.loadPackageNameForApkPathOrUri(context, it)
+                    }
+                if (!pkg.isNullOrBlank()) {
+                    resolvedPackagesByKey[displayItem.key] = pkg
+                }
+            }
+    }
+
+    fun resolvePackageForDisplayItem(displayItem: TransferDisplayItem): String? {
+        resolvedPackagesByKey[displayItem.key]?.let { return it }
+        return receivedApks.firstOrNull { apk ->
+            val targetFile = displayItem.iconApkPathOrUri?.let(AppIconBitmapCache::resolveLocalApkFile)
+            (targetFile != null && apk.filePath == targetFile.absolutePath) ||
+                (!displayItem.bundleFolderName.isNullOrBlank() && apk.filePath.contains(displayItem.bundleFolderName)) ||
+                apk.fileName.equals(displayItem.rawFileName, ignoreCase = true) ||
+                apk.appLabel.equals(displayItem.displayTitle, ignoreCase = true)
+        }?.packageName
+    }
+
+    fun canQuickOpenDisplayItem(displayItem: TransferDisplayItem): Boolean {
+        // Read resumeTick & installState so Compose re-evaluates immediately after system installer completes
+        val tick = resumeTick
+        val currentInstall = installState
+        if (tick < 0) return false
+        val pkg = resolvePackageForDisplayItem(displayItem) ?: return false
+        if (currentInstall is AppInstallSessionState.Succeeded && currentInstall.packageName == pkg) {
+            return true
+        }
+        return container.applicationInstallationManager.isAppLaunchable(pkg)
+    }
+
+    fun quickOpenTransferredApp(displayItem: TransferDisplayItem) {
+        val pkg = resolvePackageForDisplayItem(displayItem) ?: return
+        val launchIntent = container.applicationInstallationManager.resolveLaunchIntent(pkg) ?: return
+        val launcher = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed } ?: context
+        val safeIntent = if (launcher === hostActivity) {
+            launchIntent
+        } else {
+            Intent(launchIntent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { launcher.startActivity(safeIntent) }
+    }
 
     LaunchedEffect(installState) {
         val state = installState
@@ -139,6 +223,8 @@ fun TransferProgressScreen(
             val launcher = hostActivity?.takeIf { !it.isFinishing && !it.isDestroyed } ?: context
             val permIntent = container.permissionManager.createManageUnknownSourcesIntent()
             runCatching { launcher.startActivity(permIntent) }
+        } else if (state is AppInstallSessionState.Succeeded) {
+            resumeTick++
         }
     }
 
@@ -165,7 +251,7 @@ fun TransferProgressScreen(
                 fileName = file.name,
                 filePath = file.absolutePath,
                 fileSizeBytes = displayItem.fileSizeBytes,
-                packageName = null,
+                packageName = resolvedPackagesByKey[displayItem.key],
                 appLabel = displayItem.displayTitle,
                 versionName = null,
                 versionCode = null,
@@ -207,6 +293,8 @@ fun TransferProgressScreen(
             }
         },
         onInstallApp = ::installTransferredApp,
+        onQuickOpenApp = ::quickOpenTransferredApp,
+        canQuickOpenApp = ::canQuickOpenDisplayItem,
         receivedApksSection = if (hasCompletedReceivedSession && receivedApks.any { it.canLaunchSystemInstaller }) {
             {
                 ReceivedAppsInstallerCard(
@@ -257,6 +345,8 @@ fun TransferProgressContent(
     onConsumeFeedback: () -> Unit,
     onViewFile: ((TransferDisplayItem) -> Unit)? = null,
     onInstallApp: ((TransferDisplayItem) -> Unit)? = null,
+    onQuickOpenApp: ((TransferDisplayItem) -> Unit)? = null,
+    canQuickOpenApp: (TransferDisplayItem) -> Boolean = { false },
     receivedApksSection: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -360,6 +450,8 @@ fun TransferProgressContent(
                             onRequestCancel = { pendingCancelSessionId = session.sessionId },
                             onViewFile = onViewFile,
                             onInstallApp = onInstallApp,
+                            onQuickOpenApp = onQuickOpenApp,
+                            canQuickOpenApp = canQuickOpenApp,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -382,6 +474,8 @@ fun TransferProgressContent(
                             onRequestCancel = { pendingCancelSessionId = session.sessionId },
                             onViewFile = onViewFile,
                             onInstallApp = onInstallApp,
+                            onQuickOpenApp = onQuickOpenApp,
+                            canQuickOpenApp = canQuickOpenApp,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -406,6 +500,8 @@ fun TransferSessionProgressCard(
     onRequestCancel: () -> Unit,
     onViewFile: ((TransferDisplayItem) -> Unit)? = null,
     onInstallApp: ((TransferDisplayItem) -> Unit)? = null,
+    onQuickOpenApp: ((TransferDisplayItem) -> Unit)? = null,
+    canQuickOpenApp: (TransferDisplayItem) -> Boolean = { false },
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -461,11 +557,13 @@ fun TransferSessionProgressCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm)
             ) {
-                Box(modifier = Modifier.size(52.dp)) {
+                Box(modifier = Modifier.size(58.dp)) {
                     if (primaryDisplayItem != null) {
                         TransferItemVisualAvatar(
                             item = primaryDisplayItem,
-                            size = 48.dp,
+                            size = 54.dp,
+                            showCircularProgressOverlay = primaryDisplayItem.isApp && primaryDisplayItem.state.isActive,
+                            progressOverlayTestTag = "transfer_session_app_icon_progress_${session.sessionId}",
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
@@ -551,17 +649,11 @@ fun TransferSessionProgressCard(
                 )
             }
 
-            // Smooth animated progress bar + clear bytes & large percentage readout
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(ShareFlowDesign.shapes.progressTrack)
-                    .testTag("transfer_progress_bar_${session.sessionId}"),
-                color = if (session.state == TransferState.COMPLETED) semantic.verifiedBadge else MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                strokeCap = StrokeCap.Round
+            // Smooth animated progress bar using the Official Share Flow Signature Gradient
+            ShareFlowSignatureProgressBar(
+                progress = animatedProgress,
+                height = 10.dp,
+                modifier = Modifier.testTag("transfer_progress_bar_${session.sessionId}")
             )
 
             Row(
@@ -613,7 +705,7 @@ fun TransferSessionProgressCard(
                 )
             }
 
-            // Clean per-item list for multi-item transfers, or direct full-width Install/View CTA for single received item
+            // Clean per-item list for multi-item transfers, or direct Install + Quick Open / View CTA for single received item
             val isReceived = session.direction == TransferDirection.RECEIVED
             if (displayItems.size > 1) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -623,21 +715,39 @@ fun TransferSessionProgressCard(
                             item = item,
                             isReceived = isReceived,
                             onViewFile = onViewFile,
-                            onInstallApp = onInstallApp
+                            onInstallApp = onInstallApp,
+                            onQuickOpenApp = onQuickOpenApp,
+                            canQuickOpen = canQuickOpenApp(item)
                         )
                     }
                 }
             } else if (isReceived && displayItems.size == 1 && displayItems.first().state == TransferState.COMPLETED) {
                 val singleItem = displayItems.first()
                 if (singleItem.isApp && onInstallApp != null) {
-                    PrimaryActionButton(
-                        text = stringResource(R.string.transfer_action_install_app),
-                        onClick = { onInstallApp(singleItem) },
-                        leadingIcon = Icons.Filled.InstallMobile,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("transfer_item_install_${singleItem.key}")
-                    )
+                    val quickOpenEnabled = onQuickOpenApp != null && canQuickOpenApp(singleItem)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        PrimaryActionButton(
+                            text = stringResource(R.string.transfer_action_install_app),
+                            onClick = { onInstallApp(singleItem) },
+                            leadingIcon = Icons.Filled.InstallMobile,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("transfer_item_install_${singleItem.key}")
+                        )
+                        SecondaryActionButton(
+                            text = stringResource(R.string.receive_app_quick_open_action),
+                            onClick = { onQuickOpenApp?.invoke(singleItem) },
+                            enabled = quickOpenEnabled,
+                            outlined = !quickOpenEnabled,
+                            leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("transfer_item_quick_open_${singleItem.key}")
+                        )
+                    }
                 } else if (!singleItem.isApp && onViewFile != null && !singleItem.localUri.isNullOrBlank()) {
                     PrimaryActionButton(
                         text = stringResource(R.string.transfer_action_view_file),
@@ -767,7 +877,9 @@ private fun TransferDisplayItemRow(
     item: TransferDisplayItem,
     isReceived: Boolean,
     onViewFile: ((TransferDisplayItem) -> Unit)?,
-    onInstallApp: ((TransferDisplayItem) -> Unit)?
+    onInstallApp: ((TransferDisplayItem) -> Unit)?,
+    onQuickOpenApp: ((TransferDisplayItem) -> Unit)? = null,
+    canQuickOpen: Boolean = false
 ) {
     val locale = ShareFlowDesign.locale
     val animatedItemProgress by animateFloatAsState(
@@ -799,7 +911,9 @@ private fun TransferDisplayItemRow(
             ) {
                 TransferItemVisualAvatar(
                     item = item,
-                    size = 40.dp
+                    size = 46.dp,
+                    showCircularProgressOverlay = item.isApp && item.state.isActive,
+                    progressOverlayTestTag = "transfer_app_icon_progress_${item.key}"
                 )
 
                 Column(
@@ -824,43 +938,101 @@ private fun TransferDisplayItemRow(
                     )
                 }
 
-                // Receiver completed action: Install App for APK/App bundles, OR View File for any other file
-                if (isReceived && item.state == TransferState.COMPLETED) {
-                    if (item.isApp && onInstallApp != null) {
+                // Receiver completed action for non-APK files inline
+                if (isReceived && item.state == TransferState.COMPLETED && !item.isApp &&
+                    onViewFile != null && !item.localUri.isNullOrBlank()
+                ) {
+                    FilledTonalButton(
+                        onClick = { onViewFile(item) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("transfer_item_view_${item.key}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.transfer_action_view_file),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            // Receiver completed action row for APKs: Install App + Quick Open side-by-side
+            if (isReceived && item.state == TransferState.COMPLETED && item.isApp && onInstallApp != null) {
+                val quickOpenEnabled = onQuickOpenApp != null && canQuickOpen
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = { onInstallApp(item) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .minimumInteractiveComponentSize()
+                            .testTag("transfer_item_install_${item.key}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.InstallMobile,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.transfer_action_install_app),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                    if (quickOpenEnabled) {
                         FilledTonalButton(
-                            onClick = { onInstallApp(item) },
+                            onClick = { onQuickOpenApp?.invoke(item) },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier
+                                .weight(1f)
                                 .minimumInteractiveComponentSize()
-                                .testTag("transfer_item_install_${item.key}")
+                                .testTag("transfer_item_quick_open_${item.key}")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.InstallMobile,
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = stringResource(R.string.transfer_action_install_app),
+                                text = stringResource(R.string.receive_app_quick_open_action),
                                 style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(start = 6.dp)
                             )
                         }
-                    } else if (!item.isApp && onViewFile != null && !item.localUri.isNullOrBlank()) {
-                        FilledTonalButton(
-                            onClick = { onViewFile(item) },
+                    } else {
+                        OutlinedButton(
+                            onClick = { onQuickOpenApp?.invoke(item) },
+                            enabled = false,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier
+                                .weight(1f)
                                 .minimumInteractiveComponentSize()
-                                .testTag("transfer_item_view_${item.key}")
+                                .testTag("transfer_item_quick_open_${item.key}")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Visibility,
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = stringResource(R.string.transfer_action_view_file),
+                                text = stringResource(R.string.receive_app_quick_open_action),
                                 style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(start = 6.dp)
                             )
                         }
@@ -869,13 +1041,9 @@ private fun TransferDisplayItemRow(
             }
 
             if (item.state != TransferState.COMPLETED) {
-                LinearProgressIndicator(
-                    progress = { animatedItemProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(5.dp)
-                        .clip(ShareFlowDesign.shapes.progressTrack),
-                    strokeCap = StrokeCap.Round
+                ShareFlowSignatureProgressBar(
+                    progress = animatedItemProgress,
+                    height = 5.dp
                 )
             }
         }
