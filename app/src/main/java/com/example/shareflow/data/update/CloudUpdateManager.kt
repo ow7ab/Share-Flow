@@ -504,7 +504,8 @@ class CloudUpdateManager(
     private val currentVersionCode: Int = BuildConfig.VERSION_CODE,
     private val currentVersionName: String = BuildConfig.VERSION_NAME,
     private val currentSdkInt: Int = Build.VERSION.SDK_INT,
-    private val expectedPackageName: String = context.packageName
+    private val expectedPackageName: String = context.packageName,
+    private val defaultManifestUrl: String = BuildConfig.CLOUD_UPDATE_MANIFEST_URL
 ) {
     private val appContext = context.applicationContext ?: context
     private val _state = MutableStateFlow<CloudUpdateState>(CloudUpdateState.Idle)
@@ -513,7 +514,7 @@ class CloudUpdateManager(
     fun resolveEffectiveManifestUrl(userConfiguredUrl: String): String {
         val custom = userConfiguredUrl.trim()
         if (custom.isNotEmpty()) return custom
-        return BuildConfig.CLOUD_UPDATE_MANIFEST_URL.trim()
+        return defaultManifestUrl.trim()
     }
 
     suspend fun checkForUpdates(manifestUrl: String): CloudUpdateState {

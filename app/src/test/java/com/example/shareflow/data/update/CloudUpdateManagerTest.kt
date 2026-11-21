@@ -59,9 +59,14 @@ class CloudUpdateManagerTest {
     """.trimIndent()
 
     @Test
-    fun `version metadata is incremented to 1_0_1 versionCode 2`() {
-        assertEquals(2, BuildConfig.VERSION_CODE)
-        assertEquals("1.0.1", BuildConfig.VERSION_NAME)
+    fun `version metadata is incremented to 1_0_2 versionCode 3 with default GitHub release manifest`() {
+        assertEquals(3, BuildConfig.VERSION_CODE)
+        assertEquals("1.0.2", BuildConfig.VERSION_NAME)
+        assertEquals(
+            "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
+            BuildConfig.CLOUD_UPDATE_MANIFEST_URL
+        )
+        assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(BuildConfig.CLOUD_UPDATE_MANIFEST_URL))
     }
 
     @Test
@@ -100,7 +105,21 @@ class CloudUpdateManagerTest {
     }
 
     @Test
-    fun `checkForUpdates returns PortalNotConfigured when no portal URL is set`() = runTest {
+    fun `checkForUpdates returns PortalNotConfigured when no portal URL or default manifest is set`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val manager = createManager(
+            dispatcher = dispatcher,
+            httpClient = FakeCloudUpdateHttpClient(),
+            inspector = FakeApkSecurityInspector(AppResult.Success(Unit)),
+            defaultManifestUrl = ""
+        )
+
+        val state = manager.checkForUpdates("")
+        assertEquals(CloudUpdateState.PortalNotConfigured, state)
+    }
+
+    @Test
+    fun `resolveEffectiveManifestUrl falls back to official GitHub Releases version json`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val manager = createManager(
             dispatcher = dispatcher,
@@ -108,8 +127,14 @@ class CloudUpdateManagerTest {
             inspector = FakeApkSecurityInspector(AppResult.Success(Unit))
         )
 
-        val state = manager.checkForUpdates("")
-        assertEquals(CloudUpdateState.PortalNotConfigured, state)
+        assertEquals(
+            "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
+            manager.resolveEffectiveManifestUrl("")
+        )
+        assertEquals(
+            "https://shareflow.sd/version.json",
+            manager.resolveEffectiveManifestUrl("https://shareflow.sd/version.json")
+        )
     }
 
     @Test
@@ -212,7 +237,8 @@ class CloudUpdateManagerTest {
         dispatcher: kotlinx.coroutines.CoroutineDispatcher,
         httpClient: CloudUpdateHttpClient,
         inspector: ApkPackageSecurityInspector,
-        currentVersionCode: Int = 2
+        currentVersionCode: Int = 2,
+        defaultManifestUrl: String = BuildConfig.CLOUD_UPDATE_MANIFEST_URL
     ): CloudUpdateManager = CloudUpdateManager(
         context = context,
         httpClient = httpClient,
@@ -221,9 +247,10 @@ class CloudUpdateManagerTest {
         permissionManager = PermissionManager(context),
         dispatchers = TestDispatcherProvider(dispatcher),
         currentVersionCode = currentVersionCode,
-        currentVersionName = "1.0.1",
+        currentVersionName = "1.0.2",
         currentSdkInt = 36,
-        expectedPackageName = context.packageName
+        expectedPackageName = context.packageName,
+        defaultManifestUrl = defaultManifestUrl
     )
 
     private class FakeCloudUpdateHttpClient(

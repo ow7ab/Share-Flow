@@ -125,10 +125,7 @@ class SmartConnectionUiRobolectricTest {
         composeTestRule.onNodeWithTag("settings_section_cloud_update").assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_update_sudan_badge").assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_update_current_version").assertIsDisplayed()
-
-        // Tapping Check for Updates before portal URL is configured displays guidance cleanly
-        composeTestRule.onNodeWithTag("settings_check_updates_button").performClick()
-        waitForTag("settings_update_not_configured_card")
-        composeTestRule.onNodeWithTag("settings_update_not_configured_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_url_input").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_check_updates_button").assertIsDisplayed()
     }
 }

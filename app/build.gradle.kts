@@ -16,10 +16,14 @@ android {
     applicationId = "com.aistudio.shareflow.kxrvnm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.0.1"
+    versionCode = 3
+    versionName = "1.0.2"
 
-    buildConfigField("String", "CLOUD_UPDATE_MANIFEST_URL", "\"\"")
+    buildConfigField(
+      "String",
+      "CLOUD_UPDATE_MANIFEST_URL",
+      "\"https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json\""
+    )
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

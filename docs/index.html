@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Share Flow — التحميل المباشر لأحدث إصدار رسمي موقّع من تطبيق مشاركة الملفات المحلي لأندرويد (Share-Flow.apk)." />
+  <title>Share Flow — التحميل المباشر لأندرويد</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="heritage-ribbon" aria-hidden="true"></div>
+  <main class="container">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SF</span>
+        <div>
+          <p class="brand-title">Share Flow</p>
+          <p class="brand-subtitle" id="brand-subtitle">مشاركة ملفات محلية فائقة السرعة • بلا إنترنت</p>
+        </div>
+      </div>
+      <button type="button" id="lang-toggle" class="lang-btn">English</button>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <span class="sudan-badge" id="sudan-badge">البوابة السودانية الرسمية للتحميل المباشر</span>
+      <h1 id="hero-title">حمّل أحدث إصدار من تطبيق Share Flow لأندرويد</h1>
+      <p class="hero-desc" id="hero-desc">
+        تطبيق أندرويد متكامل لمشاركة الصور والفيديوهات والتطبيقات والملفات بسرعة فائقة عبر شبكة Wi-Fi المحلية ورموز QR مباشرة دون الحاجة إلى إنترنت أو خوادم وسيطة.
+      </p>
+
+      <div class="download-box">
+        <div id="status-banner" class="status-banner status-loading" role="status" aria-live="polite">
+          <span id="status-spinner" class="spinner" aria-hidden="true"></span>
+          <span id="status-text">جاري التحقق من أحدث إصدار رسمي موقّع (APK)…</span>
+        </div>
+
+        <p id="private-hint" class="brand-subtitle hidden"></p>
+
+        <div class="cta-row">
+          <a
+            id="download-apk-btn"
+            class="download-btn"
+            aria-disabled="true"
+            rel="noopener noreferrer"
+          >جاري تجهيز رابط التحميل…</a>
+
+          <button type="button" id="retry-btn" class="secondary-btn hidden">إعادة الفحص</button>
+          <button type="button" id="copy-sha-btn" class="secondary-btn hidden">نسخ SHA-256</button>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="meta-label" id="meta-version-label">رقم الإصدار</span>
+            <span class="meta-value" id="meta-version-value">…</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label" id="meta-size-label">حجم ملف APK</span>
+            <span class="meta-value" id="meta-size-value">…</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label" id="meta-updated-label">تاريخ آخر تحديث</span>
+            <span class="meta-value" id="meta-updated-value">…</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label" id="meta-package-label">صيغة الملف</span>
+            <span class="meta-value" id="meta-package-value">Share-Flow.apk (تثبيت مباشر بدون ZIP)</span>
+          </div>
+        </div>
+
+        <div class="meta-item hidden" id="meta-sha-card">
+          <span class="meta-label" id="meta-sha-label">بصمة التحقق SHA-256</span>
+          <span class="meta-value mono" id="meta-sha-value"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <article class="card">
+        <h2 id="features-title">مميزات Share Flow</h2>
+        <ul class="feature-list">
+          <li id="feat-1">ربط مباشر عبر QR ونقطة اتصال محلية بدون راوتر أو إنترنت.</li>
+          <li id="feat-2">تشفير AES-256-GCM والتحقق من سلامة الملفات عبر SHA-256.</li>
+          <li id="feat-3">مشاركة التطبيقات والصور والفيديوهات والمستندات والمجلدات.</li>
+          <li id="feat-4">خزنة خاصة مشفّرة، عارض وسائط مدمج، وفحص تحديثات سحابي آمن.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2 id="install-title">خطوات التثبيت الآمن على أندرويد</h2>
+        <ol class="feature-list">
+          <li id="inst-1">اضغط زر التحميل المباشر لتنزيل ملف Share-Flow.apk مباشرة دون فك ضغط.</li>
+          <li id="inst-2">افتح ملف Share-Flow.apk بعد اكتمال التحميل.</li>
+          <li id="inst-3">اسمح بتثبيت التطبيقات من هذا المصدر عند طلب نظام Android.</li>
+          <li id="inst-4">تُحفظ بياناتك وإصداراتك السابقة بأمان عند التحديث فوق النسخة الأقدم.</li>
+        </ol>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top: 18px;" aria-labelledby="history-title">
+      <h2 id="history-title">سجل الإصدارات السابقة</h2>
+      <div id="history-list" class="history-list"></div>
+    </section>
+
+    <footer id="footer-text">Share Flow — ملفاتك على أجهزتك وتحت تحكمك الكامل.</footer>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
