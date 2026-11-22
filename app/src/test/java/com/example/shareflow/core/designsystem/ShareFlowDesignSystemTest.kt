@@ -1,6 +1,7 @@
 package com.example.shareflow.core.designsystem
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,10 +18,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.CategoryCard
@@ -398,5 +401,68 @@ class ShareFlowDesignSystemTest {
         composeTestRule.onNodeWithTag("nav_item_settings").assertIsDisplayed().performClick()
         composeTestRule.waitForIdle()
         assertEquals(com.example.shareflow.navigation.ShareFlowRoutes.SETTINGS, currentRoute.value)
+    }
+
+    @Test
+    fun `renders compact home layout and glass navigation bar in Arabic RTL light and dark modes`() {
+        val themeMode = mutableStateOf(ThemeMode.LIGHT)
+        val readyState = com.example.shareflow.ui.home.HomeUiState.Ready(
+            settings = com.example.shareflow.domain.model.AppSettings(
+                appLanguage = AppLanguage.ARABIC
+            ),
+            totalTransferCount = 0,
+            trustedDeviceCount = 0,
+            recentTransfers = emptyList(),
+            nearbyDevices = emptyList(),
+            recentFiles = emptyList(),
+            storageSummary = null,
+            connectionState = com.example.shareflow.domain.model.ConnectionState.Idle,
+            networkStatus = com.example.shareflow.network.DeviceNetworkStatus(
+                isWifiConnected = true,
+                localIpv4Address = "192.168.1.20"
+            )
+        )
+
+        composeTestRule.setContent {
+            ShareFlowTheme(
+                themeMode = themeMode.value,
+                appLanguage = AppLanguage.ARABIC
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize()
+                ) {
+                    com.example.shareflow.ui.home.HomeDashboardContent(
+                        uiState = readyState,
+                        onNavigateToRoute = {},
+                        bottomBarClearance = 88.dp
+                    )
+                    com.example.shareflow.navigation.ShareFlowFloatingGlassNavBar(
+                        currentRoute = com.example.shareflow.navigation.ShareFlowRoutes.HOME,
+                        onNavigateTopLevel = {},
+                        modifier = androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        assertTrue(
+            composeTestRule.onAllNodesWithTag("home_hero_card", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+        composeTestRule.onNodeWithTag("home_brand_title").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_connection_status").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_receive_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_unified_transfer_hint").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
+
+        // Verify Dark Mode Arabic RTL rendering
+        themeMode.value = ThemeMode.DARK
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_receive_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
     }
 }

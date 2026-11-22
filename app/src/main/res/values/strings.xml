@@ -18,6 +18,7 @@
     <string name="home_ready_offline">Offline-First Ready</string>
     <string name="home_status_idle">Ready • Offline</string>
     <string name="home_status_wifi_ready">Wi-Fi Ready</string>
+    <string name="home_status_connected_short">Connected</string>
     <string name="home_status_receiving">Receiving on :%1$s</string>
     <string name="home_status_discovering">Discovering…</string>
     <string name="home_status_connected">Connected to %1$s</string>

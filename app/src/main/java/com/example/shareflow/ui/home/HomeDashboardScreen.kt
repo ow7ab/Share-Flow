@@ -1,7 +1,6 @@
 package com.example.shareflow.ui.home
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -27,13 +26,9 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,13 +42,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,9 +62,8 @@ import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.components.TransferCard
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
-import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
+import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.ConnectionState
@@ -79,6 +74,7 @@ import com.example.shareflow.network.DeviceNetworkStatus
 @Composable
 fun HomeDashboardScreen(
     onNavigateToRoute: (String) -> Unit,
+    bottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -106,6 +102,7 @@ fun HomeDashboardScreen(
             onNavigateToRoute(ShareFlowRoutes.SEND)
         },
         activeTransferCount = activeTransfers.size,
+        bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
 }
@@ -116,6 +113,7 @@ fun HomeDashboardContent(
     onNavigateToRoute: (String) -> Unit,
     onSelectRecentFile: (LocalFileEntry) -> Unit = {},
     activeTransferCount: Int = 0,
+    bottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -142,36 +140,35 @@ fun HomeDashboardContent(
                         .widthIn(max = spacing.maxContentWidth)
                         .testTag("home_dashboard_list"),
                     contentPadding = PaddingValues(
-                        horizontal = spacing.screenHorizontal,
-                        vertical = spacing.md
+                        start = spacing.screenHorizontal,
+                        end = spacing.screenHorizontal,
+                        top = spacing.sm,
+                        bottom = bottomBarClearance + spacing.lg
                     ),
-                    verticalArrangement = Arrangement.spacedBy(spacing.md)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 1. Header: Logo, Device Name, Connection Status, Settings Shortcut
-                    item(key = "hero_header") {
-                        HeroIdentityCard(
-                            deviceName = uiState.settings.deviceName,
-                            port = uiState.settings.transferPort,
+                    // 1. Compact Header Row: Brand Wordmark + Subtle Network Status Badge (no top device banner card)
+                    item(key = "compact_header") {
+                        CompactHomeHeaderRow(
                             connectionState = uiState.connectionState,
-                            networkStatus = uiState.networkStatus,
-                            onSettingsClick = { onNavigateToRoute(ShareFlowRoutes.SETTINGS) }
+                            networkStatus = uiState.networkStatus
                         )
                     }
 
-                    // 2. Main Actions: Dedicated Send & Receive Only
+                    // 2. Primary Focus: Equal-Size Send & Receive Action Tiles + Hint Directly Below
                     item(key = "primary_actions") {
-                        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 PrimaryActionTile(
                                     title = stringResource(R.string.home_action_send),
                                     subtitle = stringResource(R.string.home_action_send_sub),
                                     icon = Icons.AutoMirrored.Filled.Send,
                                     containerColor = semantic.sendAccent,
-                                    contentColor = semantic.onSendAccent,
-                                    useSignatureBorder = true,
+                                    gradientEndColor = Color(0xFFB01E44),
+                                    contentColor = Color.White,
                                     testTag = "home_send_button",
                                     onClick = { onNavigateToRoute(ShareFlowRoutes.SEND) },
                                     modifier = Modifier.weight(1f)
@@ -181,8 +178,8 @@ fun HomeDashboardContent(
                                     subtitle = stringResource(R.string.home_action_receive_sub),
                                     icon = Icons.Filled.CloudDownload,
                                     containerColor = semantic.receiveAccent,
-                                    contentColor = semantic.onReceiveAccent,
-                                    useSignatureBorder = false,
+                                    gradientEndColor = Color(0xFFF05456),
+                                    contentColor = Color.White,
                                     testTag = "home_receive_button",
                                     onClick = { onNavigateToRoute(ShareFlowRoutes.RECEIVE) },
                                     modifier = Modifier.weight(1f)
@@ -193,6 +190,7 @@ fun HomeDashboardContent(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .padding(horizontal = 4.dp)
                                     .testTag("home_unified_transfer_hint")
                             )
@@ -275,7 +273,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    // 5. Recent Files Section
+                    // 4. Recent Files Section
                     item(key = "recent_files_header") {
                         HomeSectionRow(
                             title = stringResource(R.string.home_section_recent_files),
@@ -310,7 +308,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    // 6. Storage Overview Section
+                    // 5. Storage Overview Section
                     item(key = "storage_overview") {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(spacing.xs),
@@ -336,7 +334,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    // 7. Quick Tools Section
+                    // 6. Quick Tools Section
                     item(key = "quick_tools") {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -391,9 +389,120 @@ fun HomeDashboardContent(
                     }
 
                     item(key = "bottom_spacer") {
-                        Spacer(modifier = Modifier.height(spacing.md))
+                        Spacer(modifier = Modifier.height(spacing.sm))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactHomeHeaderRow(
+    connectionState: ConnectionState,
+    networkStatus: DeviceNetworkStatus,
+    modifier: Modifier = Modifier
+) {
+    val semantic = ShareFlowDesign.semanticColors
+    val locale = ShareFlowDesign.locale
+
+    val isConnectedOrActive = connectionState is ConnectionState.Connected ||
+        connectionState is ConnectionState.Advertising ||
+        networkStatus.isWifiConnected
+
+    val statusLabel = when (connectionState) {
+        is ConnectionState.Connected -> stringResource(
+            R.string.home_status_connected,
+            connectionState.peer.displayName
+        )
+        is ConnectionState.Advertising -> stringResource(
+            R.string.home_status_receiving,
+            ShareFlowFormatters.formatInteger(connectionState.port.toLong(), locale)
+        )
+        is ConnectionState.Discovering -> stringResource(R.string.home_status_discovering)
+        else -> if (networkStatus.isWifiConnected) {
+            stringResource(R.string.home_status_connected_short)
+        } else {
+            stringResource(R.string.home_status_idle)
+        }
+    }
+
+    val statusDescription = when (connectionState) {
+        is ConnectionState.Connected -> statusLabel
+        is ConnectionState.Advertising -> statusLabel
+        is ConnectionState.Discovering -> statusLabel
+        else -> if (networkStatus.isWifiConnected) {
+            stringResource(R.string.home_status_wifi_ready)
+        } else {
+            stringResource(R.string.home_status_idle)
+        }
+    }
+
+    val pillContainerColor = when {
+        connectionState is ConnectionState.Connected || networkStatus.isWifiConnected -> semantic.successContainer
+        connectionState is ConnectionState.Advertising -> MaterialTheme.colorScheme.primaryContainer
+        connectionState is ConnectionState.Discovering -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val pillContentColor = when {
+        connectionState is ConnectionState.Connected || networkStatus.isWifiConnected -> semantic.success
+        connectionState is ConnectionState.Advertising -> MaterialTheme.colorScheme.onPrimaryContainer
+        connectionState is ConnectionState.Discovering -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .testTag("home_brand_title")
+        )
+
+        Surface(
+            shape = CircleShape,
+            color = pillContainerColor,
+            contentColor = pillContentColor,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .semantics { contentDescription = statusDescription }
+                .testTag("home_connection_status")
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isConnectedOrActive) pillContentColor
+                            else pillContentColor.copy(alpha = 0.55f)
+                        )
+                )
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = pillContentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -430,206 +539,72 @@ private fun HomeSectionRow(
 }
 
 @Composable
-private fun HeroIdentityCard(
-    deviceName: String,
-    port: Int,
-    connectionState: ConnectionState,
-    networkStatus: DeviceNetworkStatus,
-    onSettingsClick: () -> Unit
-) {
-    val spacing = ShareFlowDesign.spacing
-    val semantic = ShareFlowDesign.semanticColors
-    val locale = ShareFlowDesign.locale
-    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val scrimColors = if (isRtl) {
-        listOf(Color.Transparent, semantic.heroScrimEnd, semantic.heroScrimStart)
-    } else {
-        listOf(semantic.heroScrimStart, semantic.heroScrimEnd, Color.Transparent)
-    }
-
-    val statusText = when (connectionState) {
-        is ConnectionState.Advertising -> stringResource(
-            R.string.home_status_receiving,
-            ShareFlowFormatters.formatInteger(connectionState.port.toLong(), locale)
-        )
-        is ConnectionState.Discovering -> stringResource(R.string.home_status_discovering)
-        is ConnectionState.Connected -> stringResource(
-            R.string.home_status_connected,
-            connectionState.peer.displayName
-        )
-        else -> if (networkStatus.isWifiConnected) {
-            stringResource(R.string.home_status_wifi_ready)
-        } else {
-            stringResource(R.string.home_status_idle)
-        }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(184.dp)
-            .testTag("home_hero_card"),
-        shape = ShareFlowDesign.shapes.featuredCard,
-        border = BorderStroke(1.dp, ShareFlowBrandGradients.signatureBorder(alpha = 0.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.raised)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Image(
-                painter = painterResource(id = R.drawable.img_hero_shareflow),
-                contentDescription = stringResource(R.string.cd_hero_banner),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Brush.horizontalGradient(colors = scrimColors))
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(spacing.lg),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_shareflow_foreground_art),
-                            contentDescription = stringResource(R.string.cd_app_logo),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .testTag("home_app_logo")
-                        )
-                        StatusPill(
-                            label = statusText,
-                            containerColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f),
-                            contentColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream,
-                            modifier = Modifier.testTag("home_connection_status")
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.64f),
-                        border = BorderStroke(1.dp, com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Coral.copy(alpha = 0.42f))
-                    ) {
-                        IconButton(
-                            onClick = onSettingsClick,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .testTag("home_settings_shortcut")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = stringResource(R.string.cd_open_settings),
-                                tint = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream
-                            )
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextPrimary
-                        )
-                        Text(
-                            text = "TCP :${ShareFlowFormatters.formatInteger(port.toLong(), locale)}",
-                            style = ShareFlowMonoStyle,
-                            color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Peach
-                        )
-                    }
-                    Text(
-                        text = stringResource(R.string.home_device_identity_format, deviceName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream.copy(alpha = 0.94f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("home_device_name_text")
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PrimaryActionTile(
     title: String,
     subtitle: String,
     icon: ImageVector,
     containerColor: Color,
+    gradientEndColor: Color,
     contentColor: Color,
-    useSignatureBorder: Boolean,
     testTag: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val spacing = ShareFlowDesign.spacing
+    val tileShape = RoundedCornerShape(24.dp)
+    val tileBrush = Brush.verticalGradient(
+        colors = listOf(containerColor, gradientEndColor)
+    )
+
     Surface(
         onClick = onClick,
         modifier = modifier
-            .height(92.dp)
-            .clip(MaterialTheme.shapes.large)
+            .height(132.dp)
+            .clip(tileShape)
             .testTag(testTag),
-        shape = MaterialTheme.shapes.large,
+        shape = tileShape,
         color = containerColor,
         contentColor = contentColor,
-        border = if (useSignatureBorder) {
-            BorderStroke(1.4.dp, ShareFlowBrandGradients.signatureBorder(alpha = 0.9f))
-        } else {
-            BorderStroke(1.dp, com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream.copy(alpha = 0.45f))
-        },
-        tonalElevation = ShareFlowDesign.elevation.raised
+        shadowElevation = 6.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = ShareFlowMarpleColors.Cream.copy(alpha = 0.28f)
+        )
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = spacing.md, vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
+                .background(brush = tileBrush)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = contentColor.copy(alpha = 0.16f),
-                modifier = Modifier.size(44.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = contentColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(spacing.sm))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = contentColor,
+                    modifier = Modifier.size(30.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
                     color = contentColor,
+                    textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = contentColor.copy(alpha = 0.85f),
-                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.90f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }

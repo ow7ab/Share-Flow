@@ -1,91 +1,116 @@
-# دليل البناء والتوقيع والنشر التلقائي لتطبيق Share Flow
-# Share Flow Automated Release & Direct APK Distribution Guide
+# Share Flow — Private Source + Public Releases + GitHub Pages
+# دليل بنية الإنتاج: مستودع شيفرة خاص + مستودع إصدارات عام + GitHub Pages
 
 ---
 
-## 1. الروابط المباشرة لأحدث إصدار (Direct Release URLs)
+## 1. معمارية التوزيع والإنتاج (Production Architecture)
 
-عند نشر الإصدار عبر `.github/workflows/release.yml` في المستودع `ow7ab/Share-Flow`، تتحدث الروابط التالية تلقائياً دون أي ملفات ZIP ودون توجيه المستخدم لصفحة ملفات GitHub:
+| المكوّن | المستودع / الرابط | الخصوصية (Visibility) | الغرض الحصري |
+|---|---|---|---|
+| **الشيفرة المصدرية** | `ow7ab/Share-Flow` | **PRIVATE (خاص دائماً)** | شيفرة تطبيق Android، إعدادات Gradle، اختبارات الوحدة، وسير عمل GitHub Actions |
+| **التوزيع العام والصفحات** | `ow7ab/Share-Flow-Releases` | **PUBLIC (عام)** | نشر ملفات APK الموقّعة عبر GitHub Releases + استضافة ملفات الموقع الثابتة في `/docs` فقط |
+| **موقع التحميل الرسمي** | `https://ow7ab.github.io/Share-Flow-Releases/` | عام (بدون مصادقة) | GitHub Pages من فرع `main` ومجلد `/docs` |
+| **صفحة الإصدارات العامة** | `https://github.com/ow7ab/Share-Flow-Releases/releases` | عام (بدون مصادقة) | سجل الإصدارات الكامل مع الاحتفاظ بالنسخ السابقة |
+| **رابط التحميل المباشر لملف APK** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk` | عام (بدون مصادقة) | تحميل مباشر لملف `Share-Flow.apk` دون ZIP ودون تسجيل دخول GitHub |
+| **رابط التحديث السحابي (`version.json`)** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json` | عام (بدون مصادقة) | يستخدمه `CloudUpdateManager` داخل التطبيق للتحقق الآمن من التحديثات |
+| **بصمة التحقق (`SHA-256`)** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk.sha256` | عام (بدون مصادقة) | للتحقق من سلامة ملف APK قبل التثبيت |
 
-- **رابط التحميل المباشر لملف APK (أحدث إصدار دائماً):**
-  `https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk`
-- **رابط ملف التحديث السحابي للتطبيق (`version.json`):**
-  `https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json`
-- **رابط بصمة التحقق SHA-256:**
-  `https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk.sha256`
-- **موقع التحميل المباشر (GitHub Pages من مجلد `/docs`):**
-  `https://ow7ab.github.io/Share-Flow/`
-
-- **هوية التطبيق الحالية المحفوظة دون تغيير:**
+- **هوية التطبيق المحفوظة دون أي تعديل:**
+  - `namespace`: `com.example`
   - `applicationId`: `com.aistudio.shareflow.kxrvnm`
   - `versionName`: `1.0.10` | `versionCode`: `11`
+  - `minSdk`: `24` | `targetSdk`: `36`
+
+> **قواعد حماية الشيفرة والبيانات:** لا يُنسخ أي ملف Kotlin أو Gradle أو XML أو `google-services.json` أو Keystore أو سر إلى `ow7ab/Share-Flow-Releases` أبداً. يتحقق السكربت `scripts/sync-public-docs.sh` بقائمة سماح صارمة (Allowlist) وفحص للأسرار قبل أي دفع إلى المستودع العام.
 
 ---
 
-## 2. إعداد أسرار التوقيع في GitHub Secrets (مرة واحدة فقط)
+## 2. متغيرات وأسرار GitHub المطلوبة في المستودع الخاص (`ow7ab/Share-Flow`)
 
-اذهب إلى المستودع على GitHub:
-**Settings → Secrets and variables → Actions → New repository secret**
+### أ) متغيرات المستودع (**Settings → Secrets and variables → Actions → Variables**)
 
-أضف الأسرار التالية (لا تقم أبداً برفع ملفات `.jks` أو `.keystore` أو كلمات المرور داخل المستودع):
-
-| اسم السر (Secret Name) | الوصف | إلزامي؟ |
+| اسم المتغير (Variable) | القيمة المطلوبة | إلزامي؟ |
 |---|---|---|
-| `ANDROID_KEYSTORE_BASE64` | محتوى مفتاح التوقيع الدائم محولاً إلى Base64 عبر الأمر `base64 -w 0 my-upload-key.jks` | نعم |
-| `ANDROID_STORE_PASSWORD` | كلمة مرور ملف Keystore | نعم |
-| `ANDROID_KEY_PASSWORD` | كلمة مرور المفتاح الداخلي (Key Password) | نعم |
-| `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح داخل Keystore (الافتراضي `upload` مطابق لـ `app/build.gradle.kts`) | اختياري |
-| `EXPECTED_CERT_SHA256` | بصمة SHA-256 لشهادة التوقيع المعتمدة لمنع نشر أي إصدار بشهادة مختلفة | اختياري (موصى به بشدة) |
+| `PUBLIC_RELEASES_REPO` | `ow7ab/Share-Flow-Releases` | **نعم** |
+| `SHAREFLOW_PORTAL_URL` | `https://ow7ab.github.io/Share-Flow-Releases/` | اختياري (مُعدّ افتراضياً) |
 
-> **حماية توافق التحديثات:** سير العمل لا يُنشئ مفتاح توقيع جديداً أبداً، ويتحقق من وجود `PrivateKeyEntry`، ويتحقق من عدم حدوث تراجع في `versionCode` قبل النشر. إذا غاب أي سر أساسي أو فشل التوقيع يتوقف البناء فوراً دون نشر نسخة غير متوافقة.
+### ب) أسرار المستودع (**Settings → Secrets and variables → Actions → Secrets**)
 
----
+| اسم السر (Secret) | الوصف وكيفية استخراجه | إلزامي؟ |
+|---|---|---|
+| `ANDROID_KEYSTORE_BASE64` | محتوى مفتاح التوقيع الدائم محولاً إلى Base64: `base64 -w 0 shareflow-release.jks` | **نعم** |
+| `ANDROID_STORE_PASSWORD` | كلمة مرور ملف Keystore | **نعم** |
+| `ANDROID_KEY_PASSWORD` | كلمة مرور المفتاح الداخلي (Key Password) | **نعم** |
+| `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح داخل Keystore (مثلاً `upload`) | **نعم** |
+| `EXPECTED_CERT_SHA256` | بصمة SHA-256 لشهادة التوقيع الدائمة (64 محرف Hex دون فواصل أو بنقطتين) لمنع أي انحراف في الشهادة | **نعم** |
+| `PUBLIC_RELEASES_TOKEN` | Fine-grained Personal Access Token مقيّد **فقط** بمستودع `ow7ab/Share-Flow-Releases` بصلاحية `Contents: Read and write` (و`Metadata: Read-only`) | **نعم** |
 
-## 3. كيفية تشغيل النشر التلقائي وما يتحقق منه قبل النشر
-
-يعمل سير العمل `.github/workflows/release.yml` تلقائياً في ثلاث حالات:
-1. عند كل دفع (Push) جديد إلى فرع `main`.
-2. عند إنشاء وسم إصدار جديد يبدأ بـ `v` مثل `v1.0.10`.
-3. يدوياً من تبويب **Actions → ShareFlow Automated Release Build & APK Publish → Run workflow** (مع إمكانية كتابة ملاحظات إصدار بالعربية والإنجليزية).
-
-قبل النشر يتحقق سير العمل تلقائياً من:
-1. التحقق من وجود أسرار التوقيع وسلامة مفتاح `PrivateKeyEntry` عبر `keytool` (بقراءة كلمة المرور من متغير البيئة وليس من سطر الأوامر).
-2. اجتياز اختبارات بوابة التحميل (`node --test ./scripts/test-portal.js`).
-3. اجتياز اختبارات الوحدة وRobolectric (`./gradlew :app:testDebugUnitTest`).
-4. نجاح بناء Release APK وAAB عبر Gradle Wrapper (`./gradlew :app:assembleRelease :app:bundleRelease`).
-5. صحة التوقيع الرقمي (v1/v2/v3) عبر `apksigner verify --verbose --print-certs` ومطابقة `EXPECTED_CERT_SHA256` عند ضبطه.
-6. محاذاة الملف (`zipalign -c -v 4`) لضمان التثبيت المباشر على Android 11+.
-7. تطابق معرف الحزمة (`com.aistudio.shareflow.kxrvnm`) ووجود النشاط الرئيسي عبر `aapt2 dump badging`.
-8. منع التراجع في رقم البناء (`versionCode`) مقارنة بآخر `version.json` منشور.
-9. رفع `Share-Flow.apk` مباشرة (بدون ZIP) داخل GitHub Releases مع الاحتفاظ بكافة الإصدارات السابقة والتحقق عبر HTTP HEAD أن رابط التحميل المباشر يعيد ملفاً ثنائياً مطابق الحجم وليس صفحة HTML.
-10. حذف ملف Keystore المؤقت من مجلد `RUNNER_TEMP` دائماً حتى عند فشل البناء.
+> **لا تقم أبداً** بوضع `PUBLIC_RELEASES_TOKEN` أو أي مفتاح داخل `docs/` أو شيفرة المتصفح. يعمل الموقع العام بالوصول غير المصادق إلى `https://api.github.com/repos/ow7ab/Share-Flow-Releases/releases/latest`.
 
 ---
 
-## 4. تفعيل موقع التحميل المباشر (GitHub Pages)
+## 3. خطوات التهيئة اليدوية على GitHub (مرة واحدة فقط)
 
-1. في إعدادات المستودع: **Settings → Pages**.
-2. اختر **Source: Deploy from a branch**.
-3. اختر الفرع **`main`** والمجلد **`/docs`** ثم اضغط **Save**.
-4. سيعرض الموقع فوراً أحدث إصدار (`Share-Flow.apk`) مع رقم النسخة، الحجم، تاريخ التحديث، بصمة SHA-256، وسجل الإصدارات السابقة، مع التعامل الآمن مع حالات التحميل، عدم توفر إصدار، أو تجاوز حد طلبات API.
+1. **التحقق من خصوصية مستودع الشيفرة:**
+   - تأكد أن `ow7ab/Share-Flow` مضبوط على **Private** ولا تقم بتغيير خصوصيته أبداً.
+2. **إنشاء مستودع التوزيع العام:**
+   - أنشئ المستودع `ow7ab/Share-Flow-Releases` بوضعية **Public** مع تهيئة فرع `main` (يمكن اختيار *Add a README file* عند الإنشاء).
+   - **لا تنقل** أي ملفات شيفرة مصدرية أو ملفات Android إلى هذا المستودع.
+3. **إنشاء Fine-grained Personal Access Token (`PUBLIC_RELEASES_TOKEN`):**
+   - اذهب إلى: **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+   - **Repository access:** اختر **Only select repositories** ← اختر `ow7ab/Share-Flow-Releases` فقط.
+   - **Repository permissions:**
+     - `Contents`: **Read and write** (للنشر في Releases وتحديث مجلد `/docs` على `main`).
+     - `Metadata`: **Read-only** (مطلوب تلقائياً).
+   - انسخ الرمز واحفظه فوراً في أسرار `ow7ab/Share-Flow` باسم `PUBLIC_RELEASES_TOKEN`.
+4. **إضافة المتغيرات والأسرار في `ow7ab/Share-Flow`:**
+   - أضف المتغير `PUBLIC_RELEASES_REPO = ow7ab/Share-Flow-Releases`.
+   - أضف الأسرار الستة الموضحة في الجدول أعلاه (`ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_PASSWORD`, `ANDROID_KEY_ALIAS`, `EXPECTED_CERT_SHA256`, `PUBLIC_RELEASES_TOKEN`).
+   - لاستخراج بصمة `EXPECTED_CERT_SHA256` من مفتاحك الدائم محلياً:
+     ```bash
+     keytool -list -v -keystore shareflow-release.jks -alias upload | grep "SHA256:"
+     ```
+5. **تفعيل GitHub Pages في `ow7ab/Share-Flow-Releases`:**
+   - بعد أول مزامنة لمجلد `/docs` (عبر `sync-website.yml` أو أول إصدار من `release.yml`):
+   - افتح `ow7ab/Share-Flow-Releases` ← **Settings → Pages**.
+   - **Source:** `Deploy from a branch`.
+   - **Branch:** `main` | **Folder:** `/docs` ← اضغط **Save**.
+   - انتظر 1–2 دقيقة ثم تحقق من الرابط: `https://ow7ab.github.io/Share-Flow-Releases/`.
 
 ---
 
-## 5. إذا كان المستودع خاصاً (Private Repository Distribution Options)
+## 4. تشغيل النشر الإنتاجي (Controlled Release Workflow)
 
-روابط GitHub Releases داخل المستودعات الخاصة لا تقبل التحميل المباشر بدون مصادقة. لتوفير تحميل مباشر وآمن دون جعل الشيفرة المصدرية عامة، يدعم المشروع 3 حلول جاهزة:
+لا يقوم `.github/workflows/release.yml` بنشر إصدار تلقائياً عند كل commit عادي على `main`؛ بل يعمل فقط عند:
+1. **دفع وسم إصدار دلالي (Semantic Tag):** مثل `v1.0.10` (يجب أن يطابق `versionName` في `app/build.gradle.kts`):
+   ```bash
+   git tag -a v1.0.10 -m "Share Flow v1.0.10 (Build 11)"
+   git push origin v1.0.10
+   ```
+2. **التشغيل اليدوي المحكوم (`workflow_dispatch`):** من تبويب **Actions → ShareFlow Production Release (Private Source -> Public APK & Pages) → Run workflow** مع إدخال ملاحظات الإصدار بالعربية والإنجليزية.
 
-### الخيار أ (مدعوم تلقائياً في `release.yml`): مستودع إصدارات عام مستقل للـ APK فقط
-1. أنشئ مستودعاً عاماً فارغاً (بدون أي شيفرة مصدرية) مثل: `ow7ab/Share-Flow-Releases`.
-2. في إعدادات المستودع الخاص `ow7ab/Share-Flow`:
-   - أضف متغيراً (**Variables → Actions**): `PUBLIC_RELEASES_REPO = ow7ab/Share-Flow-Releases`
-   - أضف سراً (**Secrets → Actions**): `PUBLIC_RELEASES_TOKEN` (رمز Fine-grained PAT بصلاحية `Contents: Read and write` على مستودع الإصدارات العام فقط).
-3. في ملف `docs/config.js` غيّر `releasesRepo` إلى `"ow7ab/Share-Flow-Releases"`.
-4. ستبقى الشيفرة المصدرية خاصة 100% بينما يُنشر فقط `Share-Flow.apk` و`version.json` للعامة.
+### ما يتحقق منه سير العمل تلقائياً قبل أي نشر:
+1. وجود جميع الأسرار الستة والمتغير `PUBLIC_RELEASES_REPO`، ومنع تطابق مستودع التوزيع مع المستودع الخاص.
+2. التحقق عبر GitHub API أن `ow7ab/Share-Flow-Releases` مستودع **Public** فعلاً وأن وسم الإصدار المطلوب **غير موجود مسبقاً** (لا يتم الكتابة فوق أي إصدار سابق أبداً).
+3. فك تشفير Keystore داخل `${RUNNER_TEMP}` بصلاحية `600` والتحقق من `PrivateKeyEntry` عبر `keytool -storepass:env`.
+4. اجتياز اختبارات بوابة التحميل (`node --test ./scripts/test-portal.js`) وفحص قائمة السماح والأسرار (`bash ./scripts/sync-public-docs.sh --dry-run`).
+5. اجتياز اختبارات وحدة Android (`./gradlew :app:testDebugUnitTest`).
+6. بناء Release APK وAAB (`./gradlew :app:assembleRelease :app:bundleRelease`).
+7. التحقق الصارم عبر:
+   - `apksigner verify --verbose --print-certs` + مطابقة `EXPECTED_CERT_SHA256`.
+   - `zipalign -c -v 4`.
+   - `aapt2 dump badging` (تطابق `com.aistudio.shareflow.kxrvnm`، تطابق `v${VERSION_NAME}` مع الوسم، ووجود النشاط الرئيسي).
+   - `jarsigner -verify -strict` لملف AAB.
+   - عدم تراجع `versionCode` وعدم تغيّر شهادة التوقيع مقارنة بآخر `version.json` منشور.
+8. رفع `Share-Flow.apk` (بشكل مستقل دون ZIP)، و`Share-Flow.apk.sha256`، و`version.json` إلى `ow7ab/Share-Flow-Releases` عبر GitHub Releases (`--latest`).
+9. التحقق الفعلي (غير المصادق) عبر `curl -fsSLI` أن الرابط `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk` يُرجع ملف APK ثنائياً مطابق الحجم وليس صفحة HTML أو 404.
+10. مزامنة مجلد `/docs` الثابت فقط (مع `latest-release.json`) إلى فرع `main` في `ow7ab/Share-Flow-Releases`.
+11. حذف Keystore المؤقت والملفات الحساسة دائماً (`if: always()`).
 
-### الخيار ب: استضافة `Share-Flow.apk` و`version.json` على مساحة تنزيل عامة مستقلة (Cloudflare R2 / Firebase Hosting / خادم HTTPS)
-- ارفع الملفين (`Share-Flow.apk` و`version.json`) من مخرجات البناء إلى خادمك عبر HTTPS.
-- ضع رابط `version.json` في `docs/config.js` داخل `customManifestUrl` وفي إعدادات التحديث السحابي بالتطبيق.
+---
 
-### الخيار ج: تحميل آمن مقصور على المستخدمين المصرح لهم فقط (Authorized Users Only)
-- استخدم وسيط خادم آمن (مثل Cloudflare Worker أو Firebase Cloud Function) يتحقق أولاً من هوية المستخدم المصرح له (جلسة/تسجيل دخول)، ثم يجلب ملف `Share-Flow.apk` من GitHub Releases API (`Accept: application/octet-stream`) باستخدام توكن قراءة فقط مخزّن على الخادم الوسيط (لا يُوضع في المتصفح مطلقاً)، ويعيد بث ملف APK مباشرة للمستخدم المصرح له برابط مؤقت قصير الصلاحية.
+## 5. تحديث الموقع دون إصدار APK جديد (`sync-website.yml`)
+
+إذا قمت بتعديل تصميم أو نصوص الموقع داخل `/docs` فقط، يمكنك تشغيل سير العمل اليدوي:
+**Actions → ShareFlow Public Website Sync (Docs Only) → Run workflow**
+وسيقوم بتشغيل اختبارات البوابة وفحص السماح/الأسرار ثم دفع ملفات `/docs` الثابتة فقط إلى `ow7ab/Share-Flow-Releases`.

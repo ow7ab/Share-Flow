@@ -18,6 +18,7 @@
     <string name="home_ready_offline">جاهز للعمل دون إنترنت</string>
     <string name="home_status_idle">جاهز • دون إنترنت</string>
     <string name="home_status_wifi_ready">واي فاي متصل</string>
+    <string name="home_status_connected_short">متصل</string>
     <string name="home_status_receiving">يستقبل على :%1$s</string>
     <string name="home_status_discovering">جارٍ البحث…</string>
     <string name="home_status_connected">متصل بـ %1$s</string>

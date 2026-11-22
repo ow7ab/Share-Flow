@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.example.MainActivity
 import org.junit.Rule
@@ -32,19 +33,30 @@ class ShareFlowNavigationRobolectricTest {
     }
 
     @Test
-    fun `home dashboard displays header actions and all five required sections`() {
-        waitForTag("home_hero_card")
+    fun `home dashboard hides top device card and displays compact header actions and all sections`() {
+        waitForTag("home_send_button")
 
-        // Header: logo, device name, connection status, settings shortcut
-        composeTestRule.onNodeWithTag("home_app_logo").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("home_device_name_text").assertIsDisplayed()
+        // Top device card & header settings shortcut must be completely hidden
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("home_hero_card", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("home_settings_shortcut", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+
+        // Compact Header: brand wordmark + network status indicator pill
+        composeTestRule.onNodeWithTag("home_brand_title").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_connection_status").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("home_settings_shortcut").assertIsDisplayed()
 
-        // Main actions: Dedicated Send & Receive + unified hint
+        // Main actions: Prominent equal-size Send & Receive + unified hint
         composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_receive_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_unified_transfer_hint").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
 
         // Disconnected Nearby section must NOT exist on Home — sending/receiving live strictly in SEND & RECEIVE
         org.junit.Assert.assertTrue(
@@ -70,7 +82,7 @@ class ShareFlowNavigationRobolectricTest {
 
     @Test
     fun `navigates across all five bottom navigation tabs and verifies screens`() {
-        waitForTag("home_hero_card")
+        waitForTag("home_send_button")
 
         // 1. Files tab — all 7 categories + drill-in
         composeTestRule.onNodeWithTag("nav_item_files").performClick()
@@ -157,13 +169,13 @@ class ShareFlowNavigationRobolectricTest {
 
         // 5. Return to Home tab
         composeTestRule.onNodeWithTag("nav_item_home").performClick()
-        waitForTag("home_hero_card")
-        composeTestRule.onNodeWithTag("home_hero_card").assertIsDisplayed()
+        waitForTag("home_send_button")
+        composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
     }
 
     @Test
-    fun `navigates to send receive qr pairing and settings shortcut from home`() {
-        waitForTag("home_hero_card")
+    fun `navigates to send receive and settings tab from home`() {
+        waitForTag("home_send_button")
 
         // Send screen
         composeTestRule.onNodeWithTag("home_send_button").performClick()
@@ -174,13 +186,14 @@ class ShareFlowNavigationRobolectricTest {
         composeTestRule.onNodeWithTag("send_continue_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("send_continue_button").assertIsNotEnabled()
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
-        waitForTag("home_hero_card")
+        waitForTag("home_send_button")
 
         // Unified Receive screen (inline controls only — no disconnected bottom QR jump-out card)
         composeTestRule.onNodeWithTag("home_receive_button").performClick()
         waitForTag("receive_screen_list")
+        composeTestRule.waitForIdle()
         val receiveList = composeTestRule.onNodeWithTag("receive_screen_list")
-        composeTestRule.onNodeWithTag("receive_toggle_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("receive_toggle_button").performScrollTo().assertIsDisplayed()
         receiveList.performScrollToNode(hasTestTag("receive_connection_status_card"))
         composeTestRule.onNodeWithTag("receive_connection_status_card").assertIsDisplayed()
         receiveList.performScrollToNode(hasTestTag("receive_discovery_status_card"))
@@ -193,10 +206,10 @@ class ShareFlowNavigationRobolectricTest {
 
         // Navigate back to Home
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
-        waitForTag("home_hero_card")
+        waitForTag("home_send_button")
 
-        // Settings shortcut in Home header
-        composeTestRule.onNodeWithTag("home_settings_shortcut").performClick()
+        // Settings accessed via bottom navigation Settings tab
+        composeTestRule.onNodeWithTag("nav_item_settings").performClick()
         waitForTag("settings_list")
         composeTestRule.onNodeWithTag("settings_section_appearance").assertIsDisplayed()
     }

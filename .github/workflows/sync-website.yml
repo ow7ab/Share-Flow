@@ -1,0 +1,48 @@
+name: Sync ShareFlow Public Website to GitHub Pages Repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Optional sync commit description"
+        required: false
+        default: "Sync static download portal docs"
+
+concurrency:
+  group: shareflow-public-website-sync
+  cancel-in-progress: false
+
+# Read-only on the private source repository; cross-repo push uses PUBLIC_RELEASES_TOKEN exclusively.
+permissions:
+  contents: read
+
+jobs:
+  sync-static-website:
+    name: Validate & Sync Static docs/ to ow7ab/Share-Flow-Releases
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private source repository
+        uses: actions/checkout@v4
+
+      - name: Run portal verification tests and dry-run allowlist check
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test ./scripts/test-portal.js
+          bash ./scripts/sync-public-docs.sh --dry-run
+
+      - name: Sync verified static docs/ directory to public repository
+        shell: bash
+        env:
+          PUBLIC_RELEASES_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          PUBLIC_RELEASES_REPO: ${{ vars.PUBLIC_RELEASES_REPO }}
+          SYNC_COMMIT_REASON: ${{ github.event.inputs.reason || 'Sync static download portal docs' }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/sync-public-docs.sh
+
+      - name: Clean temporary sync workspace
+        if: always()
+        shell: bash
+        run: rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"

@@ -82,7 +82,7 @@ class PermissionManagerAndUnifiedSendTest {
 
     @Test
     fun `Unified Send screen displays all 4 SHAREit tabs Photos Videos Apps Files cleanly`() {
-        waitForTag("home_hero_card")
+        waitForTag("home_send_button")
         composeTestRule.onNodeWithTag("home_send_button").performClick()
 
         waitForTag("send_category_selector")

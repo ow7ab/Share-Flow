@@ -2,9 +2,11 @@
   "use strict";
 
   const CONFIG = (typeof window !== "undefined" && window.SHAREFLOW_PORTAL_CONFIG) || {
-    releasesRepo: "ow7ab/Share-Flow",
+    releasesRepo: "ow7ab/Share-Flow-Releases",
     assetFileName: "Share-Flow.apk",
     manifestFileName: "version.json",
+    directLatestApkUrl: "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+    portalUrl: "https://ow7ab.github.io/Share-Flow-Releases/",
     customManifestUrl: ""
   };
 
@@ -20,9 +22,9 @@
       loadingStatus: "جاري التحقق من أحدث إصدار رسمي موقّع (APK)…",
       readyStatus: "أحدث إصدار رسمي موقّع وجاهز للتثبيت المباشر (Share-Flow.apk)",
       unavailableStatus:
-        "لا يوجد إصدار APK منشور للعامة حالياً. فور نشر أول إصدار عبر GitHub Releases سيظهر زر التحميل المباشر تلقائياً هنا.",
+        "لا يوجد إصدار APK منشور للعامة حالياً. فور نشر أول إصدار في مستودع التوزيع العام سيظهر زر التحميل المباشر تلقائياً هنا.",
       privateHint:
-        "ملاحظة: إذا كان المستودع خاصاً، تأكد من ربط بوابة التحميل بمساحة تنزيل عامة مستقلة (مثل مستودع إصدارات عام أو رابط version.json مخصص).",
+        "تُوزَّع ملفات APK عبر مستودع التوزيع العام (ow7ab/Share-Flow-Releases) بينما تبقى الشيفرة المصدرية خاصة بالكامل. أعد المحاولة بعد نشر أول وسم إصدار.",
       rateLimitStatus:
         "تم بلوغ حد الطلبات المؤقت لخادم الإصدارات من هذه الشبكة. أعد المحاولة بعد قليل.",
       errorStatus:
@@ -38,6 +40,7 @@
       metaUpdated: "تاريخ آخر تحديث",
       metaPackage: "صيغة الملف",
       metaSha: "بصمة التحقق SHA-256",
+      releaseNotesLabel: "ملاحظات الإصدار",
       apkFormatValue: "Share-Flow.apk (تثبيت مباشر بدون ZIP)",
       featuresTitle: "مميزات Share Flow",
       f1: "ربط مباشر عبر QR ونقطة اتصال محلية بدون راوتر أو إنترنت.",
@@ -65,9 +68,9 @@
       loadingStatus: "Checking latest signed official APK release…",
       readyStatus: "Latest signed release verified and ready for direct install (Share-Flow.apk)",
       unavailableStatus:
-        "No public APK release is available yet. Once the first release is published via GitHub Releases, the direct APK download button will activate automatically.",
+        "No public APK release is available yet. Once the first release is published to the public distribution repository, the direct APK download button will activate automatically.",
       privateHint:
-        "Note: If the source repository is private, connect this portal to a public releases mirror repository or a standalone HTTPS version.json endpoint.",
+        "Signed APKs are distributed publicly from ow7ab/Share-Flow-Releases while application source code stays private. Retry once the first release tag is published.",
       rateLimitStatus:
         "Temporary release server rate limit reached from this network. Please retry shortly.",
       errorStatus:
@@ -83,6 +86,7 @@
       metaUpdated: "Last Updated",
       metaPackage: "Package Format",
       metaSha: "SHA-256 Checksum",
+      releaseNotesLabel: "Release Notes",
       apkFormatValue: "Share-Flow.apk (Direct install, no ZIP)",
       featuresTitle: "Key Features",
       f1: "Direct QR & local hotspot pairing with zero router or internet required.",
@@ -212,6 +216,26 @@
     return match ? Number(match[1]) : null;
   }
 
+  function formatReleaseNotes(rawBody) {
+    if (typeof rawBody !== "string") return "";
+    const cleanedLines = rawBody
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map((line) =>
+        line
+          .replace(/^\s*#{1,6}\s*/, "")
+          .replace(/^\s*[-*]\s+/, "• ")
+          .replace(/\*\*(.*?)\*\*/g, "$1")
+          .replace(/`([^`]+)`/g, "$1")
+          .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1")
+          .trim()
+      )
+      .filter((line) => line.length > 0 && !/^-{3,}$/.test(line));
+
+    const joined = cleanedLines.join("\n").trim();
+    return joined.length > 1500 ? `${joined.slice(0, 1497)}…` : joined;
+  }
+
   function selectApkAsset(assets, preferredFileName) {
     if (!Array.isArray(assets)) return null;
     const expectedName = preferredFileName || CONFIG.assetFileName || "Share-Flow.apk";
@@ -230,29 +254,40 @@
     );
   }
 
+  function mapGithubRelease(release, preferredFileName, canonicalLatestUrl) {
+    if (!release || release.draft) return null;
+    const expectedName = preferredFileName || CONFIG.assetFileName || "Share-Flow.apk";
+    const apkAsset = selectApkAsset(release.assets, expectedName);
+    if (!apkAsset) return null;
+
+    const useCanonicalLatest =
+      Boolean(canonicalLatestUrl) &&
+      apkAsset.name === expectedName &&
+      isSafeDirectApkUrl(canonicalLatestUrl);
+
+    const buildNumber = extractBuildNumber(release.name, release.body);
+    const baseLabel = release.name || release.tag_name || "Latest";
+    return {
+      versionLabel: baseLabel,
+      tagName: release.tag_name || "",
+      buildNumber,
+      prerelease: Boolean(release.prerelease),
+      apkUrl: useCanonicalLatest ? canonicalLatestUrl.trim() : apkAsset.browser_download_url,
+      perTagApkUrl: apkAsset.browser_download_url,
+      fileSizeBytes: Number(apkAsset.size) || 0,
+      publishedAt: release.published_at || apkAsset.updated_at || "",
+      sha256: extractShaFromNotes(release.body),
+      releaseNotes: formatReleaseNotes(release.body)
+    };
+  }
+
   function resolveReleasesList(releases, preferredFileName) {
     if (!Array.isArray(releases) || releases.length === 0) {
       return { status: "unavailable", data: null, history: [] };
     }
 
     const mapped = releases
-      .filter((r) => r && !r.draft)
-      .map((r) => {
-        const apkAsset = selectApkAsset(r.assets, preferredFileName);
-        if (!apkAsset) return null;
-        const buildNumber = extractBuildNumber(r.name, r.body);
-        const baseLabel = r.name || r.tag_name || "Latest";
-        return {
-          versionLabel: baseLabel,
-          tagName: r.tag_name || "",
-          buildNumber,
-          prerelease: Boolean(r.prerelease),
-          apkUrl: apkAsset.browser_download_url,
-          fileSizeBytes: Number(apkAsset.size) || 0,
-          publishedAt: r.published_at || apkAsset.updated_at || "",
-          sha256: extractShaFromNotes(r.body)
-        };
-      })
+      .map((r) => mapGithubRelease(r, preferredFileName, ""))
       .filter(Boolean);
 
     if (mapped.length === 0) {
@@ -271,18 +306,55 @@
     };
   }
 
+  function resolveLatestAndHistory(latestRelease, allReleases, preferredFileName, directLatestApkUrl) {
+    const primaryFromLatest = mapGithubRelease(
+      latestRelease,
+      preferredFileName,
+      directLatestApkUrl || ""
+    );
+
+    const mappedList = Array.isArray(allReleases)
+      ? allReleases.map((r) => mapGithubRelease(r, preferredFileName, "")).filter(Boolean)
+      : [];
+
+    if (primaryFromLatest) {
+      const seenTags = new Set([primaryFromLatest.tagName]);
+      const history = mappedList.filter((item) => {
+        if (!item.tagName) return item.apkUrl !== primaryFromLatest.perTagApkUrl;
+        if (seenTags.has(item.tagName)) return false;
+        seenTags.add(item.tagName);
+        return true;
+      });
+      return {
+        status: "ready",
+        data: primaryFromLatest,
+        history
+      };
+    }
+
+    return resolveReleasesList(allReleases, preferredFileName);
+  }
+
   function normalizeCustomManifest(data) {
     if (!data || typeof data !== "object") {
       return { status: "unavailable", data: null, history: [] };
     }
-    if (!isSafeDirectApkUrl(data.apkDownloadUrl)) {
+    const candidateUrl =
+      (typeof data.latestApkDownloadUrl === "string" && isSafeDirectApkUrl(data.latestApkDownloadUrl)
+        ? data.latestApkDownloadUrl
+        : data.apkDownloadUrl);
+    if (!isSafeDirectApkUrl(candidateUrl)) {
       return { status: "unavailable", data: null, history: [] };
     }
-    const versionName = typeof data.versionName === "string" && data.versionName.trim()
-      ? data.versionName.trim()
-      : "latest";
+    const versionName =
+      typeof data.versionName === "string" && data.versionName.trim()
+        ? data.versionName.trim()
+        : "latest";
     const versionCode = Number(data.versionCode) > 0 ? Number(data.versionCode) : null;
     const label = versionCode ? `v${versionName} (Build ${versionCode})` : `v${versionName}`;
+    const notesAr = typeof data.releaseNotesAr === "string" ? data.releaseNotesAr.trim() : "";
+    const notesEn = typeof data.releaseNotesEn === "string" ? data.releaseNotesEn.trim() : "";
+    const genericNotes = typeof data.releaseNotes === "string" ? data.releaseNotes.trim() : "";
     return {
       status: "ready",
       data: {
@@ -290,12 +362,16 @@
         tagName: typeof data.releaseTag === "string" ? data.releaseTag : "",
         buildNumber: versionCode,
         prerelease: false,
-        apkUrl: data.apkDownloadUrl.trim(),
+        apkUrl: candidateUrl.trim(),
         fileSizeBytes: Number(data.fileSizeBytes) || 0,
         publishedAt: typeof data.publishedAt === "string" ? data.publishedAt : "",
-        sha256: typeof data.sha256 === "string" && /^[0-9a-fA-F]{64}$/.test(data.sha256.trim())
-          ? data.sha256.trim().toLowerCase()
-          : ""
+        sha256:
+          typeof data.sha256 === "string" && /^[0-9a-fA-F]{64}$/.test(data.sha256.trim())
+            ? data.sha256.trim().toLowerCase()
+            : "",
+        releaseNotes: formatReleaseNotes(genericNotes || notesAr || notesEn),
+        releaseNotesAr: formatReleaseNotes(notesAr),
+        releaseNotesEn: formatReleaseNotes(notesEn)
       },
       history: []
     };
@@ -323,6 +399,7 @@
     setText("meta-package-label", t.metaPackage);
     setText("meta-package-value", t.apkFormatValue);
     setText("meta-sha-label", t.metaSha);
+    setText("release-notes-label", t.releaseNotesLabel);
     setText("features-title", t.featuresTitle);
     setText("feat-1", t.f1);
     setText("feat-2", t.f2);
@@ -346,6 +423,7 @@
     const downloadBtn = document.getElementById("download-apk-btn");
     const retryBtn = document.getElementById("retry-btn");
     const shaCard = document.getElementById("meta-sha-card");
+    const notesCard = document.getElementById("release-notes-card");
     const copyShaBtn = document.getElementById("copy-sha-btn");
     const privateNote = document.getElementById("private-hint");
 
@@ -361,6 +439,7 @@
       downloadBtn.setAttribute("aria-disabled", "true");
       retryBtn.classList.add("hidden");
       shaCard.classList.add("hidden");
+      if (notesCard) notesCard.classList.add("hidden");
       copyShaBtn.classList.add("hidden");
       setText("meta-version-value", "…");
       setText("meta-size-value", "…");
@@ -388,6 +467,17 @@
         shaCard.classList.add("hidden");
         copyShaBtn.classList.add("hidden");
       }
+
+      const localizedNotes =
+        currentLang === "ar"
+          ? rel.releaseNotesAr || rel.releaseNotes || ""
+          : rel.releaseNotesEn || rel.releaseNotes || "";
+      if (notesCard && localizedNotes) {
+        notesCard.classList.remove("hidden");
+        setText("release-notes-value", localizedNotes);
+      } else if (notesCard) {
+        notesCard.classList.add("hidden");
+      }
     } else if (latestReleaseState.status === "unavailable") {
       banner.classList.add("status-unavailable");
       spinner.classList.add("hidden");
@@ -399,6 +489,7 @@
       downloadBtn.setAttribute("aria-disabled", "true");
       retryBtn.classList.remove("hidden");
       shaCard.classList.add("hidden");
+      if (notesCard) notesCard.classList.add("hidden");
       copyShaBtn.classList.add("hidden");
       setText("meta-version-value", "—");
       setText("meta-size-value", "—");
@@ -413,6 +504,7 @@
       downloadBtn.setAttribute("aria-disabled", "true");
       retryBtn.classList.remove("hidden");
       shaCard.classList.add("hidden");
+      if (notesCard) notesCard.classList.add("hidden");
       copyShaBtn.classList.add("hidden");
       setText("meta-version-value", "—");
       setText("meta-size-value", "—");
@@ -519,32 +611,52 @@
         return;
       }
 
-      const apiUrl = `https://api.github.com/repos/${CONFIG.releasesRepo}/releases?per_page=10`;
-      const response = await fetchJsonWithTimeout(
-        apiUrl,
-        { Accept: "application/vnd.github+json" },
-        12000
-      );
+      const repo = CONFIG.releasesRepo || "ow7ab/Share-Flow-Releases";
+      const latestUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+      const listUrl = `https://api.github.com/repos/${repo}/releases?per_page=10`;
+      const headers = { Accept: "application/vnd.github+json" };
 
-      if (response.status === 404) {
-        latestReleaseState = { status: "unavailable", data: null, history: [] };
-        renderReleaseState();
-        return;
-      }
+      const [latestRes, listRes] = await Promise.all([
+        fetchJsonWithTimeout(latestUrl, headers, 12000),
+        fetchJsonWithTimeout(listUrl, headers, 12000).catch(() => null)
+      ]);
 
-      if (response.status === 403 || response.status === 429) {
+      if (latestRes.status === 403 || latestRes.status === 429) {
         const fallback = await trySameOriginFallbackManifest();
         latestReleaseState = fallback || { status: "rate_limited", data: null, history: [] };
         renderReleaseState();
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP_${response.status}`);
+      if (latestRes.status === 404) {
+        if (listRes && listRes.ok) {
+          const allReleases = await listRes.json();
+          const resolvedFromList = resolveReleasesList(allReleases, CONFIG.assetFileName);
+          if (resolvedFromList.status === "ready") {
+            latestReleaseState = resolvedFromList;
+            renderReleaseState();
+            return;
+          }
+        }
+        const fallback = await trySameOriginFallbackManifest();
+        latestReleaseState = fallback || { status: "unavailable", data: null, history: [] };
+        renderReleaseState();
+        return;
       }
 
-      const releases = await response.json();
-      latestReleaseState = resolveReleasesList(releases, CONFIG.assetFileName);
+      if (!latestRes.ok) {
+        throw new Error(`HTTP_${latestRes.status}`);
+      }
+
+      const latestRelease = await latestRes.json();
+      const allReleases = listRes && listRes.ok ? await listRes.json() : [];
+
+      latestReleaseState = resolveLatestAndHistory(
+        latestRelease,
+        allReleases,
+        CONFIG.assetFileName,
+        CONFIG.directLatestApkUrl
+      );
       renderReleaseState();
     } catch {
       const fallback = await trySameOriginFallbackManifest();
@@ -596,9 +708,11 @@
       isSafeHttpsEndpoint,
       selectApkAsset,
       formatBytes,
+      formatReleaseNotes,
       extractShaFromNotes,
       extractBuildNumber,
       resolveReleasesList,
+      resolveLatestAndHistory,
       normalizeCustomManifest
     };
   } else {

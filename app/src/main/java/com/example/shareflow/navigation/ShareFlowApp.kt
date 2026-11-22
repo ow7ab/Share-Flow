@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +17,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +38,6 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -64,6 +64,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -263,12 +264,21 @@ fun ShareFlowApp(
                         }
                     }
                 ) { innerPadding ->
+                    val layoutDirection = LocalLayoutDirection.current
+                    val floatOverHome = currentRoute == ShareFlowRoutes.HOME && !useNavigationRail
+                    val bottomInset = innerPadding.calculateBottomPadding()
                     ShareFlowNavHost(
                         navController = navController,
                         onNavigateTopLevel = ::navigateTopLevel,
+                        homeBottomBarClearance = if (floatOverHome) bottomInset else 0.dp,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .padding(
+                                top = innerPadding.calculateTopPadding(),
+                                start = innerPadding.calculateStartPadding(layoutDirection),
+                                end = innerPadding.calculateEndPadding(layoutDirection),
+                                bottom = if (floatOverHome) 0.dp else bottomInset
+                            )
                     )
                 }
             }
@@ -297,8 +307,8 @@ internal fun ShareFlowFloatingGlassNavBar(
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val supportsRealBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val capsuleShape = RoundedCornerShape(30.dp)
-    val pillShape = RoundedCornerShape(22.dp)
+    val capsuleShape = RoundedCornerShape(32.dp)
+    val pillShape = RoundedCornerShape(20.dp)
 
     val destinations = TopLevelDestination.entries
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
@@ -317,38 +327,39 @@ internal fun ShareFlowFloatingGlassNavBar(
         label = "glass_nav_bloom_position"
     )
 
-    // Theme-specific iOS Glassmorphism palette (always translucent, never flat opaque)
-    val rubyActive = ShareFlowMarpleColors.Ruby
+    // Theme-specific iOS Glassmorphism palette (single unified frosted-glass card, never flat opaque)
+    val activeIconColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
     val activeLabelColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
-    val neutralInactiveIcon = if (isDark) Color(0xFFC4B9BE).copy(alpha = 0.80f) else Color(0xFF6E6469).copy(alpha = 0.84f)
-    val neutralInactiveLabel = if (isDark) Color(0xFFB5A9AE).copy(alpha = 0.78f) else Color(0xFF75676D).copy(alpha = 0.82f)
+    val activeIndicatorColor = ShareFlowMarpleColors.Ruby
+    val neutralInactiveIcon = if (isDark) Color(0xFFB8ADB2).copy(alpha = 0.84f) else Color(0xFF72696E).copy(alpha = 0.86f)
+    val neutralInactiveLabel = if (isDark) Color(0xFFABA0A5).copy(alpha = 0.82f) else Color(0xFF786E73).copy(alpha = 0.86f)
 
     val ambientShadowColor = if (isDark) {
-        Color(0xFF000000).copy(alpha = 0.56f)
+        Color(0xFF000000).copy(alpha = 0.58f)
     } else {
-        ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.20f)
+        ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.16f)
     }
     val spotShadowColor = if (isDark) {
-        ShareFlowMarpleColors.Ruby.copy(alpha = 0.24f)
+        ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f)
     } else {
-        ShareFlowMarpleColors.Ruby.copy(alpha = 0.16f)
+        ShareFlowMarpleColors.Ruby.copy(alpha = 0.14f)
     }
 
     val specularBorderBrush = remember(isDark) {
         if (isDark) {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.22f),
-                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.70f),
-                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.36f)
+                    Color.White.copy(alpha = 0.20f),
+                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.58f),
+                    Color.White.copy(alpha = 0.08f)
                 )
             )
         } else {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.92f),
-                    ShareFlowMarpleColors.Cream.copy(alpha = 0.55f),
-                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.82f)
+                    Color.White.copy(alpha = 0.94f),
+                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.78f),
+                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.92f)
                 )
             )
         }
@@ -359,18 +370,18 @@ internal fun ShareFlowFloatingGlassNavBar(
             if (supportsRealBlur) {
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.08f),
-                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.42f),
-                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.52f)
+                        Color.White.copy(alpha = 0.09f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.58f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.68f)
                     )
                 )
             } else {
-                // Graceful translucent dark glass fallback when hardware RenderEffect blur is unavailable
+                // Translucent dark glass fallback on devices without RenderEffect blur
                 Brush.verticalGradient(
                     colors = listOf(
-                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.82f),
-                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.78f),
-                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.84f)
+                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.80f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.84f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.88f)
                     )
                 )
             }
@@ -378,18 +389,18 @@ internal fun ShareFlowFloatingGlassNavBar(
             if (supportsRealBlur) {
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.62f),
-                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.48f),
-                        ShareFlowMarpleColors.Cream.copy(alpha = 0.34f)
+                        Color.White.copy(alpha = 0.74f),
+                        Color.White.copy(alpha = 0.60f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.56f)
                     )
                 )
             } else {
-                // Graceful translucent white & cream glass fallback when hardware RenderEffect blur is unavailable
+                // Translucent frosted white & cream glass fallback on devices without RenderEffect blur
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.84f),
-                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.78f),
-                        ShareFlowMarpleColors.Cream.copy(alpha = 0.62f)
+                        Color.White.copy(alpha = 0.88f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.82f),
+                        ShareFlowMarpleColors.Cream.copy(alpha = 0.30f)
                     )
                 )
             }
@@ -497,11 +508,11 @@ internal fun ShareFlowFloatingGlassNavBar(
                     .background(brush = frostedGlazeBrush)
             )
 
-            // Layer 3: Crisp Material 3 interactive navigation items
+            // Layer 3: Crisp Material 3 interactive navigation items inside ONE unified glass card
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 7.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -510,7 +521,7 @@ internal fun ShareFlowFloatingGlassNavBar(
                     val label = stringResource(destination.labelRes)
 
                     val iconTint by animateColorAsState(
-                        targetValue = if (isSelected) rubyActive else neutralInactiveIcon,
+                        targetValue = if (isSelected) activeIconColor else neutralInactiveIcon,
                         animationSpec = tween(durationMillis = 200),
                         label = "nav_icon_tint_${destination.route}"
                     )
@@ -519,17 +530,17 @@ internal fun ShareFlowFloatingGlassNavBar(
                         animationSpec = tween(durationMillis = 200),
                         label = "nav_text_tint_${destination.route}"
                     )
-                    val pillContainerColor by animateColorAsState(
+                    val activeWashColor by animateColorAsState(
                         targetValue = when {
-                            isSelected && isDark -> ShareFlowMarpleColors.Cream.copy(alpha = 0.14f)
-                            isSelected -> ShareFlowMarpleColors.Ruby.copy(alpha = 0.11f)
+                            isSelected && isDark -> ShareFlowMarpleColors.DarkPrimary.copy(alpha = 0.14f)
+                            isSelected -> ShareFlowMarpleColors.Ruby.copy(alpha = 0.09f)
                             else -> Color.Transparent
                         },
                         animationSpec = tween(durationMillis = 220),
                         label = "nav_pill_bg_${destination.route}"
                     )
                     val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.12f else 1.0f,
+                        targetValue = if (isSelected) 1.10f else 1.0f,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
                             stiffness = Spring.StiffnessMedium
@@ -545,7 +556,7 @@ internal fun ShareFlowFloatingGlassNavBar(
                         label = "nav_icon_lift_${destination.route}"
                     )
                     val indicatorWidth by animateDpAsState(
-                        targetValue = if (isSelected) 18.dp else 0.dp,
+                        targetValue = if (isSelected) 16.dp else 0.dp,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
                             stiffness = Spring.StiffnessMediumLow
@@ -553,30 +564,18 @@ internal fun ShareFlowFloatingGlassNavBar(
                         label = "nav_indicator_${destination.route}"
                     )
 
-                    Surface(
-                        shape = pillShape,
-                        color = pillContainerColor,
-                        border = if (isSelected) {
-                            BorderStroke(
-                                width = 0.75.dp,
-                                color = if (isDark) {
-                                    ShareFlowMarpleColors.Ruby.copy(alpha = 0.45f)
-                                } else {
-                                    ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f)
-                                }
-                            )
-                        } else {
-                            null
-                        },
+                    Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
                             .clip(pillShape)
+                            .background(activeWashColor)
                             .minimumInteractiveComponentSize()
                             .semantics { selected = isSelected }
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = androidx.compose.material3.ripple(
-                                    color = rubyActive
+                                    color = activeIndicatorColor
                                 ),
                                 role = Role.Tab,
                                 onClick = { onNavigateTopLevel(destination.route) }
@@ -584,7 +583,7 @@ internal fun ShareFlowFloatingGlassNavBar(
                             .testTag(destination.testTag)
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 7.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
@@ -603,7 +602,7 @@ internal fun ShareFlowFloatingGlassNavBar(
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.5.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                                 ),
                                 color = textTint,
@@ -616,7 +615,7 @@ internal fun ShareFlowFloatingGlassNavBar(
                                         .width(indicatorWidth)
                                         .height(2.5.dp)
                                         .clip(CircleShape)
-                                        .background(rubyActive)
+                                        .background(activeIndicatorColor)
                                 )
                             }
                         }
@@ -631,6 +630,7 @@ internal fun ShareFlowFloatingGlassNavBar(
 private fun ShareFlowNavHost(
     navController: NavHostController,
     onNavigateTopLevel: (String) -> Unit,
+    homeBottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     fun navigateToRoute(route: String) {
@@ -694,7 +694,10 @@ private fun ShareFlowNavHost(
     ) {
         // Top-level destinations: Home, Files, Media, Tools, Settings
         composable(route = ShareFlowRoutes.HOME) {
-            HomeDashboardScreen(onNavigateToRoute = ::navigateToRoute)
+            HomeDashboardScreen(
+                onNavigateToRoute = ::navigateToRoute,
+                bottomBarClearance = homeBottomBarClearance
+            )
         }
         composable(route = ShareFlowRoutes.FILES_HUB) {
             FilesScreen(

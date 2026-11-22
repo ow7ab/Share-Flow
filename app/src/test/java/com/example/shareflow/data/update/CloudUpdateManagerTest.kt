@@ -67,7 +67,7 @@ class CloudUpdateManagerTest {
         )
         assertEquals("com.aistudio.shareflow.kxrvnm", BuildConfig.APPLICATION_ID)
         assertEquals(
-            "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
+            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
         )
         assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(BuildConfig.CLOUD_UPDATE_MANIFEST_URL))
@@ -79,14 +79,14 @@ class CloudUpdateManagerTest {
             {
               "versionCode": 12,
               "versionName": "1.0.11",
-              "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.11/Share-Flow.apk",
+              "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.11/Share-Flow.apk",
               "sha256": "$sampleApkSha256",
               "fileSizeBytes": ${sampleApkBytes.size},
               "minSupportedAndroidSdk": 24,
               "mandatory": false,
               "releaseNotesAr": "إصدار رسمي موقّع وموثّق من تطبيق Share Flow جاهز للتثبيت المباشر.",
               "releaseNotesEn": "Verified signed Share Flow Android release ready for direct APK installation.",
-              "portalUrl": "https://ow7ab.github.io/Share-Flow/",
+              "portalUrl": "https://ow7ab.github.io/Share-Flow-Releases/",
               "publishedAt": "2026-11-22T09:00:00Z",
               "releaseTag": "v1.0.11",
               "signingCertSha256": "$sampleApkSha256"
@@ -99,7 +99,7 @@ class CloudUpdateManagerTest {
         assertEquals(12, data.versionCode)
         assertEquals("1.0.11", data.versionName)
         assertTrue(data.apkDownloadUrl.endsWith("/Share-Flow.apk"))
-        assertEquals("https://ow7ab.github.io/Share-Flow/", data.portalUrl)
+        assertEquals("https://ow7ab.github.io/Share-Flow-Releases/", data.portalUrl)
     }
 
     @Test
@@ -161,7 +161,7 @@ class CloudUpdateManagerTest {
         )
 
         assertEquals(
-            "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
+            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json",
             manager.resolveEffectiveManifestUrl("")
         )
         assertEquals(
