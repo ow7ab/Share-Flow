@@ -42,6 +42,7 @@ import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
@@ -406,12 +407,13 @@ fun CloudUpdateSettingsCard(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             if (updateState.totalBytes > 0L) {
-                                LinearProgressIndicator(
-                                    progress = { updateState.progress },
-                                    modifier = Modifier.fillMaxWidth()
+                                ShareFlowSignatureProgressBar(
+                                    progress = updateState.progress,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    height = 8.dp
                                 )
                             } else {
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             }
                             SecondaryActionButton(
                                 text = stringResource(R.string.settings_update_cancel_download_action),

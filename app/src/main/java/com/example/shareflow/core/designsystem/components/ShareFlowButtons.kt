@@ -64,8 +64,8 @@ fun PrimaryActionButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            disabledContainerColor = ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.36f),
-            disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.65f)
+            disabledContainerColor = ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.28f),
+            disabledContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.55f)
         ),
         modifier = modifier
             .heightIn(min = spacing.minTouchTarget)
@@ -115,7 +115,7 @@ fun SecondaryActionButton(
     val contentColor = if (isDestructive) {
         MaterialTheme.colorScheme.error
     } else {
-        MaterialTheme.colorScheme.secondary
+        ShareFlowBrandColors.RoyalBlue
     }
 
     if (outlined) {
@@ -125,16 +125,16 @@ fun SecondaryActionButton(
             shape = ShareFlowDesign.shapes.button,
             contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
             colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = ShareFlowBrandColors.GlassSurfaceLow.copy(alpha = 0.72f),
+                containerColor = ShareFlowBrandColors.GlassSurfaceLowest.copy(alpha = 0.85f),
                 contentColor = contentColor,
-                disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.45f)
+                disabledContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.42f)
             ),
             border = BorderStroke(
                 width = 1.dp,
                 color = when {
-                    !enabled -> ShareFlowBrandColors.SkyBlue.copy(alpha = 0.16f)
+                    !enabled -> ShareFlowBrandColors.DeepNavy.copy(alpha = 0.16f)
                     isDestructive -> MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
-                    else -> ShareFlowBrandColors.SkyBlue.copy(alpha = 0.48f)
+                    else -> ShareFlowBrandColors.SkyBlue
                 }
             ),
             modifier = modifier
@@ -182,8 +182,8 @@ fun SecondaryActionButton(
                 } else {
                     MaterialTheme.colorScheme.onSecondaryContainer
                 },
-                disabledContainerColor = ShareFlowBrandColors.GlassSurfaceLow.copy(alpha = 0.55f),
-                disabledContentColor = ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.45f)
+                disabledContainerColor = ShareFlowBrandColors.GlassSurfaceHigh.copy(alpha = 0.65f),
+                disabledContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.42f)
             ),
             modifier = modifier
                 .heightIn(min = spacing.minTouchTarget)

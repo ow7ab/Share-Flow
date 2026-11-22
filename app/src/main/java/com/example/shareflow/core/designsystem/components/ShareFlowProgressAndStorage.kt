@@ -1,18 +1,27 @@
 package com.example.shareflow.core.designsystem.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -30,6 +39,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -48,7 +60,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.TransferDirection
 
 /**
- * Reusable Liquid Glass progress bar filled with the Official Share Flow Signature Gradient:
+ * Reusable Liquid Glass determinate progress bar filled with the Official Share Flow Signature Gradient:
  * Royal Blue (#1D59BB) -> Sky Blue (#76B9FF) -> Soft Cream (#FEF3B3) -> Golden Yellow (#FEBD19).
  */
 @Composable
@@ -64,7 +76,12 @@ fun ShareFlowSignatureProgressBar(
             .fillMaxWidth()
             .height(height)
             .clip(trackShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(ShareFlowBrandColors.GlassSurfaceHighest)
+            .border(
+                width = 0.75.dp,
+                color = ShareFlowBrandColors.GlassCardBorder,
+                shape = trackShape
+            )
     ) {
         if (clamped > 0.005f) {
             Box(
@@ -79,6 +96,70 @@ fun ShareFlowSignatureProgressBar(
 }
 
 /**
+ * Reusable Liquid Glass indeterminate progress bar with a luminous sweeping
+ * Official Share Flow Signature Gradient segment.
+ */
+@Composable
+fun ShareFlowSignatureProgressBar(
+    modifier: Modifier = Modifier,
+    height: Dp = 6.dp
+) {
+    val trackShape = ShareFlowDesign.shapes.progressTrack
+    val transition = rememberInfiniteTransition(label = "signature_indeterminate_progress")
+    val offsetFraction by transition.animateFloat(
+        initialValue = -0.45f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1350, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "signature_indeterminate_offset"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(trackShape)
+            .background(ShareFlowBrandColors.GlassSurfaceHighest)
+            .border(
+                width = 0.75.dp,
+                color = ShareFlowBrandColors.GlassCardBorder,
+                shape = trackShape
+            )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val segWidth = size.width * 0.42f
+            val startX = offsetFraction * size.width
+            val radius = size.height / 2f
+            drawRoundRect(
+                brush = ShareFlowBrandGradients.signatureHorizontal(),
+                topLeft = Offset(startX, 0f),
+                size = Size(segWidth, size.height),
+                cornerRadius = CornerRadius(radius, radius)
+            )
+        }
+    }
+}
+
+/**
+ * Reusable active-state tab indicator painted with the Official Share Flow Signature Gradient.
+ */
+@Composable
+fun ShareFlowSignatureTabIndicator(
+    modifier: Modifier = Modifier,
+    height: Dp = 3.dp
+) {
+    Box(
+        modifier = modifier
+            .height(height)
+            .padding(horizontal = 16.dp)
+            .clip(CircleShape)
+            .background(ShareFlowBrandGradients.signatureHorizontal())
+    )
+}
+
+/**
  * Reusable Material 3 storage capacity indicator driven strictly by real used/total byte values.
  */
 @Composable
@@ -89,7 +170,6 @@ fun StorageIndicator(
     title: String? = null
 ) {
     val spacing = ShareFlowDesign.spacing
-    val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
 
     val safeTotal = totalBytes.coerceAtLeast(0L)
@@ -104,8 +184,8 @@ fun StorageIndicator(
 
     val barColor = when {
         fraction >= 0.9f -> MaterialTheme.colorScheme.error
-        fraction >= 0.75f -> ShareFlowBrandColors.GoldenYellow
-        else -> ShareFlowBrandColors.SkyBlue
+        fraction >= 0.75f -> ShareFlowBrandColors.DeepNavy
+        else -> ShareFlowBrandColors.RoyalBlue
     }
 
     Surface(
@@ -151,7 +231,7 @@ fun StorageIndicator(
                 Text(
                     text = ShareFlowFormatters.formatPercentage(fraction, locale),
                     style = ShareFlowMonoStyle,
-                    color = ShareFlowBrandColors.SoftCream
+                    color = ShareFlowBrandColors.DeepNavy
                 )
             }
 
@@ -193,7 +273,7 @@ fun StorageIndicator(
                         ShareFlowFormatters.formatBytes(availableBytes, locale)
                     ),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ShareFlowBrandColors.RoyalBlue
                 )
             }
         }
@@ -336,12 +416,12 @@ fun TransferProgressCard(
                     Text(
                         text = ShareFlowFormatters.formatTransferSpeed(bytesPerSecond, locale),
                         style = ShareFlowMonoStyle,
-                        color = ShareFlowBrandColors.SkyBlue
+                        color = ShareFlowBrandColors.RoyalBlue
                     )
                     Text(
                         text = ShareFlowFormatters.formatPercentage(fraction, locale),
                         style = ShareFlowMonoStyle,
-                        color = ShareFlowBrandColors.SoftCream
+                        color = ShareFlowBrandColors.DeepNavy
                     )
                 }
             }

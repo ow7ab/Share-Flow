@@ -46,13 +46,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -79,7 +80,9 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
@@ -88,6 +91,7 @@ import com.example.shareflow.domain.model.MusicPlaylist
 import com.example.shareflow.domain.model.MusicRepeatMode
 import com.example.shareflow.media.music.MusicPlaybackState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MusicPlayerScreen(
     onNavigateBack: () -> Unit,
@@ -217,25 +221,39 @@ fun MusicPlayerScreen(
                 }
             }
 
-            TabRow(
-                selectedTabIndex = uiState.selectedTab.ordinal,
+            val selectedMusicTab = uiState.selectedTab.ordinal
+            PrimaryTabRow(
+                selectedTabIndex = selectedMusicTab,
+                containerColor = ShareFlowBrandColors.SoftCream,
+                contentColor = ShareFlowBrandColors.DeepNavy,
+                indicator = {
+                    ShareFlowSignatureTabIndicator(
+                        modifier = Modifier.tabIndicatorOffset(selectedMusicTab, matchContentSize = false)
+                    )
+                },
                 modifier = Modifier.testTag("music_tabs")
             ) {
                 Tab(
                     selected = uiState.selectedTab == MusicTab.LIBRARY,
                     onClick = { viewModel.selectTab(MusicTab.LIBRARY) },
+                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                     text = { Text(stringResource(R.string.media_music_tab_library)) },
                     modifier = Modifier.testTag("music_tab_library")
                 )
                 Tab(
                     selected = uiState.selectedTab == MusicTab.QUEUE,
                     onClick = { viewModel.selectTab(MusicTab.QUEUE) },
+                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                     text = { Text(stringResource(R.string.media_music_tab_queue, playbackState.queue.size)) },
                     modifier = Modifier.testTag("music_tab_queue")
                 )
                 Tab(
                     selected = uiState.selectedTab == MusicTab.PLAYLISTS,
                     onClick = { viewModel.selectTab(MusicTab.PLAYLISTS) },
+                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                     text = { Text(stringResource(R.string.media_music_tab_playlists, playlists.size)) },
                     modifier = Modifier.testTag("music_tab_playlists")
                 )

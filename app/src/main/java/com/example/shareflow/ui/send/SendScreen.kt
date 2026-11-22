@@ -61,7 +61,10 @@ import com.example.R
 import com.example.shareflow.core.common.SafDocumentInspector
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -262,11 +265,14 @@ fun SendScreen(
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (uiState.isExtractingApps) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        ShareFlowSignatureProgressBar(
+                            modifier = Modifier.fillMaxWidth(),
+                            height = 5.dp
+                        )
                         Text(
                             text = stringResource(R.string.send_apps_extracting_status),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = ShareFlowBrandColors.RoyalBlue,
                             modifier = Modifier.padding(horizontal = spacing.screenHorizontal, vertical = 4.dp)
                         )
                     }
@@ -350,8 +356,16 @@ fun SendScreen(
                 Triple(SendContentTab.APPS, R.string.send_tab_apps, Icons.Filled.Apps),
                 Triple(SendContentTab.FILES, R.string.send_tab_files, Icons.Filled.Folder)
             )
+            val selectedTabIndex = tabs.indexOfFirst { it.first == uiState.activeTab }.coerceAtLeast(0)
             PrimaryTabRow(
-                selectedTabIndex = tabs.indexOfFirst { it.first == uiState.activeTab }.coerceAtLeast(0),
+                selectedTabIndex = selectedTabIndex,
+                containerColor = ShareFlowBrandColors.SoftCream,
+                contentColor = ShareFlowBrandColors.DeepNavy,
+                indicator = {
+                    ShareFlowSignatureTabIndicator(
+                        modifier = Modifier.tabIndicatorOffset(selectedTabIndex, matchContentSize = false)
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = spacing.maxContentWidth)
@@ -361,6 +375,8 @@ fun SendScreen(
                     Tab(
                         selected = uiState.activeTab == tab,
                         onClick = { viewModel.selectTab(tab) },
+                        selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                        unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                         text = {
                             Text(
                                 text = stringResource(labelRes),

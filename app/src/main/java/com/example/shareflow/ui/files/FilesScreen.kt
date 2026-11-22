@@ -90,6 +90,7 @@ import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PermissionExplanationDialog
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.components.StorageIndicator
@@ -579,7 +580,7 @@ private fun FileManagerBody(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (uiState.isOperationBusy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
         }
 
         if (uiState.isSearchActive) {

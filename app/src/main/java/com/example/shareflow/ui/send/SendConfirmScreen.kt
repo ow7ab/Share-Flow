@@ -76,6 +76,7 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -356,7 +357,7 @@ fun SendConfirmScreen(
                                         )
                                     }
                                 }
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                                 SecondaryActionButton(
                                     text = stringResource(R.string.smart_sender_cancel_action),
                                     onClick = viewModel::cancelSmartConnect,
@@ -408,10 +409,7 @@ fun SendConfirmScreen(
                                         )
                                     }
                                 }
-                                LinearProgressIndicator(
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             }
                         }
                     }

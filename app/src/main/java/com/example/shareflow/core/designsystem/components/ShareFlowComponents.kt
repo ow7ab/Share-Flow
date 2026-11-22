@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 
@@ -75,8 +76,10 @@ fun ShareFlowTopBar(
         },
         actions = { actions() },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = ShareFlowBrandColors.SoftCream,
+            titleContentColor = ShareFlowBrandColors.DeepNavy,
+            navigationIconContentColor = ShareFlowBrandColors.RoyalBlue,
+            actionIconContentColor = ShareFlowBrandColors.RoyalBlue
         )
     )
 }
@@ -148,7 +151,7 @@ fun MetricStatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = ShareFlowBrandColors.RoyalBlue,
                 modifier = Modifier.size(20.dp)
             )
             Text(
@@ -157,7 +160,7 @@ fun MetricStatCard(
                     fontSize = MaterialTheme.typography.titleLarge.fontSize,
                     lineHeight = MaterialTheme.typography.titleLarge.lineHeight
                 ),
-                color = MaterialTheme.colorScheme.onSurface,
+                color = ShareFlowBrandColors.DeepNavy,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

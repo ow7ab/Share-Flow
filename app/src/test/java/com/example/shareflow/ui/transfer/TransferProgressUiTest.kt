@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import com.example.shareflow.core.designsystem.components.TransferCard
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.domain.model.AppLanguage
@@ -304,6 +306,8 @@ class TransferProgressUiTest {
         }
 
         // Install App button appears for the grouped WhatsApp app (not split_config.arm64_v8a.apk)
+        composeRule.onNodeWithTag("transfer_progress_list")
+            .performScrollToNode(hasTestTag("transfer_item_install_bundle_WhatsApp_v2.24_split_apk"))
         composeRule.onNodeWithTag("transfer_item_install_bundle_WhatsApp_v2.24_split_apk")
             .assertIsDisplayed()
             .performClick()
@@ -315,6 +319,8 @@ class TransferProgressUiTest {
             .assertIsNotEnabled()
 
         // View File button appears for the received photo
+        composeRule.onNodeWithTag("transfer_progress_list")
+            .performTouchInput { swipeUp() }
         composeRule.onNodeWithTag("transfer_item_view_img_1")
             .assertIsDisplayed()
             .performClick()

@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.ConnectionType
@@ -277,14 +278,17 @@ fun DeviceCard(
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
-        border = BorderStroke(
-            width = if (selected) 1.5.dp else 1.dp,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = if (selected) {
+            BorderStroke(
+                width = 1.5.dp,
+                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.85f)
+            )
+        } else {
+            BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
     ) {
         Row(
             modifier = Modifier
@@ -446,14 +450,17 @@ fun FileItem(
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = if (selected) {
+            BorderStroke(
+                width = 1.25.dp,
+                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.85f)
+            )
+        } else {
+            BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
     ) {
         Row(
             modifier = Modifier

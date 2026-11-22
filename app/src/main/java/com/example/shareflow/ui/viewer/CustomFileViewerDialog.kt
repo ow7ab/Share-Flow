@@ -504,7 +504,7 @@ fun CustomFileViewerDialog(
                 // Bottom Action Dock: Send via ShareFlow + Move to Private Vault (+ Install APK)
                 Surface(
                     color = if (isMediaDarkStage) {
-                        com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.GlassSurfaceLow
+                        com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavyGlassSurface
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },

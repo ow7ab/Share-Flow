@@ -81,6 +81,7 @@ import com.example.shareflow.core.designsystem.components.ConfirmationDialog
 import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
@@ -209,7 +210,7 @@ fun VaultScreen(
                 .padding(innerPadding)
         ) {
             if (uiState.isBusy) {
-                LinearProgressIndicator(
+                ShareFlowSignatureProgressBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_progress_indicator")

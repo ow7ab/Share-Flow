@@ -65,6 +65,7 @@ import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -323,7 +324,7 @@ fun ReceiveScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             }
                         }
                     }
@@ -371,7 +372,7 @@ fun ReceiveScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                                 Text(
                                     text = stringResource(R.string.smart_receive_preparing_body),
                                     style = MaterialTheme.typography.bodySmall,
@@ -470,10 +471,7 @@ fun ReceiveScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        LinearProgressIndicator(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            color = semantic.verifiedBadge
-                                        )
+                                        ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                                         Text(
                                             text = stringResource(R.string.receive_waiting_searching_banner),
                                             style = MaterialTheme.typography.labelMedium,

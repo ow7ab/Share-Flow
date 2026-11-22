@@ -61,6 +61,7 @@ import com.example.shareflow.core.designsystem.components.ModuleDirectoryCard
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -413,11 +414,10 @@ fun StorageAnalyzerScreen(
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
                                                 }
-                                                LinearProgressIndicator(
-                                                    progress = { (usage.bytesUsed.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f) },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(6.dp)
+                                                ShareFlowSignatureProgressBar(
+                                                    progress = (usage.bytesUsed.toFloat() / maxBytes.toFloat()).coerceIn(0f, 1f),
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    height = 6.dp
                                                 )
                                             }
                                         }

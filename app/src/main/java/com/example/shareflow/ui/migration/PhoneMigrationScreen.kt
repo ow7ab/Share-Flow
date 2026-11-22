@@ -72,6 +72,7 @@ import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
 import com.example.shareflow.domain.model.MigrationCategory
 import com.example.shareflow.domain.model.MigrationCategorySummary
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.domain.model.MigrationRole
 import com.example.shareflow.domain.model.MigrationStep
 
@@ -604,11 +605,10 @@ fun PhoneMigrationContent(
                                             style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        LinearProgressIndicator(
-                                            progress = { session?.progressFraction ?: 0f },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(8.dp)
+                                        ShareFlowSignatureProgressBar(
+                                            progress = session?.progressFraction ?: 0f,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            height = 8.dp
                                         )
                                         if (session != null) {
                                             Text(

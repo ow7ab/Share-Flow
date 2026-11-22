@@ -1,7 +1,7 @@
 package com.example.shareflow.core.designsystem.theme
 
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
@@ -9,58 +9,65 @@ import androidx.compose.ui.graphics.Color
 import com.example.shareflow.domain.model.AccentColor
 
 /**
- * OFFICIAL SHARE FLOW BRAND COLOR SYSTEM
+ * OFFICIAL SHARE FLOW BRAND COLOR SYSTEM — SOFT CREAM (#FEF3B3) PRIMARY IDENTITY
  *
- * Centralized, immutable brand color tokens implementing the mandatory 5-color Share Flow
- * visual identity with a refined iOS-inspired Liquid Glass aesthetic over Deep Navy.
+ * Centralized, immutable brand color tokens built around Soft Cream (#FEF3B3) as the
+ * primary application canvas color, paired with Deep Navy typography, Royal Blue primary
+ * actions, Sky Blue secondary glass accents, Golden Yellow highlights, and the Signature
+ * Gradient across a luminous Liquid Glass surface hierarchy.
  *
  * Mandatory Brand HEX Palette:
- * - Deep Navy:     #0A1821 (Primary application background)
+ * - Soft Cream:    #FEF3B3 (Primary application background & main brand canvas)
+ * - Deep Navy:     #0A1821 (High-contrast typography, floating glass nav capsule, hero depth)
  * - Royal Blue:    #1D59BB (Primary actions, buttons, selected navigation states)
- * - Sky Blue:      #76B9FF (Secondary actions, icons, glass borders, supporting visuals)
- * - Soft Cream:    #FEF3B3 (Selected light surfaces, subtle highlights, readable text accents)
+ * - Sky Blue:      #76B9FF (Secondary actions, glass borders, supporting visual accents)
  * - Golden Yellow: #FEBD19 (Important highlights, status indicators, visual emphasis)
  */
 object ShareFlowBrandColors {
     // Mandatory Official Brand Colors (Exact HEX)
+    val SoftCream: Color = Color(0xFFFEF3B3)
     val DeepNavy: Color = Color(0xFF0A1821)
     val RoyalBlue: Color = Color(0xFF1D59BB)
     val SkyBlue: Color = Color(0xFF76B9FF)
-    val SoftCream: Color = Color(0xFFFEF3B3)
     val GoldenYellow: Color = Color(0xFFFEBD19)
 
-    // Liquid Glass Surface Elevation Ladder (strictly derived from Deep Navy #0A1821)
+    // Luminous Liquid Glass Surface Elevation Ladder (derived from Soft Cream #FEF3B3)
+    val GlassSurfaceLowest: Color = Color(0xFFFFFCEB)
+    val GlassSurfaceLow: Color = Color(0xFFFFF9DC)
+    val GlassSurface: Color = SoftCream
+    val GlassSurfaceHigh: Color = Color(0xFFF6E79A)
+    val GlassSurfaceHighest: Color = Color(0xFFECE08B)
+
+    // Deep Navy elevation alias retained for dark media/viewer overlays
     val DeepNavyLowest: Color = Color(0xFF071118)
-    val GlassSurfaceLow: Color = Color(0xFF102331)
-    val GlassSurface: Color = Color(0xFF152C3D)
-    val GlassSurfaceHigh: Color = Color(0xFF1B374D)
-    val GlassSurfaceHighest: Color = Color(0xFF234560)
+    val DeepNavyGlassSurface: Color = Color(0xFF102331)
 
     // Floating Glass Navigation & Translucent Border Tokens
-    val GlassNavBackground: Color = Color(0xE00A1821)
-    val GlassNavBorder: Color = Color(0x5276B9FF)
-    val GlassCardBorder: Color = Color(0x3376B9FF)
-    val GlassActiveBorder: Color = Color(0x8876B9FF)
-    val GlassSoftCreamHighlight: Color = Color(0x55FEF3B3)
+    val GlassNavBackground: Color = Color(0xEB0A1821)
+    val GlassNavBorder: Color = Color(0x6676B9FF)
+    val GlassCardBorder: Color = Color(0x471D59BB)
+    val GlassActiveBorder: Color = Color(0x991D59BB)
+    val GlassSoftCreamHighlight: Color = Color(0x88FEF3B3)
 
-    // Brand Containers (derived exclusively from Royal Blue, Sky Blue, Golden Yellow on Deep Navy)
-    val RoyalBlueContainer: Color = Color(0xFF153D7E)
-    val SkyBlueContainer: Color = Color(0xFF123452)
-    val GoldenYellowContainer: Color = Color(0xFF33280B)
+    // Brand Containers (derived exclusively from Royal Blue, Sky Blue, Golden Yellow on Soft Cream)
+    val RoyalBlueContainer: Color = Color(0xFFDCEBFF)
+    val SkyBlueContainer: Color = Color(0xFFE3F2FF)
+    val GoldenYellowContainer: Color = Color(0xFFFFE596)
 
-    // High-Contrast Readable Ink Tokens on Deep Navy / Brand Surfaces (WCAG AA+ Verified)
-    val InkOnDeepNavy: Color = Color(0xFFF6FAFF)
-    val InkSecondaryOnDeepNavy: Color = Color(0xFFBBD5EC)
-    val InkOnRoyalBlue: Color = Color(0xFFFFFFFF)
-    val InkOnSkyBlue: Color = DeepNavy
-    val InkOnGoldenYellow: Color = DeepNavy
-    val InkOnSoftCream: Color = DeepNavy
+    // High-Contrast Readable Ink Tokens (WCAG AA/AAA Verified)
+    val InkOnSoftCream: Color = DeepNavy                    // 15.8:1 contrast on #FEF3B3
+    val InkSecondaryOnSoftCream: Color = Color(0xFF233B4D)  // 9.8:1 contrast on #FEF3B3
+    val InkOnDeepNavy: Color = Color(0xFFF6FAFF)            // 17.0:1 contrast on #0A1821
+    val InkSecondaryOnDeepNavy: Color = Color(0xFFBBD5EC)   // 11.4:1 contrast on #0A1821
+    val InkOnRoyalBlue: Color = Color(0xFFFFFFFF)           // 6.7:1 contrast on #1D59BB
+    val InkOnSkyBlue: Color = DeepNavy                      // 8.8:1 contrast on #76B9FF
+    val InkOnGoldenYellow: Color = DeepNavy                 // 11.1:1 contrast on #FEBD19
 
-    // System Error Tokens (reserved exclusively for destructive/failure states)
-    val ErrorSurfaceAccent: Color = Color(0xFFFF8A80)
-    val OnErrorSurfaceAccent: Color = DeepNavy
-    val ErrorContainerGlass: Color = Color(0xFF47181E)
-    val OnErrorContainerGlass: Color = Color(0xFFFFDAD6)
+    // System Error Tokens (high contrast on Soft Cream #FEF3B3)
+    val ErrorSurfaceAccent: Color = Color(0xFFB3261E)
+    val OnErrorSurfaceAccent: Color = Color(0xFFFFFFFF)
+    val ErrorContainerGlass: Color = Color(0xFFFFDAD6)
+    val OnErrorContainerGlass: Color = Color(0xFF410002)
 }
 
 /**
@@ -79,18 +86,14 @@ object ShareFlowBrandGradients {
 
     fun signatureLinear(): Brush = Brush.linearGradient(colors = SignatureStops)
 
-    fun signatureBorder(alpha: Float = 0.85f): Brush = Brush.horizontalGradient(
+    fun signatureBorder(alpha: Float = 0.90f): Brush = Brush.horizontalGradient(
         colors = SignatureStops.map { it.copy(alpha = alpha) }
     )
 
-    fun signatureSubtleGlow(alpha: Float = 0.24f): Brush = Brush.horizontalGradient(
+    fun signatureSubtleGlow(alpha: Float = 0.28f): Brush = Brush.horizontalGradient(
         colors = SignatureStops.map { it.copy(alpha = alpha) }
     )
 
-    /**
-     * Liquid Glass hero & primary button sheen keeping crisp white text legibility
-     * while honoring Royal Blue -> Sky Blue depth.
-     */
     fun primaryActionSheen(): Brush = Brush.horizontalGradient(
         colors = listOf(
             ShareFlowBrandColors.RoyalBlue,
@@ -101,42 +104,42 @@ object ShareFlowBrandGradients {
 }
 
 /**
- * Official Material 3 ColorScheme implementing the mandatory Share Flow Brand Color System.
+ * Official Material 3 ColorScheme with Soft Cream (#FEF3B3) as the primary application color.
  */
-val ShareFlowBrandColorScheme: ColorScheme = darkColorScheme(
+val ShareFlowBrandColorScheme: ColorScheme = lightColorScheme(
     primary = ShareFlowBrandColors.RoyalBlue,
     onPrimary = ShareFlowBrandColors.InkOnRoyalBlue,
     primaryContainer = ShareFlowBrandColors.RoyalBlueContainer,
-    onPrimaryContainer = ShareFlowBrandColors.SoftCream,
+    onPrimaryContainer = ShareFlowBrandColors.DeepNavy,
     inversePrimary = ShareFlowBrandColors.SkyBlue,
 
     secondary = ShareFlowBrandColors.SkyBlue,
     onSecondary = ShareFlowBrandColors.InkOnSkyBlue,
     secondaryContainer = ShareFlowBrandColors.SkyBlueContainer,
-    onSecondaryContainer = ShareFlowBrandColors.SkyBlue,
+    onSecondaryContainer = ShareFlowBrandColors.DeepNavy,
 
     tertiary = ShareFlowBrandColors.GoldenYellow,
     onTertiary = ShareFlowBrandColors.InkOnGoldenYellow,
     tertiaryContainer = ShareFlowBrandColors.GoldenYellowContainer,
-    onTertiaryContainer = ShareFlowBrandColors.SoftCream,
+    onTertiaryContainer = ShareFlowBrandColors.DeepNavy,
 
-    background = ShareFlowBrandColors.DeepNavy,
-    onBackground = ShareFlowBrandColors.InkOnDeepNavy,
-    surface = ShareFlowBrandColors.DeepNavy,
-    onSurface = ShareFlowBrandColors.InkOnDeepNavy,
-    surfaceVariant = ShareFlowBrandColors.GlassSurface,
-    onSurfaceVariant = ShareFlowBrandColors.InkSecondaryOnDeepNavy,
+    background = ShareFlowBrandColors.SoftCream,
+    onBackground = ShareFlowBrandColors.InkOnSoftCream,
+    surface = ShareFlowBrandColors.SoftCream,
+    onSurface = ShareFlowBrandColors.InkOnSoftCream,
+    surfaceVariant = ShareFlowBrandColors.GlassSurfaceHigh,
+    onSurfaceVariant = ShareFlowBrandColors.InkSecondaryOnSoftCream,
 
-    surfaceContainerLowest = ShareFlowBrandColors.DeepNavyLowest,
+    surfaceContainerLowest = ShareFlowBrandColors.GlassSurfaceLowest,
     surfaceContainerLow = ShareFlowBrandColors.GlassSurfaceLow,
     surfaceContainer = ShareFlowBrandColors.GlassSurface,
     surfaceContainerHigh = ShareFlowBrandColors.GlassSurfaceHigh,
     surfaceContainerHighest = ShareFlowBrandColors.GlassSurfaceHighest,
 
-    inverseSurface = ShareFlowBrandColors.SoftCream,
-    inverseOnSurface = ShareFlowBrandColors.InkOnSoftCream,
+    inverseSurface = ShareFlowBrandColors.DeepNavy,
+    inverseOnSurface = ShareFlowBrandColors.SoftCream,
 
-    outline = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.48f),
+    outline = ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.45f),
     outlineVariant = ShareFlowBrandColors.GlassCardBorder,
 
     error = ShareFlowBrandColors.ErrorSurfaceAccent,
@@ -145,7 +148,7 @@ val ShareFlowBrandColorScheme: ColorScheme = darkColorScheme(
     onErrorContainer = ShareFlowBrandColors.OnErrorContainerGlass
 )
 
-// Backward-compatible scheme aliases bound strictly to the official Share Flow brand palette
+// Backward-compatible scheme aliases bound strictly to the official Soft Cream (#FEF3B3) brand palette
 val DarkColorScheme: ColorScheme = ShareFlowBrandColorScheme
 val LightColorScheme: ColorScheme = ShareFlowBrandColorScheme
 
@@ -163,7 +166,7 @@ fun AccentColor.swatchColor(@Suppress("UNUSED_PARAMETER") darkTheme: Boolean): C
     AccentColor.CYAN -> ShareFlowBrandColors.SkyBlue
     AccentColor.EMERALD -> ShareFlowBrandColors.SoftCream
     AccentColor.CORAL -> ShareFlowBrandColors.GoldenYellow
-    AccentColor.VIOLET -> ShareFlowBrandColors.RoyalBlue
+    AccentColor.VIOLET -> ShareFlowBrandColors.DeepNavy
 }
 
 /**
@@ -195,10 +198,10 @@ val OfficialShareFlowSemanticColors = ShareFlowSemanticColors(
     onSendAccent = ShareFlowBrandColors.InkOnRoyalBlue,
     receiveAccent = ShareFlowBrandColors.SkyBlue,
     onReceiveAccent = ShareFlowBrandColors.InkOnSkyBlue,
-    verifiedBadge = ShareFlowBrandColors.GoldenYellow,
-    onVerifiedBadge = ShareFlowBrandColors.InkOnGoldenYellow,
+    verifiedBadge = ShareFlowBrandColors.DeepNavy,
+    onVerifiedBadge = ShareFlowBrandColors.SoftCream,
     verifiedContainer = ShareFlowBrandColors.GoldenYellowContainer,
-    warningAccent = ShareFlowBrandColors.SoftCream,
+    warningAccent = ShareFlowBrandColors.DeepNavy,
     warningContainer = ShareFlowBrandColors.GoldenYellowContainer,
     heroScrimStart = Color(0xF20A1821),
     heroScrimEnd = Color(0xA60A1821),

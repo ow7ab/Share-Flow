@@ -33,6 +33,8 @@ import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PermissionExplanationDialog
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.components.TransferCard
 import com.example.shareflow.core.designsystem.components.TransferProgressCard
@@ -256,6 +258,7 @@ class ShareFlowDesignSystemTest {
         var capturedDirection: LayoutDirection? = null
         var capturedPrimary: Color? = null
         var capturedBackground: Color? = null
+        var capturedOnBackground: Color? = null
         var capturedSecondary: Color? = null
         var capturedTertiary: Color? = null
 
@@ -269,6 +272,7 @@ class ShareFlowDesignSystemTest {
                 capturedDirection = LocalLayoutDirection.current
                 capturedPrimary = MaterialTheme.colorScheme.primary
                 capturedBackground = MaterialTheme.colorScheme.background
+                capturedOnBackground = MaterialTheme.colorScheme.onBackground
                 capturedSecondary = MaterialTheme.colorScheme.secondary
                 capturedTertiary = MaterialTheme.colorScheme.tertiary
                 Text(
@@ -280,7 +284,8 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Rtl, capturedDirection)
-        assertEquals(Color(0xFF0A1821), capturedBackground)
+        assertEquals(Color(0xFFFEF3B3), capturedBackground)
+        assertEquals(Color(0xFF0A1821), capturedOnBackground)
         assertEquals(Color(0xFF1D59BB), capturedPrimary)
         assertEquals(Color(0xFF76B9FF), capturedSecondary)
         assertEquals(Color(0xFFFEBD19), capturedTertiary)
@@ -315,6 +320,32 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Ltr, capturedDirection)
+        assertEquals(Color(0xEB0A1821), ShareFlowBrandColors.GlassNavBackground)
+        assertEquals(Color(0x6676B9FF), ShareFlowBrandColors.GlassNavBorder)
         composeTestRule.onNodeWithTag("ltr_settings_title").assertTextEquals("Settings")
+    }
+
+    @Test
+    fun `renders signature gradient determinate indeterminate progress bars and tab indicator`() {
+        composeTestRule.setContent {
+            ShareFlowTheme(appLanguage = AppLanguage.ENGLISH) {
+                Column {
+                    ShareFlowSignatureProgressBar(
+                        progress = 0.65f,
+                        modifier = Modifier.testTag("signature_progress_determinate")
+                    )
+                    ShareFlowSignatureProgressBar(
+                        modifier = Modifier.testTag("signature_progress_indeterminate")
+                    )
+                    ShareFlowSignatureTabIndicator(
+                        modifier = Modifier.testTag("signature_tab_indicator")
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("signature_progress_determinate").assertExists()
+        composeTestRule.onNodeWithTag("signature_progress_indeterminate").assertExists()
+        composeTestRule.onNodeWithTag("signature_tab_indicator").assertExists()
     }
 }

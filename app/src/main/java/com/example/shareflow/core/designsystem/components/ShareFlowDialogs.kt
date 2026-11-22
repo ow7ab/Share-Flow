@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 
 /**
@@ -39,11 +40,14 @@ fun PermissionExplanationDialog(
         onDismissRequest = onDismiss,
         modifier = modifier,
         shape = ShareFlowDesign.shapes.dialog,
+        containerColor = ShareFlowBrandColors.GlassSurfaceLowest,
+        titleContentColor = ShareFlowBrandColors.DeepNavy,
+        textContentColor = ShareFlowBrandColors.InkSecondaryOnSoftCream,
         icon = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = ShareFlowBrandColors.RoyalBlue
             )
         },
         title = {
@@ -62,6 +66,7 @@ fun PermissionExplanationDialog(
         confirmButton = {
             TextButton(
                 onClick = onGrantClick,
+                colors = ButtonDefaults.textButtonColors(contentColor = ShareFlowBrandColors.RoyalBlue),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .let { if (confirmTestTag != null) it.testTag(confirmTestTag) else it }
@@ -72,6 +77,7 @@ fun PermissionExplanationDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = ShareFlowBrandColors.DeepNavy),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .let { if (dismissTestTag != null) it.testTag(dismissTestTag) else it }
@@ -103,6 +109,9 @@ fun ConfirmationDialog(
         onDismissRequest = onDismiss,
         modifier = modifier,
         shape = ShareFlowDesign.shapes.dialog,
+        containerColor = ShareFlowBrandColors.GlassSurfaceLowest,
+        titleContentColor = ShareFlowBrandColors.DeepNavy,
+        textContentColor = ShareFlowBrandColors.InkSecondaryOnSoftCream,
         icon = icon?.let {
             {
                 Icon(
@@ -111,7 +120,7 @@ fun ConfirmationDialog(
                     tint = if (isDestructive) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        ShareFlowBrandColors.RoyalBlue
                     }
                 )
             }
@@ -135,7 +144,7 @@ fun ConfirmationDialog(
                 colors = if (isDestructive) {
                     ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 } else {
-                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                    ButtonDefaults.textButtonColors(contentColor = ShareFlowBrandColors.RoyalBlue)
                 },
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
@@ -147,6 +156,7 @@ fun ConfirmationDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = ShareFlowBrandColors.DeepNavy),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .let { if (dismissTestTag != null) it.testTag(dismissTestTag) else it }

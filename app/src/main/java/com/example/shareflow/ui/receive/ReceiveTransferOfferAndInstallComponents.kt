@@ -49,6 +49,7 @@ import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import android.content.Intent
 import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
@@ -238,7 +239,7 @@ fun ReceivedAppsInstallerCard(
             when (val state = installState) {
                 AppInstallSessionState.Idle -> Unit
                 is AppInstallSessionState.Validating -> {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                     Text(
                         text = stringResource(R.string.receive_app_install_validating),
                         style = MaterialTheme.typography.bodySmall,
@@ -247,9 +248,10 @@ fun ReceivedAppsInstallerCard(
                 }
 
                 is AppInstallSessionState.Staging -> {
-                    LinearProgressIndicator(
-                        progress = { state.progressFraction },
-                        modifier = Modifier.fillMaxWidth()
+                    ShareFlowSignatureProgressBar(
+                        progress = state.progressFraction,
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 8.dp
                     )
                     Text(
                         text = stringResource(

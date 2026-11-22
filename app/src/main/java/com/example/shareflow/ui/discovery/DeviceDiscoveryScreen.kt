@@ -57,6 +57,7 @@ import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -256,7 +257,7 @@ fun DeviceDiscoveryContent(
                             }
 
                             if (isDiscovering) {
-                                LinearProgressIndicator(
+                                ShareFlowSignatureProgressBar(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("discovery_progress_bar")

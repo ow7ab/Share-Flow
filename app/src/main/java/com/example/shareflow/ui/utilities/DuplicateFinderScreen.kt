@@ -57,6 +57,7 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -369,7 +370,7 @@ fun DuplicateFinderContent(
                 if (uiState.isScanning) {
                     item(key = "dup_progress") {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             if (uiState.totalCandidates > 0) {
                                 Text(
                                     text = stringResource(

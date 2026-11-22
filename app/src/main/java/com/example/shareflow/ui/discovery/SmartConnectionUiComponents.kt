@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.example.R
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.domain.model.SmartConnectionError
@@ -212,7 +213,7 @@ fun SmartSenderProgressCard(
             }
 
             if (phase.isInProgress) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {

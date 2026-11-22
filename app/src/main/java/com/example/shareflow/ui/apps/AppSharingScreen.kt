@@ -79,7 +79,9 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -327,19 +329,31 @@ fun AppSharingContent(
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val selectedAppTab = if (uiState.activeTab == AppSharingTab.INSTALLED) 0 else 1
             PrimaryTabRow(
-                selectedTabIndex = if (uiState.activeTab == AppSharingTab.INSTALLED) 0 else 1,
+                selectedTabIndex = selectedAppTab,
+                containerColor = ShareFlowBrandColors.SoftCream,
+                contentColor = ShareFlowBrandColors.DeepNavy,
+                indicator = {
+                    ShareFlowSignatureTabIndicator(
+                        modifier = Modifier.tabIndicatorOffset(selectedAppTab, matchContentSize = false)
+                    )
+                },
                 modifier = Modifier.widthIn(max = spacing.maxContentWidth)
             ) {
                 Tab(
                     selected = uiState.activeTab == AppSharingTab.INSTALLED,
                     onClick = { onSelectTab(AppSharingTab.INSTALLED) },
+                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                     text = { Text(text = stringResource(R.string.apps_tab_installed)) },
                     modifier = Modifier.testTag("apps_tab_installed")
                 )
                 Tab(
                     selected = uiState.activeTab == AppSharingTab.RECEIVED,
                     onClick = { onSelectTab(AppSharingTab.RECEIVED) },
+                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
+                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
                     text = {
                         val suffix = if (uiState.receivedApks.isNotEmpty()) {
                             " (${ShareFlowFormatters.formatCount(uiState.receivedApks.size, locale)})"
