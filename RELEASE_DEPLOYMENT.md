@@ -12,7 +12,7 @@
 | **موقع التحميل الرسمي** | `https://ow7ab.github.io/Share-Flow-Releases/` | عام (بدون مصادقة) | GitHub Pages من فرع `main` ومجلد `/docs` |
 | **صفحة الإصدارات العامة** | `https://github.com/ow7ab/Share-Flow-Releases/releases` | عام (بدون مصادقة) | سجل الإصدارات الكامل مع الاحتفاظ بالنسخ السابقة |
 | **رابط التحميل المباشر لملف APK** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk` | عام (بدون مصادقة) | تحميل مباشر لملف `Share-Flow.apk` دون ZIP ودون تسجيل دخول GitHub |
-| **رابط التحديث السحابي (`version.json`)** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json` | عام (بدون مصادقة) | يستخدمه `CloudUpdateManager` داخل التطبيق للتحقق الآمن من التحديثات |
+| **رابط التحديث الرسمي (`version.json`)** | `https://ow7ab.github.io/Share-Flow-Releases/version.json` (مع احتياطي تلقائي `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json`) | عام (بدون مصادقة) | مصدر بيانات موحّد يغذّي الموقع الرسمي و`CloudUpdateManager` داخل التطبيق تلقائياً دون إدخال أي رابط يدوياً |
 | **بصمة التحقق (`SHA-256`)** | `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk.sha256` | عام (بدون مصادقة) | للتحقق من سلامة ملف APK قبل التثبيت |
 
 - **هوية التطبيق المحفوظة دون أي تعديل:**
@@ -105,14 +105,14 @@
    - عدم تراجع `versionCode` وعدم تغيّر شهادة التوقيع مقارنة بآخر `version.json` منشور.
 8. رفع `Share-Flow.apk` (بشكل مستقل دون ZIP)، و`Share-Flow.apk.sha256`، و`version.json` إلى `ow7ab/Share-Flow-Releases` عبر GitHub Releases (`--latest`).
 9. التحقق الفعلي (غير المصادق) عبر `curl -fsSLI` أن الرابط `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk` يُرجع ملف APK ثنائياً مطابق الحجم وليس صفحة HTML أو 404.
-10. مزامنة مجلد `/docs` الثابت فقط (مع `latest-release.json`) إلى فرع `main` في `ow7ab/Share-Flow-Releases`.
+10. مزامنة مجلد `/docs` الثابت فقط (مع نسختي `version.json` و`latest-release.json`) إلى فرع `main` في `ow7ab/Share-Flow-Releases`.
 11. حذف Keystore المؤقت والملفات الحساسة دائماً (`if: always()`).
 
 ---
 
-## 5. تحديث الموقع دون إصدار APK جديد (`sync-website.yml`)
+## 5. تحديث الموقع ولقطات التطبيق (`sync-website.yml`)
 
-إذا قمت بتعديل تصميم أو نصوص الموقع داخل `/docs` فقط، يمكنك تشغيل سير العمل اليدوي:
+إذا قمت بتعديل تصميم أو نصوص الموقع داخل `/docs` فقط، أو عند إضافة لقطات شاشة حقيقية من هاتف Android داخل `docs/screenshots/` وتسجيلها في مصفوفة `galleryItems` داخل `docs/config.js`، يمكنك تشغيل سير العمل اليدوي:
 **Actions → ShareFlow Public Website Sync (Docs Only) → Run workflow**
 وسيقوم بتشغيل اختبارات البوابة وفحص السماح/الأسرار ثم دفع ملفات `/docs` الثابتة فقط إلى `ow7ab/Share-Flow-Releases`.
 

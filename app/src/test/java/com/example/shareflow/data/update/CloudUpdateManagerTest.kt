@@ -59,7 +59,7 @@ class CloudUpdateManagerTest {
     """.trimIndent()
 
     @Test
-    fun `version metadata and default GitHub release manifest URL are valid and consistent`() {
+    fun `version metadata and default official website manifest URL are valid and consistent`() {
         assertTrue("VERSION_CODE must be monotonic >= 12", BuildConfig.VERSION_CODE >= 12)
         assertTrue(
             "VERSION_NAME must follow semantic versioning",
@@ -67,10 +67,11 @@ class CloudUpdateManagerTest {
         )
         assertEquals("com.aistudio.shareflow.kxrvnm", BuildConfig.APPLICATION_ID)
         assertEquals(
-            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json",
+            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
         )
         assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(BuildConfig.CLOUD_UPDATE_MANIFEST_URL))
+        assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(CloudUpdateManager.DEFAULT_FALLBACK_MANIFEST_URL))
     }
 
     @Test
@@ -101,6 +102,32 @@ class CloudUpdateManagerTest {
         assertTrue(data.apkDownloadUrl.endsWith("/Share-Flow.apk"))
         assertEquals("https://ow7ab.github.io/Share-Flow-Releases/", data.portalUrl)
         assertEquals(sampleApkSha256, data.signingCertSha256)
+    }
+
+    @Test
+    fun `manifest parser accepts unified website version json with apkUrl and releaseNotes array`() {
+        val unifiedManifest = """
+            {
+              "versionCode": 13,
+              "versionName": "1.0.12",
+              "apkUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+              "sha256": "$sampleApkSha256",
+              "fileSizeBytes": ${sampleApkBytes.size},
+              "releaseNotes": [
+                "تحسين سرعة الاتصال المباشر",
+                "واجهة تحديث تلقائي أكثر استقراراً"
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = CloudUpdateValidator.parseManifestJson(unifiedManifest)
+        assertTrue("Unified version.json with apkUrl and releaseNotes array must parse", parsed is AppResult.Success)
+        val data = (parsed as AppResult.Success).data
+        assertEquals(13, data.versionCode)
+        assertEquals("1.0.12", data.versionName)
+        assertEquals("https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk", data.apkDownloadUrl)
+        assertTrue(data.releaseNotesAr.contains("تحسين سرعة الاتصال المباشر"))
+        assertTrue(data.releaseNotesEn.contains("واجهة تحديث تلقائي أكثر استقراراً"))
     }
 
     @Test
@@ -153,7 +180,7 @@ class CloudUpdateManagerTest {
     }
 
     @Test
-    fun `resolveEffectiveManifestUrl falls back to official GitHub Releases version json`() = runTest {
+    fun `resolveEffectiveManifestUrl defaults to official GitHub Pages version json`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val manager = createManager(
             dispatcher = dispatcher,
@@ -162,12 +189,44 @@ class CloudUpdateManagerTest {
         )
 
         assertEquals(
-            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json",
+            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
             manager.resolveEffectiveManifestUrl("")
         )
         assertEquals(
             "https://shareflow.sd/version.json",
             manager.resolveEffectiveManifestUrl("https://shareflow.sd/version.json")
+        )
+    }
+
+    @Test
+    fun `checkForUpdates automatically falls back to GitHub Releases version json when official website fails`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val requestedUrls = mutableListOf<String>()
+        val httpClient = FakeCloudUpdateHttpClient(
+            manifestResolver = { url ->
+                requestedUrls += url
+                if (url == CloudUpdateManager.DEFAULT_FALLBACK_MANIFEST_URL) {
+                    AppResult.Success(validManifestJson(versionCode = 13, versionName = "1.0.12"))
+                } else {
+                    AppResult.Failure(AppError.Network("Website temporarily unreachable"))
+                }
+            }
+        )
+        val manager = createManager(
+            dispatcher = dispatcher,
+            httpClient = httpClient,
+            inspector = FakeApkSecurityInspector(AppResult.Success(Unit)),
+            currentVersionCode = 12
+        )
+
+        val state = manager.checkForUpdates("")
+        assertTrue("Expected UpdateAvailable via fallback but got $state", state is CloudUpdateState.UpdateAvailable)
+        assertEquals(
+            listOf(
+                "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+                CloudUpdateManager.DEFAULT_FALLBACK_MANIFEST_URL
+            ),
+            requestedUrls
         )
     }
 
@@ -206,6 +265,31 @@ class CloudUpdateManagerTest {
         val apkFile = File((ready as CloudUpdateState.ReadyToInstall).verifiedApkPath)
         assertTrue(apkFile.exists())
         apkFile.delete()
+    }
+
+    @Test
+    fun `downloadAndVerifyUpdate reuses verified cached APK without re-downloading same version`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val trackingHttp = FakeCloudUpdateHttpClient(
+            manifestResponse = AppResult.Success(validManifestJson(versionCode = 14, versionName = "1.0.13")),
+            apkBytes = sampleApkBytes
+        )
+        val manager = createManager(
+            dispatcher = dispatcher,
+            httpClient = trackingHttp,
+            inspector = FakeApkSecurityInspector(AppResult.Success(Unit)),
+            currentVersionCode = 12
+        )
+
+        val available = manager.checkForUpdates("https://shareflow.sd/version.json") as CloudUpdateState.UpdateAvailable
+        val firstReady = manager.downloadAndVerifyUpdate(available.manifest)
+        val secondReady = manager.downloadAndVerifyUpdate(available.manifest)
+
+        assertTrue(firstReady is CloudUpdateState.ReadyToInstall)
+        assertTrue(secondReady is CloudUpdateState.ReadyToInstall)
+        assertEquals("Same verified version must not be downloaded twice", 1, trackingHttp.downloadCount)
+
+        File((firstReady as CloudUpdateState.ReadyToInstall).verifiedApkPath).delete()
     }
 
     @Test
@@ -325,12 +409,14 @@ class CloudUpdateManagerTest {
 
     private class FakeCloudUpdateHttpClient(
         private val manifestResponse: AppResult<String> = AppResult.Failure(AppError.Network("unused")),
-        private val apkBytes: ByteArray = ByteArray(0)
+        private val apkBytes: ByteArray = ByteArray(0),
+        private val manifestResolver: ((String) -> AppResult<String>)? = null
     ) : CloudUpdateHttpClient {
         var downloadCount: Int = 0
             private set
 
-        override suspend fun fetchManifestText(manifestUrl: String): AppResult<String> = manifestResponse
+        override suspend fun fetchManifestText(manifestUrl: String): AppResult<String> =
+            manifestResolver?.invoke(manifestUrl) ?: manifestResponse
 
         override suspend fun downloadApkToFile(
             apkUrl: String,

@@ -177,8 +177,9 @@ object CloudUpdateValidator {
                 return AppResult.Failure(AppError.Validation("Manifest missing valid versionName."))
             }
             val apkDownloadUrl = json.optString("apkDownloadUrl", "").trim()
+                .ifEmpty { json.optString("apkUrl", "").trim() }
             if (!isValidPublicHttpsUrl(apkDownloadUrl)) {
-                return AppResult.Failure(AppError.Security("Manifest apkDownloadUrl must be a valid public HTTPS URL."))
+                return AppResult.Failure(AppError.Security("Manifest apkDownloadUrl/apkUrl must be a valid public HTTPS URL."))
             }
             val sha256 = json.optString("sha256", "").trim().lowercase()
             if (!SHA256_REGEX.matches(sha256)) {
@@ -190,8 +191,9 @@ object CloudUpdateValidator {
             }
             val minSdk = json.optInt("minSupportedAndroidSdk", 24).coerceAtLeast(21)
             val mandatory = json.optBoolean("mandatory", false)
-            val releaseNotesAr = json.optString("releaseNotesAr", "").trim().take(2000)
-            val releaseNotesEn = json.optString("releaseNotesEn", "").trim().take(2000)
+            val genericReleaseNotes = parseReleaseNotesField(json)
+            val releaseNotesAr = json.optString("releaseNotesAr", "").trim().ifEmpty { genericReleaseNotes }.take(2000)
+            val releaseNotesEn = json.optString("releaseNotesEn", "").trim().ifEmpty { genericReleaseNotes }.take(2000)
             val rawPortalUrl = json.optString("portalUrl", "").trim()
             val portalUrl = rawPortalUrl.takeIf { it.isNotEmpty() && isValidPublicHttpsUrl(it) }
             val publishedAt = json.optString("publishedAt", "").trim().take(64)
@@ -217,6 +219,20 @@ object CloudUpdateValidator {
         }.getOrElse { err ->
             AppResult.Failure(AppError.Validation("Invalid update manifest JSON: ${err.message ?: "parse error"}"))
         }
+    }
+
+    private fun parseReleaseNotesField(json: JSONObject): String {
+        val notesArray = json.optJSONArray("releaseNotes")
+        if (notesArray != null) {
+            val lines = buildList {
+                for (i in 0 until notesArray.length()) {
+                    val item = notesArray.optString(i, "").trim()
+                    if (item.isNotEmpty()) add("• $item")
+                }
+            }
+            if (lines.isNotEmpty()) return lines.joinToString("\n").take(2000)
+        }
+        return json.optString("releaseNotes", "").trim().take(2000)
     }
 
     fun constantTimeHashEquals(expectedHex: String, actualHex: String): Boolean {
@@ -547,7 +563,8 @@ class CloudUpdateManager(
     private val currentVersionName: String = BuildConfig.VERSION_NAME,
     private val currentSdkInt: Int = Build.VERSION.SDK_INT,
     private val expectedPackageName: String = context.packageName,
-    private val defaultManifestUrl: String = BuildConfig.CLOUD_UPDATE_MANIFEST_URL
+    private val defaultManifestUrl: String = BuildConfig.CLOUD_UPDATE_MANIFEST_URL,
+    private val fallbackManifestUrl: String = DEFAULT_FALLBACK_MANIFEST_URL
 ) {
     private val appContext = context.applicationContext ?: context
     private val _state = MutableStateFlow<CloudUpdateState>(CloudUpdateState.Idle)
@@ -560,6 +577,7 @@ class CloudUpdateManager(
     }
 
     suspend fun checkForUpdates(manifestUrl: String): CloudUpdateState {
+        val isUsingDefaultEndpoint = manifestUrl.trim().isEmpty()
         val effectiveUrl = resolveEffectiveManifestUrl(manifestUrl)
         if (effectiveUrl.isBlank()) {
             val notConfigured = CloudUpdateState.PortalNotConfigured
@@ -576,7 +594,18 @@ class CloudUpdateManager(
         }
 
         _state.value = CloudUpdateState.Checking
-        val fetchRes = httpClient.fetchManifestText(effectiveUrl)
+        val primaryFetch = httpClient.fetchManifestText(effectiveUrl)
+        val fetchRes = if (
+            primaryFetch is AppResult.Failure &&
+            isUsingDefaultEndpoint &&
+            fallbackManifestUrl.isNotBlank() &&
+            !fallbackManifestUrl.equals(effectiveUrl, ignoreCase = true) &&
+            CloudUpdateValidator.isValidPublicHttpsUrl(fallbackManifestUrl)
+        ) {
+            httpClient.fetchManifestText(fallbackManifestUrl)
+        } else {
+            primaryFetch
+        }
         val rawJson = when (fetchRes) {
             is AppResult.Success -> fetchRes.data
             is AppResult.Failure -> {
@@ -652,9 +681,6 @@ class CloudUpdateManager(
             }
 
             val updatesDir = File(appContext.cacheDir, UPDATES_CACHE_DIR).apply { mkdirs() }
-            // Prune stale update APKs before downloading a new one
-            updatesDir.listFiles()?.forEach { old -> runCatching { old.delete() } }
-
             val targetFile = File(updatesDir, "shareflow-v${manifest.versionCode}.apk")
             // Path traversal confinement guard
             val canonicalBase = updatesDir.canonicalPath + File.separator
@@ -666,6 +692,42 @@ class CloudUpdateManager(
                 )
                 _state.value = err
                 return@withContext err
+            }
+
+            // Prune stale older update APKs while keeping any matching cached version for verification
+            updatesDir.listFiles()?.forEach { old ->
+                if (old.name != targetFile.name) {
+                    runCatching { old.delete() }
+                }
+            }
+
+            // Avoid re-downloading the exact same version if a verified local copy already exists
+            if (targetFile.exists() && targetFile.isFile && targetFile.length() > 0L) {
+                _state.value = CloudUpdateState.Verifying(manifest)
+                val cachedHashResult = runCatching {
+                    targetFile.inputStream().use { stream ->
+                        checksumVerifier.verifySha256(stream, manifest.sha256)
+                    }
+                }.getOrNull()
+                val cachedHashOk = cachedHashResult is AppResult.Success && cachedHashResult.data
+                if (cachedHashOk) {
+                    val cachedInspect = packageInspector.inspectUpdateApk(
+                        apkFile = targetFile,
+                        expectedPackageName = expectedPackageName,
+                        expectedMinVersionCode = manifest.versionCode,
+                        currentInstalledVersionCode = currentVersionCode
+                    )
+                    if (cachedInspect is AppResult.Success) {
+                        val ready = CloudUpdateState.ReadyToInstall(
+                            manifest = manifest,
+                            verifiedApkPath = targetFile.absolutePath
+                        )
+                        _state.value = ready
+                        return@withContext ready
+                    }
+                }
+                // Cached file was stale, corrupted, or failed inspection — discard and re-download cleanly
+                runCatching { targetFile.delete() }
             }
 
             _state.value = CloudUpdateState.Downloading(
@@ -791,5 +853,7 @@ class CloudUpdateManager(
 
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"
+        const val DEFAULT_FALLBACK_MANIFEST_URL =
+            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json"
     }
 }

@@ -21,8 +21,37 @@ test("docs/config.js targets public ow7ab/Share-Flow-Releases and GitHub Pages w
   assert.equal(cfg.manifestFileName, "version.json");
   assert.equal(cfg.directLatestApkUrl, DIRECT_LATEST_APK);
   assert.equal(cfg.portalUrl, "https://ow7ab.github.io/Share-Flow-Releases/");
+  assert.equal(
+    cfg.officialVersionManifestUrl,
+    "https://ow7ab.github.io/Share-Flow-Releases/version.json"
+  );
   assert.equal(cfg.customManifestUrl, "");
   assert.equal(portal.isSafeDirectApkUrl(cfg.directLatestApkUrl), true);
+
+  assert.ok(Array.isArray(cfg.galleryItems) && cfg.galleryItems.length >= 2);
+  const docsDir = path.join(__dirname, "..", "docs");
+  for (const item of cfg.galleryItems) {
+    assert.ok(item.src && !item.src.includes(".."), `Invalid gallery src: ${item.src}`);
+    const assetPath = path.join(docsDir, item.src);
+    assert.ok(fs.existsSync(assetPath), `Gallery asset missing on disk: docs/${item.src}`);
+    assert.ok(fs.statSync(assetPath).size > 0, `Gallery asset empty: docs/${item.src}`);
+  }
+});
+
+test("docs/index.html contains all official landing page sections and Liquid Glass anchors", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "docs", "index.html"), "utf8");
+  for (const requiredId of [
+    'id="download-apk-btn"',
+    'id="discover-features-btn"',
+    'id="features"',
+    'id="screenshots"',
+    'id="install-title"',
+    'id="releases"',
+    'id="faq"',
+    'id="lightbox"'
+  ]) {
+    assert.ok(html.includes(requiredId), `Missing required element ${requiredId} in docs/index.html`);
+  }
 });
 
 test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or private repo release URLs", () => {
@@ -231,6 +260,29 @@ test("normalizeCustomManifest parses release workflow version.json, release note
   assert.equal(valid.data.sha256, "d".repeat(64));
   assert.equal(valid.data.releaseNotesAr, "تحديث رسمي موقّع");
   assert.equal(valid.data.releaseNotesEn, "Signed official update");
+
+  const unifiedArrayManifest = portal.normalizeCustomManifest({
+    versionCode: 12,
+    versionName: "1.0.11",
+    apkUrl: `https://github.com/${PUBLIC_REPO}/releases/download/v1.0.11/Share-Flow.apk`,
+    sha256: "e".repeat(64),
+    fileSizeBytes: 26200000,
+    publishedAt: "2026-11-22T10:00:00Z",
+    releaseNotes: [
+      "واجهة الموقع الرسمي بنمط Liquid Glass",
+      "دعم التحديث التلقائي المباشر عبر version.json"
+    ]
+  });
+  assert.equal(unifiedArrayManifest.status, "ready");
+  assert.equal(unifiedArrayManifest.data.versionLabel, "v1.0.11 (Build 12)");
+  assert.equal(
+    unifiedArrayManifest.data.apkUrl,
+    `https://github.com/${PUBLIC_REPO}/releases/download/v1.0.11/Share-Flow.apk`
+  );
+  assert.deepEqual(portal.toChangelogLines(unifiedArrayManifest.data.releaseNotes), [
+    "واجهة الموقع الرسمي بنمط Liquid Glass",
+    "دعم التحديث التلقائي المباشر عبر version.json"
+  ]);
 
   const badZip = portal.normalizeCustomManifest({
     versionCode: 11,

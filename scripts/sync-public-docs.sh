@@ -52,8 +52,9 @@ if [ "$COPIED_COUNT" -lt 1 ] || [ ! -f "${STAGE_DOCS}/index.html" ] || [ ! -f "$
   exit 1
 fi
 
-# Include latest-release.json fallback manifest when provided by release.yml
+# Publish central version.json (and latest-release.json alias) when provided by release.yml
 if [ -n "${LATEST_MANIFEST_FILE:-}" ] && [ -f "${LATEST_MANIFEST_FILE}" ]; then
+  cp -f "${LATEST_MANIFEST_FILE}" "${STAGE_DOCS}/version.json"
   cp -f "${LATEST_MANIFEST_FILE}" "${STAGE_DOCS}/latest-release.json"
 fi
 

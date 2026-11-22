@@ -378,11 +378,13 @@ jobs:
 
           PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           DIRECT_APK_URL="https://github.com/${PUBLIC_REPO}/releases/download/${RELEASE_TAG}/Share-Flow.apk"
+          LATEST_APK_URL="https://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk"
 
-          # 7. Generate and validate version.json for in-app Cloud Update & public website
+          # 7. Generate and validate unified version.json for official website and in-app CloudUpdateManager
           VERSION_CODE="$VERSION_CODE" \
           VERSION_NAME="$VERSION_NAME" \
           DIRECT_APK_URL="$DIRECT_APK_URL" \
+          LATEST_APK_URL="$LATEST_APK_URL" \
           APK_SHA256="$APK_SHA256" \
           APK_SIZE="$APK_SIZE" \
           MIN_SDK="${MIN_SDK:-24}" \
@@ -401,15 +403,23 @@ jobs:
           notes_en = os.environ.get("INPUT_NOTES_EN", "").strip() or (
               f"Verified signed Share Flow Android release (v{v_name}, build {v_code}) ready for direct APK installation."
           )
+          release_notes_list = [
+              line.lstrip("-*• ").strip()
+              for line in notes_ar.splitlines()
+              if line.strip()
+          ] or [notes_ar]
 
           manifest = {
               "versionCode": v_code,
               "versionName": v_name,
+              "apkUrl": os.environ["LATEST_APK_URL"],
               "apkDownloadUrl": os.environ["DIRECT_APK_URL"],
+              "latestApkDownloadUrl": os.environ["LATEST_APK_URL"],
               "sha256": os.environ["APK_SHA256"],
               "fileSizeBytes": int(os.environ["APK_SIZE"]),
               "minSupportedAndroidSdk": int(os.environ.get("MIN_SDK", "24")),
               "mandatory": False,
+              "releaseNotes": release_notes_list,
               "releaseNotesAr": notes_ar,
               "releaseNotesEn": notes_en,
               "portalUrl": os.environ.get("PORTAL_URL", "https://ow7ab.github.io/Share-Flow-Releases/"),
@@ -420,13 +430,15 @@ jobs:
 
           assert manifest["versionCode"] > 0
           assert len(manifest["sha256"]) == 64
+          assert manifest["apkUrl"].startswith("https://")
+          assert manifest["apkUrl"].endswith("/Share-Flow.apk")
           assert manifest["apkDownloadUrl"].startswith("https://")
           assert manifest["apkDownloadUrl"].endswith("/Share-Flow.apk")
 
           out_path = os.path.join(os.environ["STAGE_DIR"], "version.json")
           with open(out_path, "w", encoding="utf-8") as f:
               json.dump(manifest, f, ensure_ascii=False, indent=2)
-          print("Generated and validated version.json successfully.")
+          print("Generated and validated unified version.json successfully.")
           PYEOF
 
           echo "apk_path=${FIXED_APK}" >> "$GITHUB_OUTPUT"
