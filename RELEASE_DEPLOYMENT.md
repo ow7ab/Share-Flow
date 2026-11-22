@@ -18,7 +18,7 @@
 - **هوية التطبيق المحفوظة دون أي تعديل:**
   - `namespace`: `com.example`
   - `applicationId`: `com.aistudio.shareflow.kxrvnm`
-  - `versionName`: `1.0.10` | `versionCode`: `11`
+  - `versionName`: `1.0.11` | `versionCode`: `12`
   - `minSdk`: `24` | `targetSdk`: `36`
 
 > **قواعد حماية الشيفرة والبيانات:** لا يُنسخ أي ملف Kotlin أو Gradle أو XML أو `google-services.json` أو Keystore أو سر إلى `ow7ab/Share-Flow-Releases` أبداً. يتحقق السكربت `scripts/sync-public-docs.sh` بقائمة سماح صارمة (Allowlist) وفحص للأسرار قبل أي دفع إلى المستودع العام.
@@ -82,10 +82,10 @@
 ## 4. تشغيل النشر الإنتاجي (Controlled Release Workflow)
 
 لا يقوم `.github/workflows/release.yml` بنشر إصدار تلقائياً عند كل commit عادي على `main`؛ بل يعمل فقط عند:
-1. **دفع وسم إصدار دلالي (Semantic Tag):** مثل `v1.0.10` (يجب أن يطابق `versionName` في `app/build.gradle.kts`):
+1. **دفع وسم إصدار دلالي (Semantic Tag):** مثل `v1.0.11` (يجب أن يطابق `versionName` في `app/build.gradle.kts`):
    ```bash
-   git tag -a v1.0.10 -m "Share Flow v1.0.10 (Build 11)"
-   git push origin v1.0.10
+   git tag -a v1.0.11 -m "Share Flow v1.0.11 (Build 12)"
+   git push origin v1.0.11
    ```
 2. **التشغيل اليدوي المحكوم (`workflow_dispatch`):** من تبويب **Actions → ShareFlow Production Release (Private Source -> Public APK & Pages) → Run workflow** مع إدخال ملاحظات الإصدار بالعربية والإنجليزية.
 
@@ -114,3 +114,17 @@
 إذا قمت بتعديل تصميم أو نصوص الموقع داخل `/docs` فقط، يمكنك تشغيل سير العمل اليدوي:
 **Actions → ShareFlow Public Website Sync (Docs Only) → Run workflow**
 وسيقوم بتشغيل اختبارات البوابة وفحص السماح/الأسرار ثم دفع ملفات `/docs` الثابتة فقط إلى `ow7ab/Share-Flow-Releases`.
+
+---
+
+## 6. ضمان التحديث المباشر فوق النسخة القديمة دون حذف التطبيق (In-Place Update Continuity)
+
+للسماح لنظام Android بتثبيت التحديث الجديد مباشرة فوق النسخة المثبّتة (**تحديث / Update**) دون حذف النسخة القديمة ودون فقدان بيانات المستخدم، يفرض Android ثلاثة شروط إلزامية:
+
+1. **تطابق شهادة التوقيع (Same Signing Certificate):**
+   - **نسخ الاختبار (`Debug APK` عبر `blank.yml` أو AI Studio):** يفك `.github/workflows/blank.yml` تشفير المفتاح الدائم `debug.keystore.base64` ويتحقق من مطابقة بصمة SHA-256 عبر `apksigner` في كل بناء، دون إنشاء مفتاح عشوائي جديد أبداً. لذلك يتحدّث أي `Debug APK` جديد مباشرة فوق أي `Debug APK` سابق.
+   - **نسخ الإنتاج الرسمية (`Release APK` عبر `release.yml` والموقع):** يوقّع `.github/workflows/release.yml` دائماً بالمفتاح الإنتاجي الدائم `ANDROID_KEYSTORE_BASE64` ويتحقق من مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق قبل النشر. لذلك يتحدّث أي `Release APK` جديد مباشرة فوق الإصدار السابق.
+   - **ملاحظة انتقال لمرة واحدة فقط:** إذا كانت النسخة المثبّتة حالياً على هاتفك مبنية بمفتاح مختلف (مثلاً نسخة `Debug` قديمة قبل الإصلاح أو عند الانتقال الأول من `Debug` إلى `Release`)، فسيطلب Android حذفها **مرة واحدة فقط** عند الانتقال، وبعدها ستتحدّث جميع الإصدارات اللاحقة من نفس المسار مباشرة دون حذف التطبيق أبداً.
+2. **تطابق معرّف الحزمة (`applicationId`):** ثابت دائماً على `com.aistudio.shareflow.kxrvnm`.
+3. **زيادة رقم البناء (`versionCode`):** يجب زيادة `versionCode` و`versionName` في `app/build.gradle.kts` عند كل إصدار جديد (مثلاً `12 -> 13` و`1.0.11 -> 1.0.12`).
+

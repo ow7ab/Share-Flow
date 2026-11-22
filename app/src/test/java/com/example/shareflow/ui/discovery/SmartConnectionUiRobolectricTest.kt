@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.example.MainActivity
 import org.junit.Assert.assertTrue
@@ -63,7 +64,7 @@ class SmartConnectionUiRobolectricTest {
         composeTestRule.waitForIdle()
         val diagList = composeTestRule.onNodeWithTag("connection_diagnostics_screen")
         diagList.performScrollToNode(hasTestTag("diagnostics_test_result_row"))
-        composeTestRule.onNodeWithTag("diagnostics_test_result_row").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("diagnostics_test_result_row").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -79,8 +80,8 @@ class SmartConnectionUiRobolectricTest {
                 .fetchSemanticsNodes()
                 .isEmpty()
         )
-        composeTestRule.onNodeWithTag("receive_toggle_button").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("receive_direct_p2p_badge").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("receive_toggle_button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("receive_direct_p2p_badge").performScrollTo().assertIsDisplayed()
 
         // Navigate back to Home -> Tools -> verify no duplicate standalone QR scanner, diagnostics opens cleanly
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
@@ -117,15 +118,15 @@ class SmartConnectionUiRobolectricTest {
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
         waitForTag("nav_item_settings")
         composeTestRule.onNodeWithTag("nav_item_settings").performClick()
-        waitForTag("settings_screen_list")
+        waitForTag("settings_list")
         composeTestRule.waitForIdle()
 
-        val settingsList = composeTestRule.onNodeWithTag("settings_screen_list")
+        val settingsList = composeTestRule.onNodeWithTag("settings_list")
         settingsList.performScrollToNode(hasTestTag("settings_section_cloud_update"))
         composeTestRule.onNodeWithTag("settings_section_cloud_update").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_update_sudan_badge").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_update_current_version").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_update_url_input").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_check_updates_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_sudan_badge").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_current_version").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_url_input").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_check_updates_button").performScrollTo().assertIsDisplayed()
     }
 }

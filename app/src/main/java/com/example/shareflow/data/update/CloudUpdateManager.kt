@@ -40,7 +40,8 @@ data class CloudUpdateManifest(
     val releaseNotesAr: String = "",
     val releaseNotesEn: String = "",
     val portalUrl: String? = null,
-    val publishedAt: String = ""
+    val publishedAt: String = "",
+    val signingCertSha256: String? = null
 )
 
 sealed class CloudUpdateState {
@@ -122,6 +123,16 @@ interface ApkPackageSecurityInspector {
         expectedMinVersionCode: Int,
         currentInstalledVersionCode: Int
     ): AppResult<Unit>
+
+    /**
+     * Checks before downloading the APK whether an advertised release signing certificate SHA-256
+     * matches the currently installed ShareFlow package (prevents wasting bandwidth on incompatible
+     * debug-vs-release updates that Android would refuse to install in-place).
+     */
+    fun isInstalledSignatureCompatible(
+        expectedPackageName: String,
+        expectedCertSha256: String
+    ): Boolean = true
 }
 
 object CloudUpdateValidator {
@@ -184,6 +195,8 @@ object CloudUpdateValidator {
             val rawPortalUrl = json.optString("portalUrl", "").trim()
             val portalUrl = rawPortalUrl.takeIf { it.isNotEmpty() && isValidPublicHttpsUrl(it) }
             val publishedAt = json.optString("publishedAt", "").trim().take(64)
+            val rawSigningCert = json.optString("signingCertSha256", "").trim().replace(":", "").lowercase()
+            val signingCertSha256 = rawSigningCert.takeIf { it.isNotEmpty() && SHA256_REGEX.matches(it) }
 
             AppResult.Success(
                 CloudUpdateManifest(
@@ -197,7 +210,8 @@ object CloudUpdateValidator {
                     releaseNotesAr = releaseNotesAr,
                     releaseNotesEn = releaseNotesEn,
                     portalUrl = portalUrl,
-                    publishedAt = publishedAt
+                    publishedAt = publishedAt,
+                    signingCertSha256 = signingCertSha256
                 )
             )
         }.getOrElse { err ->
@@ -467,15 +481,43 @@ class AndroidApkPackageSecurityInspector(
     }
 
     @Suppress("DEPRECATION")
+    override fun isInstalledSignatureCompatible(
+        expectedPackageName: String,
+        expectedCertSha256: String
+    ): Boolean {
+        val normalizedExpected = expectedCertSha256.trim().replace(":", "").lowercase()
+        if (normalizedExpected.length != 64) return true
+        val pm = context.packageManager
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val installedInfo: PackageInfo? = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(expectedPackageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            } else {
+                pm.getPackageInfo(expectedPackageName, flags)
+            }
+        }.getOrNull()
+        val installedDigests = extractSigningCertSha256Digests(installedInfo)
+        // If runtime cannot read installed signatures (e.g., stripped test env), defer to full APK inspection.
+        if (installedDigests.isEmpty()) return true
+        return installedDigests.any { CloudUpdateValidator.constantTimeHashEquals(normalizedExpected, it) }
+    }
+
+    @Suppress("DEPRECATION")
     private fun extractSigningCertSha256Digests(pkgInfo: PackageInfo?): Set<String> {
         if (pkgInfo == null) return emptySet()
         val rawSignatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val signingInfo = pkgInfo.signingInfo ?: return emptySet()
-            if (signingInfo.hasMultipleSigners()) {
-                signingInfo.apkContentsSigners?.toList().orEmpty()
+            val candidates = if (signingInfo.hasMultipleSigners()) {
+                signingInfo.apkContentsSigners
             } else {
-                signingInfo.signingCertificateHistory?.toList().orEmpty()
+                signingInfo.signingCertificateHistory?.takeIf { it.isNotEmpty() }
+                    ?: signingInfo.apkContentsSigners
             }
+            candidates?.toList().orEmpty()
         } else {
             pkgInfo.signatures?.toList().orEmpty()
         }
@@ -588,6 +630,21 @@ class CloudUpdateManager(
                 val err = CloudUpdateState.Error(
                     reason = CloudUpdateErrorReason.INVALID_URL,
                     detail = "APK download URL must use public HTTPS.",
+                    manifest = manifest
+                )
+                _state.value = err
+                return@withContext err
+            }
+
+            if (!manifest.signingCertSha256.isNullOrBlank() &&
+                !packageInspector.isInstalledSignatureCompatible(
+                    expectedPackageName = expectedPackageName,
+                    expectedCertSha256 = manifest.signingCertSha256
+                )
+            ) {
+                val err = CloudUpdateState.Error(
+                    reason = CloudUpdateErrorReason.SIGNATURE_MISMATCH,
+                    detail = "Release signing certificate does not match the currently installed ShareFlow build.",
                     manifest = manifest
                 )
                 _state.value = err

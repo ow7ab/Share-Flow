@@ -222,27 +222,11 @@ jobs:
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: |
           set -euo pipefail
-          DEBUG_INIT="${RUNNER_TEMP}/debug-test-fallback.init.gradle"
-          cat > "$DEBUG_INIT" << 'EOF'
-          gradle.beforeProject { proj ->
-              proj.plugins.withId("com.android.application") {
-                  def components = proj.extensions.findByName("androidComponents")
-                  if (components != null) {
-                      components.finalizeDsl { ext ->
-                          def defaultDebugSigning = ext.signingConfigs.findByName("debug")
-                          def debugBuildType = ext.buildTypes.findByName("debug")
-                          if (defaultDebugSigning != null && debugBuildType != null) {
-                              def currentStoreFile = debugBuildType.signingConfig?.storeFile
-                              if (currentStoreFile == null || !currentStoreFile.exists()) {
-                                  debugBuildType.signingConfig = defaultDebugSigning
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          EOF
-          ./gradlew :app:testDebugUnitTest --init-script "$DEBUG_INIT" --stacktrace --no-daemon
+          if [ -s "./debug.keystore.base64" ] && [ ! -s "./debug.keystore" ]; then
+            tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
+            chmod 600 "./debug.keystore"
+          fi
+          ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build signed Release APK and Play App Bundle (AAB)
         shell: bash
@@ -584,3 +568,6 @@ jobs:
           rm -f "${RUNNER_TEMP}/release-notes.md"
           rm -rf "${RUNNER_TEMP}/shareflow-release-stage"
           rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"
+          if [ -n "${{ steps.locate_project.outputs.project_dir }}" ]; then
+            rm -f "${{ steps.locate_project.outputs.project_dir }}/debug.keystore"
+          fi

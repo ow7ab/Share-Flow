@@ -60,7 +60,7 @@ class CloudUpdateManagerTest {
 
     @Test
     fun `version metadata and default GitHub release manifest URL are valid and consistent`() {
-        assertTrue("VERSION_CODE must be monotonic >= 11", BuildConfig.VERSION_CODE >= 11)
+        assertTrue("VERSION_CODE must be monotonic >= 12", BuildConfig.VERSION_CODE >= 12)
         assertTrue(
             "VERSION_NAME must follow semantic versioning",
             Regex("^\\d+\\.\\d+\\.\\d+([-.][0-9A-Za-z.]+)?$").matches(BuildConfig.VERSION_NAME)
@@ -100,6 +100,7 @@ class CloudUpdateManagerTest {
         assertEquals("1.0.11", data.versionName)
         assertTrue(data.apkDownloadUrl.endsWith("/Share-Flow.apk"))
         assertEquals("https://ow7ab.github.io/Share-Flow-Releases/", data.portalUrl)
+        assertEquals(sampleApkSha256, data.signingCertSha256)
     }
 
     @Test
@@ -266,6 +267,42 @@ class CloudUpdateManagerTest {
         assertEquals(CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH, (pkgResult as CloudUpdateState.Error).reason)
     }
 
+    @Test
+    fun `downloadAndVerifyUpdate fails fast before downloading when advertised signingCertSha256 mismatches installed app`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val trackingHttp = FakeCloudUpdateHttpClient(
+            manifestResponse = AppResult.Success(
+                """
+                {
+                  "versionCode": 12,
+                  "versionName": "1.0.11",
+                  "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.11/Share-Flow.apk",
+                  "sha256": "$sampleApkSha256",
+                  "fileSizeBytes": ${sampleApkBytes.size},
+                  "signingCertSha256": "$sampleApkSha256"
+                }
+                """.trimIndent()
+            ),
+            apkBytes = sampleApkBytes
+        )
+        val manager = createManager(
+            dispatcher = dispatcher,
+            httpClient = trackingHttp,
+            inspector = FakeApkSecurityInspector(
+                result = AppResult.Success(Unit),
+                preDownloadSignatureCompatible = false
+            ),
+            currentVersionCode = 11
+        )
+
+        val available = manager.checkForUpdates("https://shareflow.sd/version.json") as CloudUpdateState.UpdateAvailable
+        val result = manager.downloadAndVerifyUpdate(available.manifest)
+
+        assertTrue(result is CloudUpdateState.Error)
+        assertEquals(CloudUpdateErrorReason.SIGNATURE_MISMATCH, (result as CloudUpdateState.Error).reason)
+        assertEquals("APK should not be downloaded when signing cert already mismatches", 0, trackingHttp.downloadCount)
+    }
+
     private fun createManager(
         dispatcher: kotlinx.coroutines.CoroutineDispatcher,
         httpClient: CloudUpdateHttpClient,
@@ -290,6 +327,9 @@ class CloudUpdateManagerTest {
         private val manifestResponse: AppResult<String> = AppResult.Failure(AppError.Network("unused")),
         private val apkBytes: ByteArray = ByteArray(0)
     ) : CloudUpdateHttpClient {
+        var downloadCount: Int = 0
+            private set
+
         override suspend fun fetchManifestText(manifestUrl: String): AppResult<String> = manifestResponse
 
         override suspend fun downloadApkToFile(
@@ -297,6 +337,7 @@ class CloudUpdateManagerTest {
             destinationFile: File,
             onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit
         ): AppResult<File> {
+            downloadCount++
             destinationFile.parentFile?.mkdirs()
             destinationFile.writeBytes(apkBytes)
             onProgress(apkBytes.size.toLong(), apkBytes.size.toLong())
@@ -305,7 +346,8 @@ class CloudUpdateManagerTest {
     }
 
     private class FakeApkSecurityInspector(
-        private val result: AppResult<Unit>
+        private val result: AppResult<Unit>,
+        private val preDownloadSignatureCompatible: Boolean = true
     ) : ApkPackageSecurityInspector {
         override fun inspectUpdateApk(
             apkFile: File,
@@ -313,5 +355,10 @@ class CloudUpdateManagerTest {
             expectedMinVersionCode: Int,
             currentInstalledVersionCode: Int
         ): AppResult<Unit> = result
+
+        override fun isInstalledSignatureCompatible(
+            expectedPackageName: String,
+            expectedCertSha256: String
+        ): Boolean = preDownloadSignatureCompatible
     }
 }

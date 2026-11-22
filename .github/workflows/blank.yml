@@ -68,45 +68,53 @@ jobs:
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: chmod +x ./gradlew
 
-      - name: Build Android Debug APK (AGP automatic debug signing)
+      - name: Restore permanent project debug keystore for in-place APK updates
+        id: prepare_debug_keystore
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: |
           set -euo pipefail
 
-          INIT_SCRIPT="${RUNNER_TEMP:-/tmp}/agp-auto-debug-signing.init.gradle"
-          cat > "$INIT_SCRIPT" << 'EOF'
-          gradle.beforeProject { proj ->
-              proj.plugins.withId("com.android.application") {
-                  def components = proj.extensions.findByName("androidComponents")
-                  if (components != null) {
-                      components.finalizeDsl { ext ->
-                          def defaultDebugSigning = ext.signingConfigs.findByName("debug")
-                          def debugBuildType = ext.buildTypes.findByName("debug")
-                          if (defaultDebugSigning != null && debugBuildType != null) {
-                              def currentStoreFile = debugBuildType.signingConfig?.storeFile
-                              if (currentStoreFile == null || !currentStoreFile.exists()) {
-                                  debugBuildType.signingConfig = defaultDebugSigning
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          EOF
+          if [ ! -s "./debug.keystore.base64" ]; then
+            echo "::error::debug.keystore.base64 is missing or empty. Refusing to generate an ephemeral random debug keystore because that breaks in-place Android updates."
+            exit 1
+          fi
 
-          ./gradlew assembleDebug --init-script "$INIT_SCRIPT" --stacktrace --no-daemon
+          # Decode the repository's permanent debug keystore (identical to AI Studio builds)
+          # so every Debug APK update installs directly over previous versions without uninstalling.
+          tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
+          chmod 600 "./debug.keystore"
 
-      - name: Dynamically locate and verify signed Debug APK
+          KEYSTORE_CERT_SHA256=$(keytool -list -v -keystore "./debug.keystore" -storepass android -alias androiddebugkey \
+            | awk -F'SHA256: ' '/SHA256:/ {gsub(/[:[:space:]]/, "", $2); print tolower($2); exit}')
+
+          if [ -z "$KEYSTORE_CERT_SHA256" ] || [ "${#KEYSTORE_CERT_SHA256}" -ne 64 ]; then
+            echo "::error::Failed to verify permanent androiddebugkey certificate inside debug.keystore.base64."
+            exit 1
+          fi
+
+          echo "Verified permanent debug signing certificate SHA-256: $KEYSTORE_CERT_SHA256"
+          echo "expected_debug_cert_sha256=$KEYSTORE_CERT_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android Debug APK (permanent project debugConfig signing)
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Verify Debug APK signature continuity, alignment, and package metadata
         id: locate_apk
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          EXPECTED_DEBUG_CERT_SHA256: ${{ steps.prepare_debug_keystore.outputs.expected_debug_cert_sha256 }}
         run: |
           set -euo pipefail
 
-          APK_FILE=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | sort | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            APK_FILE=$(find . -path "*/build/outputs/apk/*.apk" -type f | sort | head -n 1)
+          APK_FILE="./app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -s "$APK_FILE" ]; then
+            APK_FILE=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | sort | head -n 1 || true)
           fi
 
           if [ -z "$APK_FILE" ] || [ ! -s "$APK_FILE" ]; then
@@ -123,16 +131,45 @@ jobs:
           echo "APK SHA-256: $APK_SHA256"
 
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          APKSIGNER=""
+          BUILD_TOOLS_DIR=""
           if [ -n "$SDK_ROOT" ] && [ -d "$SDK_ROOT/build-tools" ]; then
-            APKSIGNER=$(find "$SDK_ROOT/build-tools" -maxdepth 2 -name "apksigner" -type f | sort -V | tail -n 1 || true)
+            BUILD_TOOLS_DIR=$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1 || true)
           fi
 
-          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
-            "$APKSIGNER" verify --verbose --print-certs "$APK_ABS_PATH"
-          else
+          APKSIGNER="${BUILD_TOOLS_DIR}/apksigner"
+          ZIPALIGN="${BUILD_TOOLS_DIR}/zipalign"
+          AAPT2="${BUILD_TOOLS_DIR}/aapt2"
+
+          if [ ! -x "$APKSIGNER" ]; then
             echo "::error::apksigner not found to verify Debug APK signature."
             exit 1
+          fi
+
+          SIGNER_OUT=$("$APKSIGNER" verify --verbose --print-certs "$APK_ABS_PATH")
+          echo "$SIGNER_OUT"
+
+          ACTUAL_CERT_SHA256=$(printf '%s\n' "$SIGNER_OUT" | grep -i "Signer #1 certificate SHA-256 digest:" | head -n 1 | awk -F': ' '{print tolower($2)}' | tr -d '[:space:]')
+          if [ -z "$ACTUAL_CERT_SHA256" ] || [ "$ACTUAL_CERT_SHA256" != "$EXPECTED_DEBUG_CERT_SHA256" ]; then
+            echo "::error::Debug APK signing certificate mismatch! Expected ${EXPECTED_DEBUG_CERT_SHA256}, got ${ACTUAL_CERT_SHA256}. Aborting to preserve in-place updates."
+            exit 1
+          fi
+          echo "Verified Debug APK signing certificate matches permanent debug.keystore.base64 (in-place updates preserved)."
+
+          if [ -x "$ZIPALIGN" ]; then
+            "$ZIPALIGN" -c -v 4 "$APK_ABS_PATH" >/dev/null
+            echo "Verified 4-byte zipalign alignment."
+          fi
+
+          if [ -x "$AAPT2" ]; then
+            BADGING=$("$AAPT2" dump badging "$APK_ABS_PATH")
+            PKG_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)
+            VERSION_CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" | head -n 1)
+            VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n 1)
+            if [ "$PKG_NAME" != "com.aistudio.shareflow.kxrvnm" ]; then
+              echo "::error::Unexpected package name '$PKG_NAME'. Expected 'com.aistudio.shareflow.kxrvnm'."
+              exit 1
+            fi
+            echo "Verified package=${PKG_NAME} versionName=${VERSION_NAME} versionCode=${VERSION_CODE}"
           fi
 
           echo "apk_path=$APK_ABS_PATH" >> "$GITHUB_OUTPUT"
@@ -144,3 +181,9 @@ jobs:
           path: ${{ steps.locate_apk.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 14
+
+      - name: Clean up decoded debug keystore from runner workspace
+        if: always()
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: rm -f "./debug.keystore"
