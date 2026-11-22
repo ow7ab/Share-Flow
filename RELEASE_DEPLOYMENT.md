@@ -31,7 +31,7 @@
 
 | اسم المتغير (Variable) | القيمة المطلوبة | إلزامي؟ |
 |---|---|---|
-| `PUBLIC_RELEASES_REPO` | `ow7ab/Share-Flow-Releases` | **نعم** |
+| `PUBLIC_RELEASES_REPO` | `ow7ab/Share-Flow-Releases` | اختياري (مُعدّ افتراضياً على `ow7ab/Share-Flow-Releases`) |
 | `SHAREFLOW_PORTAL_URL` | `https://ow7ab.github.io/Share-Flow-Releases/` | اختياري (مُعدّ افتراضياً) |
 
 ### ب) أسرار المستودع (**Settings → Secrets and variables → Actions → Secrets**)
@@ -41,9 +41,9 @@
 | `ANDROID_KEYSTORE_BASE64` | محتوى مفتاح التوقيع الدائم محولاً إلى Base64: `base64 -w 0 shareflow-release.jks` | **نعم** |
 | `ANDROID_STORE_PASSWORD` | كلمة مرور ملف Keystore | **نعم** |
 | `ANDROID_KEY_PASSWORD` | كلمة مرور المفتاح الداخلي (Key Password) | **نعم** |
-| `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح داخل Keystore (مثلاً `upload`) | **نعم** |
-| `EXPECTED_CERT_SHA256` | بصمة SHA-256 لشهادة التوقيع الدائمة (64 محرف Hex دون فواصل أو بنقطتين) لمنع أي انحراف في الشهادة | **نعم** |
 | `PUBLIC_RELEASES_TOKEN` | Fine-grained Personal Access Token مقيّد **فقط** بمستودع `ow7ab/Share-Flow-Releases` بصلاحية `Contents: Read and write` (و`Metadata: Read-only`) | **نعم** |
+| `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح داخل Keystore (يُستخدم `upload` تلقائياً عند تركه فارغاً) | اختياري (افتراضي: `upload`) |
+| `EXPECTED_CERT_SHA256` | بصمة SHA-256 لشهادة التوقيع الدائمة لتثبيت الشهادة بشكل صريح (ويتم التحقق تلقائياً من مطابقة الشهادة مع آخر إصدار منشور دائماً) | اختياري (موصى به) |
 | `ANDROID_DEBUG_KEYSTORE_BASE64` | محتوى `debug.keystore` الدائم بصيغة Base64 لتثبيت توقيع نسخ الاختبار (`blank.yml`) بشكل دائم دون انتهاء صلاحية الكاش | اختياري (موصى به لنسخ Debug) |
 
 > **لا تقم أبداً** بوضع `PUBLIC_RELEASES_TOKEN` أو أي مفتاح داخل `docs/` أو شيفرة المتصفح. يعمل الموقع العام بالوصول غير المصادق إلى `https://api.github.com/repos/ow7ab/Share-Flow-Releases/releases/latest`.

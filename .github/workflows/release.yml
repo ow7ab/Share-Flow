@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Production semantic version tag matching app versionName (e.g. v1.0.10)"
-        required: true
+        description: "Optional version tag (leave empty to auto-read versionName from app/build.gradle.kts, e.g. v1.0.11)"
+        required: false
+        default: ""
         type: string
       release_notes_ar:
         description: "ملاحظات الإصدار بالعربية (اختياري)"
@@ -54,7 +55,7 @@ jobs:
           KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
           EXPECTED_CERT: ${{ secrets.EXPECTED_CERT_SHA256 }}
           PUB_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUB_REPO: ${{ vars.PUBLIC_RELEASES_REPO }}
+          PUB_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
           SOURCE_REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
@@ -66,19 +67,18 @@ jobs:
           [ -z "$KEYSTORE_B64" ] && MISSING+=("Secret: ANDROID_KEYSTORE_BASE64")
           [ -z "$STORE_PW" ] && MISSING+=("Secret: ANDROID_STORE_PASSWORD")
           [ -z "$KEY_PW" ] && MISSING+=("Secret: ANDROID_KEY_PASSWORD")
-          [ -z "$KEY_ALIAS_SECRET" ] && MISSING+=("Secret: ANDROID_KEY_ALIAS")
-          [ -z "$EXPECTED_CERT" ] && MISSING+=("Secret: EXPECTED_CERT_SHA256")
           [ -z "$PUB_TOKEN" ] && MISSING+=("Secret: PUBLIC_RELEASES_TOKEN")
-          [ -z "$PUB_REPO" ] && MISSING+=("Variable: PUBLIC_RELEASES_REPO (expected: ow7ab/Share-Flow-Releases)")
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
-            echo "::error::Missing required production release configuration:"
+            echo "::error::Missing required production release secrets in ${SOURCE_REPO} (Settings -> Secrets and variables -> Actions -> Repository secrets):"
             for item in "${MISSING[@]}"; do
               echo "::error::  - $item"
             done
-            echo "::error::A replacement signing key is NEVER generated automatically. Configure the permanent release signing credentials and public releases repository settings first."
+            echo "::error::A replacement release signing keystore is NEVER generated automatically to preserve in-place Android upgrades. Configure your permanent keystore once and add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD, and PUBLIC_RELEASES_TOKEN."
             exit 1
           fi
+
+          RESOLVED_ALIAS="${KEY_ALIAS_SECRET:-upload}"
 
           if [ "$PUB_REPO" = "$SOURCE_REPO" ]; then
             echo "::error::PUBLIC_RELEASES_REPO ($PUB_REPO) must be a separate public distribution repository (ow7ab/Share-Flow-Releases), never the private source repository ($SOURCE_REPO)."
@@ -92,17 +92,25 @@ jobs:
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             RELEASE_TAG=$(printf '%s' "$INPUT_TAG" | tr -d '[:space:]')
+            if [ -z "$RELEASE_TAG" ]; then
+              GRADLE_VER=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' ./app/build.gradle.kts | head -n 1)
+              if [ -n "$GRADLE_VER" ]; then
+                RELEASE_TAG="v${GRADLE_VER}"
+                echo "Auto-detected release tag from app/build.gradle.kts: ${RELEASE_TAG}"
+              fi
+            fi
           else
             RELEASE_TAG="$REF_NAME"
           fi
 
           if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.10)."
+            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.11)."
             exit 1
           fi
 
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "public_repo=${PUB_REPO}" >> "$GITHUB_OUTPUT"
+          echo "key_alias=${RESOLVED_ALIAS}" >> "$GITHUB_OUTPUT"
 
       - name: Verify public destination repository visibility and non-duplicate release tag
         shell: bash
@@ -171,7 +179,7 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PW: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_ALIAS_SECRET: ${{ steps.validate_config.outputs.key_alias }}
         run: |
           set -euo pipefail
           KEYSTORE_FILE="${RUNNER_TEMP}/shareflow-release-key.jks"
@@ -183,27 +191,27 @@ jobs:
             echo "::error::Keystore alias '${KEY_ALIAS_SECRET}' is not a valid PrivateKeyEntry."
             exit 1
           fi
-          echo "Verified permanent release signing keystore and PrivateKeyEntry alias."
+          echo "Verified permanent release signing keystore and PrivateKeyEntry alias (${KEY_ALIAS_SECRET})."
           echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
 
           if [ "$KEY_ALIAS_SECRET" != "upload" ]; then
             INIT_SCRIPT="${RUNNER_TEMP}/release-alias.init.gradle"
             cat > "$INIT_SCRIPT" << 'EOF'
-            gradle.beforeProject { proj ->
-                proj.plugins.withId("com.android.application") {
-                    def components = proj.extensions.findByName("androidComponents")
-                    if (components != null) {
-                        components.finalizeDsl { ext ->
-                            def relSigning = ext.signingConfigs.findByName("release")
-                            def aliasFromEnv = System.getenv("ANDROID_KEY_ALIAS")
-                            if (relSigning != null && aliasFromEnv != null && !aliasFromEnv.trim().isEmpty()) {
-                                relSigning.keyAlias = aliasFromEnv.trim()
-                            }
-                        }
-                    }
-                }
-            }
-            EOF
+          gradle.beforeProject { proj ->
+              proj.plugins.withId("com.android.application") {
+                  def components = proj.extensions.findByName("androidComponents")
+                  if (components != null) {
+                      components.finalizeDsl { ext ->
+                          def relSigning = ext.signingConfigs.findByName("release")
+                          def aliasFromEnv = System.getenv("ANDROID_KEY_ALIAS")
+                          if (relSigning != null && aliasFromEnv != null && !aliasFromEnv.trim().isEmpty()) {
+                              relSigning.keyAlias = aliasFromEnv.trim()
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
             echo "GRADLE_ALIAS_INIT_SCRIPT=$INIT_SCRIPT" >> "$GITHUB_ENV"
           else
             echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
@@ -251,7 +259,7 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_ALIAS: ${{ steps.validate_config.outputs.key_alias }}
         run: |
           set -euo pipefail
           EXTRA_ARGS=()
@@ -313,11 +321,19 @@ jobs:
             | tr '[:upper:]' '[:lower:]' \
             | tr -d '[:space:]:' || true)
           EXPECTED_NORM=$(printf '%s' "$EXPECTED_CERT_SHA256" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')
-          if [ -z "$CERT_SHA256" ] || [ "$CERT_SHA256" != "$EXPECTED_NORM" ]; then
-            echo "::error::Signing certificate SHA-256 mismatch! Expected ${EXPECTED_NORM}, got ${CERT_SHA256}. Aborting release to protect existing user installations and upgrade compatibility."
+          if [ -z "$CERT_SHA256" ] || [ "${#CERT_SHA256}" -ne 64 ]; then
+            echo "::error::Failed to extract valid 64-char signing certificate SHA-256 from Share-Flow.apk."
             exit 1
           fi
-          echo "Verified APK signing certificate matches EXPECTED_CERT_SHA256 (${CERT_SHA256})."
+          if [ -n "$EXPECTED_NORM" ]; then
+            if [ "$CERT_SHA256" != "$EXPECTED_NORM" ]; then
+              echo "::error::Signing certificate SHA-256 mismatch! Expected ${EXPECTED_NORM}, got ${CERT_SHA256}. Aborting release to protect existing user installations and upgrade compatibility."
+              exit 1
+            fi
+            echo "Verified APK signing certificate matches EXPECTED_CERT_SHA256 (${CERT_SHA256})."
+          else
+            echo "::warning::Secret EXPECTED_CERT_SHA256 is not configured yet. Add '${CERT_SHA256}' as secret EXPECTED_CERT_SHA256 to pin this signing certificate permanently."
+          fi
 
           # 2. Verify 4-byte zipalign alignment (Android 11+ installability)
           "$ZIPALIGN" -c -v 4 "$FIXED_APK" >/dev/null
@@ -352,20 +368,20 @@ jobs:
           PREV_MANIFEST="${STAGE_DIR}/prev-version.json"
           if gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1; then
             VERSION_CODE="$VERSION_CODE" PREV_MANIFEST="$PREV_MANIFEST" CERT_SHA256="$CERT_SHA256" python3 - <<'PYEOF'
-            import json, os, sys
-            with open(os.environ["PREV_MANIFEST"], "r", encoding="utf-8") as f:
-                prev = json.load(f)
-            prev_code = int(prev.get("versionCode", 0))
-            new_code = int(os.environ["VERSION_CODE"])
-            if new_code <= prev_code:
-                print(f"::error::Production versionCode must strictly increase: new versionCode ({new_code}) <= latest published versionCode ({prev_code}).")
-                sys.exit(1)
-            prev_cert = str(prev.get("signingCertSha256", "")).strip().lower()
-            if prev_cert and prev_cert != os.environ["CERT_SHA256"].strip().lower():
-                print("::error::Signing certificate differs from previous published production release! Aborting to preserve user upgrades.")
-                sys.exit(1)
-            print(f"Verified monotonic upgrade compatibility (versionCode {prev_code} -> {new_code}, certificate unchanged).")
-            PYEOF
+          import json, os, sys
+          with open(os.environ["PREV_MANIFEST"], "r", encoding="utf-8") as f:
+              prev = json.load(f)
+          prev_code = int(prev.get("versionCode", 0))
+          new_code = int(os.environ["VERSION_CODE"])
+          if new_code <= prev_code:
+              print(f"::error::Production versionCode must strictly increase: new versionCode ({new_code}) <= latest published versionCode ({prev_code}).")
+              sys.exit(1)
+          prev_cert = str(prev.get("signingCertSha256", "")).strip().lower()
+          if prev_cert and prev_cert != os.environ["CERT_SHA256"].strip().lower():
+              print("::error::Signing certificate differs from previous published production release! Aborting to preserve user upgrades.")
+              sys.exit(1)
+          print(f"Verified monotonic upgrade compatibility (versionCode {prev_code} -> {new_code}, certificate unchanged).")
+          PYEOF
             rm -f "$PREV_MANIFEST"
           else
             echo "No prior version.json found in ${PUBLIC_REPO}; treating ${RELEASE_TAG} as initial public release."

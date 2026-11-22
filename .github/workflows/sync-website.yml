@@ -36,7 +36,7 @@ jobs:
         shell: bash
         env:
           PUBLIC_RELEASES_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUBLIC_RELEASES_REPO: ${{ vars.PUBLIC_RELEASES_REPO }}
+          PUBLIC_RELEASES_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
           SYNC_COMMIT_REASON: ${{ github.event.inputs.reason || 'Sync static download portal docs' }}
         run: |
           set -euo pipefail

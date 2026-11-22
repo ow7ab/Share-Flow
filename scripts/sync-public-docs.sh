@@ -84,8 +84,16 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 # Live push to public repository (executed only inside authorized CI workflow)
-if [ -z "${PUBLIC_RELEASES_TOKEN:-}" ] || [ -z "${PUBLIC_RELEASES_REPO:-}" ]; then
-  echo "::error::Missing PUBLIC_RELEASES_TOKEN or PUBLIC_RELEASES_REPO for public website synchronization."
+PUBLIC_RELEASES_REPO="${PUBLIC_RELEASES_REPO:-ow7ab/Share-Flow-Releases}"
+
+if ! printf '%s' "$PUBLIC_RELEASES_REPO" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
+  echo "::error::Invalid PUBLIC_RELEASES_REPO format: '${PUBLIC_RELEASES_REPO}'. Expected owner/repo (e.g. ow7ab/Share-Flow-Releases)."
+  exit 1
+fi
+
+if [ -z "${PUBLIC_RELEASES_TOKEN:-}" ]; then
+  echo "::error::Missing repository secret PUBLIC_RELEASES_TOKEN required to push static docs/ to ${PUBLIC_RELEASES_REPO}."
+  echo "::error::GitHub's default GITHUB_TOKEN cannot push to a separate repository. Create a Fine-grained Personal Access Token scoped ONLY to ${PUBLIC_RELEASES_REPO} with 'Contents: Read and write', then add it in ${GITHUB_REPOSITORY:-ow7ab/Share-Flow} -> Settings -> Secrets and variables -> Actions -> Repository secrets as PUBLIC_RELEASES_TOKEN."
   exit 1
 fi
 
@@ -99,6 +107,16 @@ AUTH_HEADER=$(printf 'x-access-token:%s' "$PUBLIC_RELEASES_TOKEN" | base64 | tr 
 
 git -c http.extraHeader="AUTHORIZATION: basic ${AUTH_HEADER}" \
   clone --depth 1 "https://github.com/${PUBLIC_RELEASES_REPO}.git" "$CLONE_DIR"
+
+# Preserve existing published version.json / latest-release.json during website-only syncs
+if [ -z "${LATEST_MANIFEST_FILE:-}" ]; then
+  for manifest_name in version.json latest-release.json; do
+    if [ -f "${CLONE_DIR}/docs/${manifest_name}" ] && [ ! -f "${STAGE_DOCS}/${manifest_name}" ]; then
+      cp -f "${CLONE_DIR}/docs/${manifest_name}" "${STAGE_DOCS}/${manifest_name}"
+      echo "Preserved existing public docs/${manifest_name} from ${PUBLIC_RELEASES_REPO}."
+    fi
+  done
+fi
 
 # Replace only the public repo's docs/ directory cleanly
 rm -rf "${CLONE_DIR}/docs"
