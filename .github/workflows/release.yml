@@ -101,8 +101,12 @@ jobs:
           chmod 600 "$KEYSTORE_FILE"
 
           TARGET_ALIAS="${KEY_ALIAS_SECRET:-upload}"
-          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$STORE_PW" -alias "$TARGET_ALIAS" >/dev/null
-          echo "Verified permanent signing keystore and alias integrity."
+          KEYSTORE_INFO=$(keytool -list -keystore "$KEYSTORE_FILE" -storepass:env STORE_PW -alias "$TARGET_ALIAS")
+          if ! printf '%s\n' "$KEYSTORE_INFO" | grep -qi "PrivateKeyEntry"; then
+            echo "::error::Keystore alias '${TARGET_ALIAS}' is not a valid PrivateKeyEntry."
+            exit 1
+          fi
+          echo "Verified permanent signing keystore and PrivateKeyEntry alias integrity."
           echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
 
           if [ -n "$KEY_ALIAS_SECRET" ] && [ "$KEY_ALIAS_SECRET" != "upload" ]; then
@@ -128,10 +132,41 @@ jobs:
             echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
           fi
 
+      - name: Run download portal automated verification tests
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          if [ -f "./scripts/test-portal.js" ]; then
+            node --test ./scripts/test-portal.js
+          fi
+
       - name: Run full unit and Robolectric test suite before building release
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
-        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
+        run: |
+          set -euo pipefail
+          DEBUG_INIT="${RUNNER_TEMP}/debug-test-fallback.init.gradle"
+          cat > "$DEBUG_INIT" << 'EOF'
+          gradle.beforeProject { proj ->
+              proj.plugins.withId("com.android.application") {
+                  def components = proj.extensions.findByName("androidComponents")
+                  if (components != null) {
+                      components.finalizeDsl { ext ->
+                          def defaultDebugSigning = ext.signingConfigs.findByName("debug")
+                          def debugBuildType = ext.buildTypes.findByName("debug")
+                          if (defaultDebugSigning != null && debugBuildType != null) {
+                              def currentStoreFile = debugBuildType.signingConfig?.storeFile
+                              if (currentStoreFile == null || !currentStoreFile.exists()) {
+                                  debugBuildType.signingConfig = defaultDebugSigning
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+          ./gradlew :app:testDebugUnitTest --init-script "$DEBUG_INIT" --stacktrace --no-daemon
 
       - name: Build signed Release APK and Play App Bundle (AAB)
         shell: bash
@@ -148,11 +183,12 @@ jobs:
           fi
           ./gradlew :app:assembleRelease :app:bundleRelease "${EXTRA_ARGS[@]}" --stacktrace --no-daemon
 
-      - name: Stage Share-Flow.apk, verify signature, alignment, package identity, and generate manifest
+      - name: Stage Share-Flow.apk, verify signature, alignment, package identity, anti-downgrade, and generate manifest
         id: verify_outputs
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
           EXPECTED_CERT_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
           TARGET_REPO: ${{ vars.PUBLIC_RELEASES_REPO || github.repository }}
           PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow/' }}
@@ -229,17 +265,46 @@ jobs:
           AAB_ABS=$(realpath "$RELEASE_AAB")
           jarsigner -verify -strict "$AAB_ABS" >/dev/null
 
-          # 5. Compute SHA-256 and exact byte size
+          # 5. Anti-downgrade guard against latest published version.json on TARGET_REPO (if any)
+          PREV_MANIFEST="${STAGE_DIR}/prev-version.json"
+          if gh release download --repo "$TARGET_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1; then
+            VERSION_CODE="$VERSION_CODE" PREV_MANIFEST="$PREV_MANIFEST" python3 - <<'PYEOF'
+            import json, os, sys
+            try:
+                with open(os.environ["PREV_MANIFEST"], "r", encoding="utf-8") as f:
+                    prev = json.load(f)
+                prev_code = int(prev.get("versionCode", 0))
+                new_code = int(os.environ["VERSION_CODE"])
+                if new_code < prev_code:
+                    print(f"::error::Version downgrade blocked: new versionCode ({new_code}) is lower than latest published versionCode ({prev_code}).")
+                    sys.exit(1)
+                print(f"Anti-downgrade check passed (new={new_code} >= previous={prev_code}).")
+            except SystemExit:
+                raise
+            except Exception as exc:
+                print(f"Skipping previous manifest comparison due to unreadable JSON: {exc}")
+            PYEOF
+            rm -f "$PREV_MANIFEST"
+          fi
+
+          # 6. Compute SHA-256 and exact byte size
           APK_SHA256=$(sha256sum "$FIXED_APK" | awk '{print $1}')
           APK_SIZE=$(stat -c%s "$FIXED_APK")
           printf '%s  Share-Flow.apk\n' "$APK_SHA256" > "${STAGE_DIR}/Share-Flow.apk.sha256"
 
-          # 6. Determine immutable release tag (preserving all prior releases)
+          # 7. Determine immutable release tag (preserving all prior releases on both local and mirror repos)
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
           else
             BASE_TAG="v${VERSION_NAME}"
+            TAG_EXISTS=0
             if git rev-parse -q --verify "refs/tags/${BASE_TAG}" >/dev/null; then
+              TAG_EXISTS=1
+            elif gh release view "${BASE_TAG}" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+              TAG_EXISTS=1
+            fi
+
+            if [ "$TAG_EXISTS" -eq 1 ]; then
               RELEASE_TAG="v${VERSION_NAME}-b${VERSION_CODE}.${GITHUB_RUN_NUMBER}"
             else
               RELEASE_TAG="${BASE_TAG}"
@@ -249,7 +314,7 @@ jobs:
           PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           DIRECT_APK_URL="https://github.com/${TARGET_REPO}/releases/download/${RELEASE_TAG}/Share-Flow.apk"
 
-          # 7. Generate and validate version.json for ShareFlow in-app Cloud Update & website
+          # 8. Generate and validate version.json for ShareFlow in-app Cloud Update & website
           VERSION_CODE="$VERSION_CODE" \
           VERSION_NAME="$VERSION_NAME" \
           DIRECT_APK_URL="$DIRECT_APK_URL" \
@@ -334,7 +399,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          SIZE_MB=$(python3 -c "print(f'{int(${APK_SIZE}) / (1024 * 1024):.2f} MB')")
+          SIZE_MB=$(APK_SIZE="$APK_SIZE" python3 -c "import os; print(f'{int(os.environ[\"APK_SIZE\"]) / (1024 * 1024):.2f} MB')")
           NOTES_FILE="${RUNNER_TEMP}/release-notes.md"
           cat > "$NOTES_FILE" << EOF
           ## Share Flow v${VERSION_NAME} (Build ${VERSION_CODE})
@@ -379,7 +444,7 @@ jobs:
               --latest
           fi
 
-      - name: Verify published GitHub Release asset integrity
+      - name: Verify published GitHub Release asset integrity and direct APK download URL
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
@@ -395,10 +460,30 @@ jobs:
           assets = {a["name"]: a for a in data.get("assets", [])}
           assert "Share-Flow.apk" in assets, "Share-Flow.apk asset missing from published release!"
           assert "version.json" in assets, "version.json asset missing from published release!"
+          assert not any(name.lower().endswith(".zip") for name in assets), "ZIP archive must not be published as release asset!"
           assert assets["Share-Flow.apk"]["size"] == int(os.environ["EXPECTED_SIZE"]), "Published APK size mismatch!"
           print("Verified published GitHub Release:", data["url"])
           print("Direct latest APK URL: https://github.com/" + os.environ["TARGET_REPO"] + "/releases/latest/download/Share-Flow.apk")
           PYEOF
+
+          IS_PRIVATE=$(gh repo view "$TARGET_REPO" --json isPrivate --jq '.isPrivate' 2>/dev/null || echo "true")
+          if [ "$IS_PRIVATE" = "false" ]; then
+            LATEST_APK_URL="https://github.com/${TARGET_REPO}/releases/latest/download/Share-Flow.apk"
+            HEADERS=$(curl -fsSLI --max-redirs 5 "$LATEST_APK_URL")
+            CONTENT_TYPE=$(printf '%s\n' "$HEADERS" | grep -i "^content-type:" | tail -n 1 | tr '[:upper:]' '[:lower:]')
+            CONTENT_LEN=$(printf '%s\n' "$HEADERS" | grep -i "^content-length:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+            if printf '%s' "$CONTENT_TYPE" | grep -q "text/html"; then
+              echo "::error::Direct APK URL returned HTML instead of binary APK ($CONTENT_TYPE)."
+              exit 1
+            fi
+            if [ -n "$CONTENT_LEN" ] && [ "$CONTENT_LEN" != "$EXPECTED_SIZE" ]; then
+              echo "::error::Direct APK URL Content-Length ($CONTENT_LEN) does not match expected APK size ($EXPECTED_SIZE)."
+              exit 1
+            fi
+            echo "Verified direct latest APK download URL responds with binary APK (${CONTENT_LEN:-unknown} bytes)."
+          else
+            echo "Target repository ${TARGET_REPO} is private; skipped unauthenticated public URL probe."
+          fi
 
       - name: Upload Release APK workflow artifact
         uses: actions/upload-artifact@v4
@@ -431,4 +516,6 @@ jobs:
         run: |
           rm -f "${RUNNER_TEMP}/shareflow-release-key.jks"
           rm -f "${RUNNER_TEMP}/release-alias.init.gradle"
+          rm -f "${RUNNER_TEMP}/debug-test-fallback.init.gradle"
+          rm -f "${RUNNER_TEMP}/release-notes.md"
           rm -rf "${RUNNER_TEMP}/shareflow-release-stage"

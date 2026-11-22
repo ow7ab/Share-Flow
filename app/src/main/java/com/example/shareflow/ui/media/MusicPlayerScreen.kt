@@ -82,7 +82,6 @@ import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
@@ -224,8 +223,8 @@ fun MusicPlayerScreen(
             val selectedMusicTab = uiState.selectedTab.ordinal
             PrimaryTabRow(
                 selectedTabIndex = selectedMusicTab,
-                containerColor = ShareFlowBrandColors.SoftCream,
-                contentColor = ShareFlowBrandColors.DeepNavy,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
                 indicator = {
                     ShareFlowSignatureTabIndicator(
                         modifier = Modifier.tabIndicatorOffset(selectedMusicTab, matchContentSize = false)
@@ -236,24 +235,24 @@ fun MusicPlayerScreen(
                 Tab(
                     selected = uiState.selectedTab == MusicTab.LIBRARY,
                     onClick = { viewModel.selectTab(MusicTab.LIBRARY) },
-                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = { Text(stringResource(R.string.media_music_tab_library)) },
                     modifier = Modifier.testTag("music_tab_library")
                 )
                 Tab(
                     selected = uiState.selectedTab == MusicTab.QUEUE,
                     onClick = { viewModel.selectTab(MusicTab.QUEUE) },
-                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = { Text(stringResource(R.string.media_music_tab_queue, playbackState.queue.size)) },
                     modifier = Modifier.testTag("music_tab_queue")
                 )
                 Tab(
                     selected = uiState.selectedTab == MusicTab.PLAYLISTS,
                     onClick = { viewModel.selectTab(MusicTab.PLAYLISTS) },
-                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = { Text(stringResource(R.string.media_music_tab_playlists, playlists.size)) },
                     modifier = Modifier.testTag("music_tab_playlists")
                 )
@@ -739,6 +738,8 @@ private fun CreatePlaylistCard(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.media_music_playlist_name_hint)) },
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -780,6 +781,11 @@ private fun AddToPlaylistDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(stringResource(R.string.media_music_add_to_playlist)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

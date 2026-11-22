@@ -53,6 +53,7 @@ import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -172,6 +173,8 @@ fun RecentFilesScreen(
                         placeholder = { Text(stringResource(R.string.recent_files_search_hint)) },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         singleLine = true,
+                        shape = ShareFlowDesign.shapes.input,
+                        colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("recent_files_search_input")
@@ -198,6 +201,7 @@ fun RecentFilesScreen(
                             Surface(
                                 shape = ShareFlowDesign.shapes.card,
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shadowElevation = ShareFlowDesign.elevation.card,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Row(
@@ -425,6 +429,7 @@ fun FavoritesScreen(
                             Surface(
                                 shape = ShareFlowDesign.shapes.card,
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shadowElevation = ShareFlowDesign.elevation.card,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Row(

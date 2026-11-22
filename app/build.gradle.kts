@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.shareflow.kxrvnm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 8
-    versionName = "1.0.7"
+    versionCode = 11
+    versionName = "1.0.10"
 
     buildConfigField(
       "String",
@@ -156,6 +156,28 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  "ksp"(libs.androidx.room.compiler)
+  "kspDebug"(libs.androidx.room.compiler)
+  "kspRelease"(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)
+}
+
+tasks.matching { it.name.startsWith("ksp") }.configureEach {
+  doFirst {
+    val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+      val isBenignKspAwtTeardownNpe =
+        thread.name.startsWith("AWT-EventQueue") &&
+          throwable is NullPointerException &&
+          throwable.stackTrace.any { frame ->
+            frame.className.startsWith("ksp.com.intellij.openapi.")
+          }
+      if (!isBenignKspAwtTeardownNpe) {
+        if (previousHandler != null) {
+          previousHandler.uncaughtException(thread, throwable)
+        } else {
+          System.err.println("Exception in thread \"${thread.name}\" $throwable")
+        }
+      }
+    }
+  }
 }

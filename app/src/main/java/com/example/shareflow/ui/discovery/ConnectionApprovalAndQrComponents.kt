@@ -88,12 +88,26 @@ fun IncomingConnectionApprovalDialog(
     AlertDialog(
         onDismissRequest = onReject,
         modifier = modifier.testTag("incoming_approval_dialog"),
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         icon = {
-            Icon(
-                imageVector = Icons.Filled.Security,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         },
         title = {
             Text(
@@ -358,7 +372,7 @@ fun RealQrCodeView(
             Icon(
                 imageVector = Icons.Filled.QrCode2,
                 contentDescription = stringResource(R.string.qr_pairing_title),
-                tint = com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy,
+                tint = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground,
                 modifier = Modifier.size(64.dp)
             )
         }
@@ -368,7 +382,7 @@ fun RealQrCodeView(
     Canvas(modifier = modifier.aspectRatio(1f)) {
         val cellW = size.width / matrix.width.toFloat()
         val cellH = size.height / matrix.height.toFloat()
-        val moduleColor = com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy
+        val moduleColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground
         drawRect(color = Color.White, size = size)
 
         for (y in 0 until matrix.height) {
@@ -477,7 +491,7 @@ fun QrCameraScannerView(
         )
 
         Surface(
-            color = Color.Black.copy(alpha = 0.6f),
+            color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -490,13 +504,13 @@ fun QrCameraScannerView(
                 Icon(
                     imageVector = Icons.Filled.Lock,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
                     text = stringResource(R.string.qr_scanner_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White
+                    color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextPrimary
                 )
             }
         }

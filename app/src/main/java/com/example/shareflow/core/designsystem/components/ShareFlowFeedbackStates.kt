@@ -61,6 +61,7 @@ fun EmptyState(
             .semantics(mergeDescendants = true) {},
         shape = ShareFlowDesign.shapes.featuredCard,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
@@ -72,14 +73,15 @@ fun EmptyState(
         ) {
             Surface(
                 shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.32f)),
                 modifier = Modifier.size(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.size(spacing.iconLarge)
                     )
                 }
@@ -127,6 +129,7 @@ fun ErrorState(
             },
         shape = ShareFlowDesign.shapes.featuredCard,
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
     ) {
         Column(
@@ -196,6 +199,8 @@ fun LoadingState(
         label = "shareflow_loading_rotation"
     )
 
+    val haloColor = ShareFlowDesign.semanticColors.cream.copy(alpha = if (ShareFlowDesign.semanticColors.isDark) 0.14f else 0.45f)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -206,8 +211,12 @@ fun LoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spacing.md)
     ) {
-        Canvas(modifier = Modifier.size(44.dp)) {
+        Canvas(modifier = Modifier.size(48.dp)) {
             val strokePx = 4.dp.toPx()
+            drawCircle(
+                color = haloColor,
+                radius = size.minDimension * 0.34f
+            )
             drawCircle(
                 color = trackColor,
                 style = Stroke(width = strokePx)

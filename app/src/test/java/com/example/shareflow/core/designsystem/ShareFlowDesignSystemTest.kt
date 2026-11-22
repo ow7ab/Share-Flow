@@ -254,7 +254,7 @@ class ShareFlowDesignSystemTest {
     }
 
     @Test
-    fun `applies Arabic RTL layout direction localized strings and official Share Flow brand palette`() {
+    fun `applies Arabic RTL layout direction localized strings and Marple Light and Dark color palettes`() {
         var capturedDirection: LayoutDirection? = null
         var capturedPrimary: Color? = null
         var capturedBackground: Color? = null
@@ -284,17 +284,20 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Rtl, capturedDirection)
-        assertEquals(Color(0xFFFEF3B3), capturedBackground)
-        assertEquals(Color(0xFF0A1821), capturedOnBackground)
-        assertEquals(Color(0xFF1D59BB), capturedPrimary)
-        assertEquals(Color(0xFF76B9FF), capturedSecondary)
-        assertEquals(Color(0xFFFEBD19), capturedTertiary)
-        assertEquals(Color(0xFFFEF3B3), ShareFlowBrandColors.SoftCream)
+        assertEquals(Color(0xFFFFF9F5), capturedBackground)
+        assertEquals(Color(0xFF292126), capturedOnBackground)
+        assertEquals(Color(0xFFCA2851), capturedPrimary)
+        assertEquals(Color(0xFFFF6766), capturedSecondary)
+        assertEquals(Color(0xFFFFB173), capturedTertiary)
+        assertEquals(Color(0xFFFFE3B3), ShareFlowBrandColors.SoftCream)
         assertEquals(
-            listOf(Color(0xFF1D59BB), Color(0xFF76B9FF), Color(0xFFFEF3B3), Color(0xFFFEBD19)),
+            listOf(Color(0xFFCA2851), Color(0xFFFF6766), Color(0xFFFFB173), Color(0xFFFFE3B3)),
             ShareFlowBrandGradients.SignatureStops
         )
-        assertEquals(LightColorScheme.primary, DarkColorScheme.primary)
+        assertEquals(Color(0xFFCA2851), LightColorScheme.primary)
+        assertEquals(Color(0xFFFF8198), DarkColorScheme.primary)
+        assertEquals(Color(0xFF171316), DarkColorScheme.background)
+        assertEquals(Color(0xFF211A1E), DarkColorScheme.surface)
         composeTestRule.onNodeWithTag("rtl_settings_title").assertTextEquals("الإعدادات")
 
         val arabicSize = ShareFlowFormatters.formatBytes(2048L, Locale.forLanguageTag("ar"))
@@ -302,15 +305,25 @@ class ShareFlowDesignSystemTest {
     }
 
     @Test
-    fun `applies English LTR layout direction and strings`() {
+    fun `applies English LTR layout direction and Marple Dark theme tokens`() {
         var capturedDirection: LayoutDirection? = null
+        var capturedDarkBackground: Color? = null
+        var capturedDarkPrimary: Color? = null
+        var capturedDarkSecondary: Color? = null
+        var capturedDarkTertiary: Color? = null
+        var capturedDarkOnBackground: Color? = null
 
         composeTestRule.setContent {
             ShareFlowTheme(
-                themeMode = ThemeMode.LIGHT,
+                themeMode = ThemeMode.DARK,
                 appLanguage = AppLanguage.ENGLISH
             ) {
                 capturedDirection = LocalLayoutDirection.current
+                capturedDarkBackground = MaterialTheme.colorScheme.background
+                capturedDarkPrimary = MaterialTheme.colorScheme.primary
+                capturedDarkSecondary = MaterialTheme.colorScheme.secondary
+                capturedDarkTertiary = MaterialTheme.colorScheme.tertiary
+                capturedDarkOnBackground = MaterialTheme.colorScheme.onBackground
                 Text(
                     text = stringResource(R.string.settings_title),
                     modifier = Modifier.testTag("ltr_settings_title")
@@ -320,8 +333,14 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Ltr, capturedDirection)
-        assertEquals(Color(0xEB0A1821), ShareFlowBrandColors.GlassNavBackground)
-        assertEquals(Color(0x6676B9FF), ShareFlowBrandColors.GlassNavBorder)
+        assertEquals(Color(0xFF171316), capturedDarkBackground)
+        assertEquals(Color(0xFFFF8198), capturedDarkPrimary)
+        assertEquals(Color(0xFFFF8986), capturedDarkSecondary)
+        assertEquals(Color(0xFFFFB77F), capturedDarkTertiary)
+        assertEquals(Color(0xFFFFF5F1), capturedDarkOnBackground)
+        assertEquals(Color(0xD9FFF9F5), ShareFlowBrandColors.GlassNavBackground)
+        assertEquals(Color(0xB3EADDE0), ShareFlowBrandColors.GlassNavBorder)
+        assertEquals(Color(0xFFEADDE0), ShareFlowBrandColors.GlassCardBorder)
         composeTestRule.onNodeWithTag("ltr_settings_title").assertTextEquals("Settings")
     }
 
@@ -347,5 +366,37 @@ class ShareFlowDesignSystemTest {
         composeTestRule.onNodeWithTag("signature_progress_determinate").assertExists()
         composeTestRule.onNodeWithTag("signature_progress_indeterminate").assertExists()
         composeTestRule.onNodeWithTag("signature_tab_indicator").assertExists()
+    }
+
+    @Test
+    fun `renders floating glass bottom navigation bar in light and dark modes and switches destinations`() {
+        val currentRoute = mutableStateOf(com.example.shareflow.navigation.ShareFlowRoutes.HOME)
+        val themeMode = mutableStateOf(ThemeMode.LIGHT)
+
+        composeTestRule.setContent {
+            ShareFlowTheme(
+                themeMode = themeMode.value,
+                appLanguage = AppLanguage.ENGLISH
+            ) {
+                com.example.shareflow.navigation.ShareFlowFloatingGlassNavBar(
+                    currentRoute = currentRoute.value,
+                    onNavigateTopLevel = { route -> currentRoute.value = route }
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("nav_item_home").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("nav_item_files").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(com.example.shareflow.navigation.ShareFlowRoutes.FILES_HUB, currentRoute.value)
+
+        // Switch to Dark Mode and verify glass bar renders cleanly and navigates
+        themeMode.value = ThemeMode.DARK
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("nav_item_settings").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(com.example.shareflow.navigation.ShareFlowRoutes.SETTINGS, currentRoute.value)
     }
 }

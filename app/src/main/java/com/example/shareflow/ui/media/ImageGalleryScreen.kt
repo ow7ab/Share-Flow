@@ -250,14 +250,21 @@ fun ImageGalleryScreen(
                                         )
                                     )
                                 },
+                                shape = ShareFlowDesign.shapes.chip,
+                                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.selectedAlbum == null),
                                 modifier = Modifier.testTag("gallery_album_chip_all")
                             )
                         }
                         items(uiState.albums, key = { it.first }) { (albumName, count) ->
+                            val albumSelected = uiState.selectedAlbum == albumName
                             FilterChip(
-                                selected = uiState.selectedAlbum == albumName,
+                                selected = albumSelected,
                                 onClick = { viewModel.selectAlbum(albumName) },
                                 label = { Text(text = "$albumName ($count)") },
+                                shape = ShareFlowDesign.shapes.chip,
+                                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = albumSelected),
                                 modifier = Modifier.testTag("gallery_album_chip_${albumName.lowercase().replace(' ', '_')}")
                             )
                         }
@@ -621,6 +628,11 @@ private fun ImageMetadataDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("gallery_metadata_dialog"),
         title = { Text(text = stringResource(R.string.media_gallery_metadata)) },
         text = {

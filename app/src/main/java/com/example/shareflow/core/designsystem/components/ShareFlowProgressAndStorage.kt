@@ -53,15 +53,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.TransferDirection
 
 /**
- * Reusable Liquid Glass determinate progress bar filled with the Official Share Flow Signature Gradient:
- * Royal Blue (#1D59BB) -> Sky Blue (#76B9FF) -> Soft Cream (#FEF3B3) -> Golden Yellow (#FEBD19).
+ * Reusable determinate progress bar filled with the Marple Signature Gradient:
+ * Ruby (#CA2851) -> Coral (#FF6766) -> Peach (#FFB173) -> Cream (#FFE3B3).
  */
 @Composable
 fun ShareFlowSignatureProgressBar(
@@ -76,10 +75,10 @@ fun ShareFlowSignatureProgressBar(
             .fillMaxWidth()
             .height(height)
             .clip(trackShape)
-            .background(ShareFlowBrandColors.GlassSurfaceHighest)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .border(
                 width = 0.75.dp,
-                color = ShareFlowBrandColors.GlassCardBorder,
+                color = MaterialTheme.colorScheme.outlineVariant,
                 shape = trackShape
             )
     ) {
@@ -96,8 +95,8 @@ fun ShareFlowSignatureProgressBar(
 }
 
 /**
- * Reusable Liquid Glass indeterminate progress bar with a luminous sweeping
- * Official Share Flow Signature Gradient segment.
+ * Reusable indeterminate progress bar with a sweeping
+ * Marple Signature Gradient segment (Ruby -> Coral -> Peach -> Cream).
  */
 @Composable
 fun ShareFlowSignatureProgressBar(
@@ -121,10 +120,10 @@ fun ShareFlowSignatureProgressBar(
             .fillMaxWidth()
             .height(height)
             .clip(trackShape)
-            .background(ShareFlowBrandColors.GlassSurfaceHighest)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .border(
                 width = 0.75.dp,
-                color = ShareFlowBrandColors.GlassCardBorder,
+                color = MaterialTheme.colorScheme.outlineVariant,
                 shape = trackShape
             )
     ) {
@@ -143,7 +142,7 @@ fun ShareFlowSignatureProgressBar(
 }
 
 /**
- * Reusable active-state tab indicator painted with the Official Share Flow Signature Gradient.
+ * Reusable active-state tab indicator painted with the Marple Signature Gradient.
  */
 @Composable
 fun ShareFlowSignatureTabIndicator(
@@ -170,6 +169,7 @@ fun StorageIndicator(
     title: String? = null
 ) {
     val spacing = ShareFlowDesign.spacing
+    val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
 
     val safeTotal = totalBytes.coerceAtLeast(0L)
@@ -184,8 +184,8 @@ fun StorageIndicator(
 
     val barColor = when {
         fraction >= 0.9f -> MaterialTheme.colorScheme.error
-        fraction >= 0.75f -> ShareFlowBrandColors.DeepNavy
-        else -> ShareFlowBrandColors.RoyalBlue
+        fraction >= 0.75f -> semantic.warningAccent
+        else -> MaterialTheme.colorScheme.primary
     }
 
     Surface(
@@ -196,6 +196,7 @@ fun StorageIndicator(
             },
         shape = ShareFlowDesign.shapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
@@ -231,7 +232,7 @@ fun StorageIndicator(
                 Text(
                     text = ShareFlowFormatters.formatPercentage(fraction, locale),
                     style = ShareFlowMonoStyle,
-                    color = ShareFlowBrandColors.DeepNavy
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -273,7 +274,7 @@ fun StorageIndicator(
                         ShareFlowFormatters.formatBytes(availableBytes, locale)
                     ),
                     style = MaterialTheme.typography.labelSmall,
-                    color = ShareFlowBrandColors.RoyalBlue
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -317,6 +318,7 @@ fun TransferProgressCard(
             },
         shape = ShareFlowDesign.shapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
@@ -416,12 +418,12 @@ fun TransferProgressCard(
                     Text(
                         text = ShareFlowFormatters.formatTransferSpeed(bytesPerSecond, locale),
                         style = ShareFlowMonoStyle,
-                        color = ShareFlowBrandColors.RoyalBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = ShareFlowFormatters.formatPercentage(fraction, locale),
                         style = ShareFlowMonoStyle,
-                        color = ShareFlowBrandColors.DeepNavy
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }

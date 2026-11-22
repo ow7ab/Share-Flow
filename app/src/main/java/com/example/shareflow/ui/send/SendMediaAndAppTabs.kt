@@ -125,6 +125,9 @@ internal fun LazyListScope.sendPhotosTabItems(
                         selected = uiState.photoFilter == SendPhotoFilter.ALL,
                         onClick = { onSelectFilter(SendPhotoFilter.ALL, null) },
                         label = { Text(stringResource(R.string.send_photos_all_filter)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.photoFilter == SendPhotoFilter.ALL),
                         modifier = Modifier.testTag("send_photos_filter_all")
                     )
                 }
@@ -133,6 +136,9 @@ internal fun LazyListScope.sendPhotosTabItems(
                         selected = uiState.photoFilter == SendPhotoFilter.RECENT,
                         onClick = { onSelectFilter(SendPhotoFilter.RECENT, null) },
                         label = { Text(stringResource(R.string.send_photos_recent_filter)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.photoFilter == SendPhotoFilter.RECENT),
                         modifier = Modifier.testTag("send_photos_filter_recent")
                     )
                 }
@@ -142,6 +148,9 @@ internal fun LazyListScope.sendPhotosTabItems(
                             selected = uiState.photoFilter == SendPhotoFilter.ALBUMS,
                             onClick = { onSelectFilter(SendPhotoFilter.ALBUMS, uiState.availableAlbums.firstOrNull()) },
                             label = { Text(stringResource(R.string.send_photos_albums_filter)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.photoFilter == SendPhotoFilter.ALBUMS),
                             modifier = Modifier.testTag("send_photos_filter_albums")
                         )
                     }
@@ -170,10 +179,14 @@ internal fun LazyListScope.sendPhotosTabItems(
         item(key = "photos_album_chips") {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(ShareFlowDesign.spacing.xs)) {
                 items(uiState.availableAlbums, key = { it }) { album ->
+                    val albumSelected = uiState.selectedAlbum == album
                     FilterChip(
-                        selected = uiState.selectedAlbum == album,
+                        selected = albumSelected,
                         onClick = { onSelectFilter(SendPhotoFilter.ALBUMS, album) },
-                        label = { Text(text = album) }
+                        label = { Text(text = album) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = albumSelected)
                     )
                 }
             }
@@ -188,7 +201,10 @@ internal fun LazyListScope.sendPhotosTabItems(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             }
         }
     } else if (uiState.visiblePhotos.isEmpty()) {
@@ -359,7 +375,10 @@ internal fun LazyListScope.sendVideosTabItems(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             }
         }
     } else if (uiState.videos.isEmpty()) {
@@ -486,6 +505,8 @@ internal fun LazyListScope.sendAppsTabItems(
                 value = uiState.appSearchQuery,
                 onValueChange = onSearchChange,
                 singleLine = true,
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 placeholder = { Text(stringResource(R.string.send_apps_search_placeholder)) },
                 modifier = Modifier
@@ -497,28 +518,40 @@ internal fun LazyListScope.sendAppsTabItems(
                     FilterChip(
                         selected = uiState.appSortOption == SendAppSortOption.NAME,
                         onClick = { onSortChange(SendAppSortOption.NAME) },
-                        label = { Text(stringResource(R.string.send_apps_sort_name)) }
+                        label = { Text(stringResource(R.string.send_apps_sort_name)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.appSortOption == SendAppSortOption.NAME)
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.appSortOption == SendAppSortOption.SIZE,
                         onClick = { onSortChange(SendAppSortOption.SIZE) },
-                        label = { Text(stringResource(R.string.send_apps_sort_size)) }
+                        label = { Text(stringResource(R.string.send_apps_sort_size)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.appSortOption == SendAppSortOption.SIZE)
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.appSortOption == SendAppSortOption.RECENT,
                         onClick = { onSortChange(SendAppSortOption.RECENT) },
-                        label = { Text(stringResource(R.string.send_apps_sort_recent)) }
+                        label = { Text(stringResource(R.string.send_apps_sort_recent)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.appSortOption == SendAppSortOption.RECENT)
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.includeSystemApps,
                         onClick = { onToggleIncludeSystem(!uiState.includeSystemApps) },
-                        label = { Text(stringResource(R.string.send_apps_system_filter)) }
+                        label = { Text(stringResource(R.string.send_apps_system_filter)) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.includeSystemApps)
                     )
                 }
             }
@@ -546,7 +579,10 @@ internal fun LazyListScope.sendAppsTabItems(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             }
         }
     } else if (uiState.visibleApps.isEmpty()) {
@@ -686,10 +722,14 @@ internal fun LazyListScope.sendFilesTabItems(
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
             items(fileCategories) { (category, labelRes) ->
+                val catSelected = uiState.activeCategory == category
                 FilterChip(
-                    selected = uiState.activeCategory == category,
+                    selected = catSelected,
                     onClick = { onSelectCategory(category) },
                     label = { Text(stringResource(labelRes)) },
+                    shape = ShareFlowDesign.shapes.chip,
+                    colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                    border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = catSelected),
                     modifier = Modifier.testTag("send_cat_${category?.name?.lowercase() ?: "all"}")
                 )
             }
@@ -814,6 +854,11 @@ internal fun PhotoPreviewDialog(
     val locale = ShareFlowDesign.locale
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = {
             Text(
                 text = photo.displayName,
@@ -878,6 +923,11 @@ internal fun VideoPreviewDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = {
             Text(
                 text = video.displayName,

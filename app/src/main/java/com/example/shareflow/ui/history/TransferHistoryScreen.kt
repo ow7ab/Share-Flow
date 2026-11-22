@@ -276,6 +276,8 @@ fun TransferHistoryContent(
                                     onValueChange = onSearchQueryChange,
                                     placeholder = { Text(stringResource(R.string.history_search_hint)) },
                                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                                    shape = ShareFlowDesign.shapes.input,
+                                    colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                                     singleLine = true,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -298,10 +300,14 @@ fun TransferHistoryContent(
                                             HistoryFilter.FAILED -> R.string.history_filter_failed
                                             HistoryFilter.CANCELLED -> R.string.history_filter_cancelled
                                         }
+                                        val filterSelected = uiState.selectedFilter == filter
                                         FilterChip(
-                                            selected = uiState.selectedFilter == filter,
+                                            selected = filterSelected,
                                             onClick = { onFilterSelected(filter) },
                                             label = { Text(stringResource(labelRes)) },
+                                            shape = ShareFlowDesign.shapes.chip,
+                                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = filterSelected),
                                             modifier = Modifier
                                                 .minimumInteractiveComponentSize()
                                                 .testTag("history_filter_${filter.name.lowercase()}")

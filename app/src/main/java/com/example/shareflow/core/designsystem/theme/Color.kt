@@ -1,6 +1,7 @@
 package com.example.shareflow.core.designsystem.theme
 
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -9,211 +10,425 @@ import androidx.compose.ui.graphics.Color
 import com.example.shareflow.domain.model.AccentColor
 
 /**
- * OFFICIAL SHARE FLOW BRAND COLOR SYSTEM — SOFT CREAM (#FEF3B3) PRIMARY IDENTITY
+ * OFFICIAL SHAREFLOW MARPLE COLOR SYSTEM + MATERIAL 3 + iOS GLASSMORPHISM
  *
- * Centralized, immutable brand color tokens built around Soft Cream (#FEF3B3) as the
- * primary application canvas color, paired with Deep Navy typography, Royal Blue primary
- * actions, Sky Blue secondary glass accents, Golden Yellow highlights, and the Signature
- * Gradient across a luminous Liquid Glass surface hierarchy.
- *
- * Mandatory Brand HEX Palette:
- * - Soft Cream:    #FEF3B3 (Primary application background & main brand canvas)
- * - Deep Navy:     #0A1821 (High-contrast typography, floating glass nav capsule, hero depth)
- * - Royal Blue:    #1D59BB (Primary actions, buttons, selected navigation states)
- * - Sky Blue:      #76B9FF (Secondary actions, glass borders, supporting visual accents)
- * - Golden Yellow: #FEBD19 (Important highlights, status indicators, visual emphasis)
+ * Primary Marple Reference Palette:
+ * - Ruby:  #CA2851 (Main action buttons, selected navigation, active controls, primary progress)
+ * - Coral: #FF6766 (Secondary actions, interactive highlights, selected chips, active tabs, focus)
+ * - Peach: #FFB173 (Secondary cards, informational elements, soft backgrounds, progress highlights)
+ * - Cream: #FFE3B3 (Light theme accent surfaces, selected content backgrounds, soft separators)
  */
-object ShareFlowBrandColors {
-    // Mandatory Official Brand Colors (Exact HEX)
-    val SoftCream: Color = Color(0xFFFEF3B3)
-    val DeepNavy: Color = Color(0xFF0A1821)
-    val RoyalBlue: Color = Color(0xFF1D59BB)
-    val SkyBlue: Color = Color(0xFF76B9FF)
-    val GoldenYellow: Color = Color(0xFFFEBD19)
+object ShareFlowMarpleColors {
+    // Exact 4 Marple Primary Identity Colors
+    val Ruby: Color = Color(0xFFCA2851)
+    val Coral: Color = Color(0xFFFF6766)
+    val Peach: Color = Color(0xFFFFB173)
+    val Cream: Color = Color(0xFFFFE3B3)
 
-    // Luminous Liquid Glass Surface Elevation Ladder (derived from Soft Cream #FEF3B3)
-    val GlassSurfaceLowest: Color = Color(0xFFFFFCEB)
-    val GlassSurfaceLow: Color = Color(0xFFFFF9DC)
-    val GlassSurface: Color = SoftCream
-    val GlassSurfaceHigh: Color = Color(0xFFF6E79A)
-    val GlassSurfaceHighest: Color = Color(0xFFECE08B)
+    // Light Theme Surfaces & Typography
+    val LightBackground: Color = Color(0xFFFFF9F5)
+    val LightSurface: Color = Color(0xFFFFFFFF)
+    val LightSurfaceContainerLow: Color = Color(0xFFFCF3EE)
+    val LightSurfaceContainer: Color = Color(0xFFF8EDE8)
+    val LightSurfaceVariant: Color = Color(0xFFF8EDE8)
+    val LightSurfaceContainerHigh: Color = Color(0xFFF2E2DC)
+    val LightSurfaceContainerHighest: Color = Color(0xFFEAD7D0)
+    val LightTextPrimary: Color = Color(0xFF292126)
+    val LightTextSecondary: Color = Color(0xFF75676D)
+    val LightBorder: Color = Color(0xFFEADDE0)
+    val LightOutline: Color = Color(0xFFCBB6BC)
 
-    // Deep Navy elevation alias retained for dark media/viewer overlays
-    val DeepNavyLowest: Color = Color(0xFF071118)
-    val DeepNavyGlassSurface: Color = Color(0xFF102331)
+    // Light Containers
+    val LightRubyContainer: Color = Color(0xFFFFD9DF)
+    val LightOnRubyContainer: Color = Color(0xFF3F0013)
+    val LightCoralContainer: Color = Color(0xFFFFDAD7)
+    val LightOnCoralContainer: Color = Color(0xFF410004)
+    val LightPeachContainer: Color = Color(0xFFFFE5CF)
+    val LightOnPeachContainer: Color = Color(0xFF2E1500)
 
-    // Floating Glass Navigation & Translucent Border Tokens
-    val GlassNavBackground: Color = Color(0xEB0A1821)
-    val GlassNavBorder: Color = Color(0x6676B9FF)
-    val GlassCardBorder: Color = Color(0x471D59BB)
-    val GlassActiveBorder: Color = Color(0x991D59BB)
-    val GlassSoftCreamHighlight: Color = Color(0x88FEF3B3)
+    // Dark Theme Surfaces & Typography (Adapted Marple contrast, zero pure black)
+    val DarkBackground: Color = Color(0xFF171316)
+    val DarkSurface: Color = Color(0xFF211A1E)
+    val DarkSurfaceLowest: Color = Color(0xFF120E11)
+    val DarkSurfaceContainerLow: Color = Color(0xFF251C21)
+    val DarkSurfaceContainer: Color = Color(0xFF2B2026)
+    val DarkSurfaceElevated: Color = Color(0xFF34252C)
+    val DarkSurfaceHighest: Color = Color(0xFF3F2D36)
+    val DarkPrimary: Color = Color(0xFFFF8198)
+    val DarkOnPrimary: Color = Color(0xFF54001A)
+    val DarkPrimaryContainer: Color = Color(0xFF7D1132)
+    val DarkOnPrimaryContainer: Color = Color(0xFFFFD9DF)
+    val DarkSecondary: Color = Color(0xFFFF8986)
+    val DarkOnSecondary: Color = Color(0xFF56090C)
+    val DarkSecondaryContainer: Color = Color(0xFF732325)
+    val DarkOnSecondaryContainer: Color = Color(0xFFFFDAD7)
+    val DarkTertiary: Color = Color(0xFFFFB77F)
+    val DarkOnTertiary: Color = Color(0xFF4B2700)
+    val DarkTertiaryContainer: Color = Color(0xFF693B0C)
+    val DarkOnTertiaryContainer: Color = Color(0xFFFFDCC3)
+    val DarkAccent: Color = Color(0xFFFFE3B3)
+    val DarkTextPrimary: Color = Color(0xFFFFF5F1)
+    val DarkTextSecondary: Color = Color(0xFFD0BFC3)
+    val DarkBorder: Color = Color(0xFF554149)
+    val DarkOutline: Color = Color(0xFF8C747C)
 
-    // Brand Containers (derived exclusively from Royal Blue, Sky Blue, Golden Yellow on Soft Cream)
-    val RoyalBlueContainer: Color = Color(0xFFDCEBFF)
-    val SkyBlueContainer: Color = Color(0xFFE3F2FF)
-    val GoldenYellowContainer: Color = Color(0xFFFFE596)
+    // Semantic Status Roles (Error, Success, Warning, Disabled, Scrim)
+    val LightError: Color = Color(0xFFBA1A1A)
+    val LightOnError: Color = Color(0xFFFFFFFF)
+    val LightErrorContainer: Color = Color(0xFFFFDAD6)
+    val LightOnErrorContainer: Color = Color(0xFF410002)
 
-    // High-Contrast Readable Ink Tokens (WCAG AA/AAA Verified)
-    val InkOnSoftCream: Color = DeepNavy                    // 15.8:1 contrast on #FEF3B3
-    val InkSecondaryOnSoftCream: Color = Color(0xFF233B4D)  // 9.8:1 contrast on #FEF3B3
-    val InkOnDeepNavy: Color = Color(0xFFF6FAFF)            // 17.0:1 contrast on #0A1821
-    val InkSecondaryOnDeepNavy: Color = Color(0xFFBBD5EC)   // 11.4:1 contrast on #0A1821
-    val InkOnRoyalBlue: Color = Color(0xFFFFFFFF)           // 6.7:1 contrast on #1D59BB
-    val InkOnSkyBlue: Color = DeepNavy                      // 8.8:1 contrast on #76B9FF
-    val InkOnGoldenYellow: Color = DeepNavy                 // 11.1:1 contrast on #FEBD19
+    val DarkError: Color = Color(0xFFFFB4AB)
+    val DarkOnError: Color = Color(0xFF690005)
+    val DarkErrorContainer: Color = Color(0xFF93000A)
+    val DarkOnErrorContainer: Color = Color(0xFFFFDAD6)
 
-    // System Error Tokens (high contrast on Soft Cream #FEF3B3)
-    val ErrorSurfaceAccent: Color = Color(0xFFB3261E)
-    val OnErrorSurfaceAccent: Color = Color(0xFFFFFFFF)
-    val ErrorContainerGlass: Color = Color(0xFFFFDAD6)
-    val OnErrorContainerGlass: Color = Color(0xFF410002)
+    val LightSuccess: Color = Color(0xFF1E7E53)
+    val LightOnSuccess: Color = Color(0xFFFFFFFF)
+    val LightSuccessContainer: Color = Color(0xFFD7F5E4)
+
+    val DarkSuccess: Color = Color(0xFF72D9A6)
+    val DarkOnSuccess: Color = Color(0xFF063821)
+    val DarkSuccessContainer: Color = Color(0xFF135134)
+
+    val LightWarning: Color = Color(0xFFB85D19)
+    val LightWarningContainer: Color = Color(0xFFFFE3B3)
+    val DarkWarning: Color = Color(0xFFFFB173)
+    val DarkWarningContainer: Color = Color(0xFF5A3210)
+
+    val LightDisabled: Color = Color(0xFFD9CCD0)
+    val LightOnDisabled: Color = Color(0xFF8E7E84)
+    val DarkDisabled: Color = Color(0xFF3E3037)
+    val DarkOnDisabled: Color = Color(0xFF7E6B73)
+
+    val Scrim: Color = Color(0x88171316)
+
+    // iOS-Inspired Glassmorphism Navigation Tokens
+    val LightGlassNavSurface: Color = Color(0xD9FFF9F5)
+    val LightGlassNavOverlay: Color = Color(0x66FFE3B3)
+    val LightGlassNavBorder: Color = Color(0xB3EADDE0)
+    val LightGlassNavActiveIndicator: Color = Color(0x1FCA2851)
+
+    val DarkGlassNavSurface: Color = Color(0xD6211A1E)
+    val DarkGlassNavOverlay: Color = Color(0x3334252C)
+    val DarkGlassNavBorder: Color = Color(0x80554149)
+    val DarkGlassNavActiveIndicator: Color = Color(0x33FF8198)
 }
 
 /**
- * Official Share Flow Signature Gradient:
- * Royal Blue (#1D59BB) -> Sky Blue (#76B9FF) -> Soft Cream (#FEF3B3) -> Golden Yellow (#FEBD19)
+ * Backward-compatible token alias object so every existing screen reference resolves cleanly
+ * to the Marple Design System tokens.
+ */
+object ShareFlowBrandColors {
+    val Ruby: Color = ShareFlowMarpleColors.Ruby
+    val Coral: Color = ShareFlowMarpleColors.Coral
+    val Peach: Color = ShareFlowMarpleColors.Peach
+    val Cream: Color = ShareFlowMarpleColors.Cream
+
+    // Mapped semantic aliases for existing components
+    val RoyalBlue: Color = ShareFlowMarpleColors.Ruby
+    val SkyBlue: Color = ShareFlowMarpleColors.Coral
+    val GoldenYellow: Color = ShareFlowMarpleColors.Peach
+    val SoftCream: Color = ShareFlowMarpleColors.Cream
+    val DeepNavy: Color = ShareFlowMarpleColors.DarkBackground
+
+    val GlassSurfaceLowest: Color = ShareFlowMarpleColors.LightSurface
+    val GlassSurfaceLow: Color = ShareFlowMarpleColors.LightSurfaceContainerLow
+    val GlassSurface: Color = ShareFlowMarpleColors.LightSurfaceContainer
+    val GlassSurfaceHigh: Color = ShareFlowMarpleColors.LightSurfaceContainerHigh
+    val GlassSurfaceHighest: Color = ShareFlowMarpleColors.LightSurfaceContainerHighest
+
+    val DeepNavyLowest: Color = ShareFlowMarpleColors.DarkSurfaceLowest
+    val DeepNavyGlassSurface: Color = ShareFlowMarpleColors.DarkSurface
+
+    val GlassNavBackground: Color = ShareFlowMarpleColors.LightGlassNavSurface
+    val GlassNavBorder: Color = ShareFlowMarpleColors.LightGlassNavBorder
+    val GlassCardBorder: Color = ShareFlowMarpleColors.LightBorder
+    val GlassActiveBorder: Color = ShareFlowMarpleColors.Ruby.copy(alpha = 0.65f)
+    val GlassSoftCreamHighlight: Color = ShareFlowMarpleColors.Cream.copy(alpha = 0.6f)
+
+    val RoyalBlueContainer: Color = ShareFlowMarpleColors.LightRubyContainer
+    val SkyBlueContainer: Color = ShareFlowMarpleColors.LightCoralContainer
+    val GoldenYellowContainer: Color = ShareFlowMarpleColors.LightPeachContainer
+
+    val InkOnSoftCream: Color = ShareFlowMarpleColors.LightTextPrimary
+    val InkSecondaryOnSoftCream: Color = ShareFlowMarpleColors.LightTextSecondary
+    val InkOnDeepNavy: Color = ShareFlowMarpleColors.DarkTextPrimary
+    val InkSecondaryOnDeepNavy: Color = ShareFlowMarpleColors.DarkTextSecondary
+    val InkOnRoyalBlue: Color = Color.White
+    val InkOnSkyBlue: Color = Color.White
+    val InkOnGoldenYellow: Color = ShareFlowMarpleColors.LightTextPrimary
+
+    val ErrorSurfaceAccent: Color = ShareFlowMarpleColors.LightError
+    val OnErrorSurfaceAccent: Color = ShareFlowMarpleColors.LightOnError
+    val ErrorContainerGlass: Color = ShareFlowMarpleColors.LightErrorContainer
+    val OnErrorContainerGlass: Color = ShareFlowMarpleColors.LightOnErrorContainer
+}
+
+/**
+ * Official Marple 4-Color Signature Gradient:
+ * Ruby (#CA2851) -> Coral (#FF6766) -> Peach (#FFB173) -> Cream (#FFE3B3)
  */
 object ShareFlowBrandGradients {
     val SignatureStops: List<Color> = listOf(
-        ShareFlowBrandColors.RoyalBlue,
-        ShareFlowBrandColors.SkyBlue,
-        ShareFlowBrandColors.SoftCream,
-        ShareFlowBrandColors.GoldenYellow
+        ShareFlowMarpleColors.Ruby,
+        ShareFlowMarpleColors.Coral,
+        ShareFlowMarpleColors.Peach,
+        ShareFlowMarpleColors.Cream
+    )
+
+    val MarpleActionStops: List<Color> = listOf(
+        ShareFlowMarpleColors.Ruby,
+        ShareFlowMarpleColors.Coral,
+        ShareFlowMarpleColors.Peach
     )
 
     fun signatureHorizontal(): Brush = Brush.horizontalGradient(colors = SignatureStops)
 
     fun signatureLinear(): Brush = Brush.linearGradient(colors = SignatureStops)
 
-    fun signatureBorder(alpha: Float = 0.90f): Brush = Brush.horizontalGradient(
+    fun signatureBorder(alpha: Float = 0.85f): Brush = Brush.horizontalGradient(
         colors = SignatureStops.map { it.copy(alpha = alpha) }
     )
 
-    fun signatureSubtleGlow(alpha: Float = 0.28f): Brush = Brush.horizontalGradient(
+    fun signatureSubtleGlow(alpha: Float = 0.26f): Brush = Brush.horizontalGradient(
         colors = SignatureStops.map { it.copy(alpha = alpha) }
     )
 
     fun primaryActionSheen(): Brush = Brush.horizontalGradient(
-        colors = listOf(
-            ShareFlowBrandColors.RoyalBlue,
-            Color(0xFF286ED4),
-            ShareFlowBrandColors.RoyalBlue
-        )
+        colors = MarpleActionStops
     )
 }
 
 /**
- * Official Material 3 ColorScheme with Soft Cream (#FEF3B3) as the primary application color.
+ * Complete Material 3 Light Theme ColorScheme built on the Marple visual identity.
  */
-val ShareFlowBrandColorScheme: ColorScheme = lightColorScheme(
-    primary = ShareFlowBrandColors.RoyalBlue,
-    onPrimary = ShareFlowBrandColors.InkOnRoyalBlue,
-    primaryContainer = ShareFlowBrandColors.RoyalBlueContainer,
-    onPrimaryContainer = ShareFlowBrandColors.DeepNavy,
-    inversePrimary = ShareFlowBrandColors.SkyBlue,
+val LightColorScheme: ColorScheme = lightColorScheme(
+    primary = ShareFlowMarpleColors.Ruby,
+    onPrimary = Color.White,
+    primaryContainer = ShareFlowMarpleColors.LightRubyContainer,
+    onPrimaryContainer = ShareFlowMarpleColors.LightOnRubyContainer,
+    inversePrimary = ShareFlowMarpleColors.DarkPrimary,
 
-    secondary = ShareFlowBrandColors.SkyBlue,
-    onSecondary = ShareFlowBrandColors.InkOnSkyBlue,
-    secondaryContainer = ShareFlowBrandColors.SkyBlueContainer,
-    onSecondaryContainer = ShareFlowBrandColors.DeepNavy,
+    secondary = ShareFlowMarpleColors.Coral,
+    onSecondary = Color.White,
+    secondaryContainer = ShareFlowMarpleColors.LightCoralContainer,
+    onSecondaryContainer = ShareFlowMarpleColors.LightOnCoralContainer,
 
-    tertiary = ShareFlowBrandColors.GoldenYellow,
-    onTertiary = ShareFlowBrandColors.InkOnGoldenYellow,
-    tertiaryContainer = ShareFlowBrandColors.GoldenYellowContainer,
-    onTertiaryContainer = ShareFlowBrandColors.DeepNavy,
+    tertiary = ShareFlowMarpleColors.Peach,
+    onTertiary = ShareFlowMarpleColors.LightTextPrimary,
+    tertiaryContainer = ShareFlowMarpleColors.LightPeachContainer,
+    onTertiaryContainer = ShareFlowMarpleColors.LightOnPeachContainer,
 
-    background = ShareFlowBrandColors.SoftCream,
-    onBackground = ShareFlowBrandColors.InkOnSoftCream,
-    surface = ShareFlowBrandColors.SoftCream,
-    onSurface = ShareFlowBrandColors.InkOnSoftCream,
-    surfaceVariant = ShareFlowBrandColors.GlassSurfaceHigh,
-    onSurfaceVariant = ShareFlowBrandColors.InkSecondaryOnSoftCream,
+    background = ShareFlowMarpleColors.LightBackground,
+    onBackground = ShareFlowMarpleColors.LightTextPrimary,
+    surface = ShareFlowMarpleColors.LightSurface,
+    onSurface = ShareFlowMarpleColors.LightTextPrimary,
+    surfaceVariant = ShareFlowMarpleColors.LightSurfaceVariant,
+    onSurfaceVariant = ShareFlowMarpleColors.LightTextSecondary,
 
-    surfaceContainerLowest = ShareFlowBrandColors.GlassSurfaceLowest,
-    surfaceContainerLow = ShareFlowBrandColors.GlassSurfaceLow,
-    surfaceContainer = ShareFlowBrandColors.GlassSurface,
-    surfaceContainerHigh = ShareFlowBrandColors.GlassSurfaceHigh,
-    surfaceContainerHighest = ShareFlowBrandColors.GlassSurfaceHighest,
+    surfaceContainerLowest = ShareFlowMarpleColors.LightSurface,
+    surfaceContainerLow = ShareFlowMarpleColors.LightSurfaceContainerLow,
+    surfaceContainer = ShareFlowMarpleColors.LightSurfaceContainer,
+    surfaceContainerHigh = ShareFlowMarpleColors.LightSurfaceContainerHigh,
+    surfaceContainerHighest = ShareFlowMarpleColors.LightSurfaceContainerHighest,
 
-    inverseSurface = ShareFlowBrandColors.DeepNavy,
-    inverseOnSurface = ShareFlowBrandColors.SoftCream,
+    inverseSurface = ShareFlowMarpleColors.DarkSurface,
+    inverseOnSurface = ShareFlowMarpleColors.DarkTextPrimary,
 
-    outline = ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.45f),
-    outlineVariant = ShareFlowBrandColors.GlassCardBorder,
+    outline = ShareFlowMarpleColors.LightOutline,
+    outlineVariant = ShareFlowMarpleColors.LightBorder,
 
-    error = ShareFlowBrandColors.ErrorSurfaceAccent,
-    onError = ShareFlowBrandColors.OnErrorSurfaceAccent,
-    errorContainer = ShareFlowBrandColors.ErrorContainerGlass,
-    onErrorContainer = ShareFlowBrandColors.OnErrorContainerGlass
+    error = ShareFlowMarpleColors.LightError,
+    onError = ShareFlowMarpleColors.LightOnError,
+    errorContainer = ShareFlowMarpleColors.LightErrorContainer,
+    onErrorContainer = ShareFlowMarpleColors.LightOnErrorContainer,
+    scrim = ShareFlowMarpleColors.Scrim
 )
 
-// Backward-compatible scheme aliases bound strictly to the official Soft Cream (#FEF3B3) brand palette
-val DarkColorScheme: ColorScheme = ShareFlowBrandColorScheme
-val LightColorScheme: ColorScheme = ShareFlowBrandColorScheme
-
-fun shareFlowDarkColorScheme(@Suppress("UNUSED_PARAMETER") accentColor: AccentColor): ColorScheme =
-    ShareFlowBrandColorScheme
-
-fun shareFlowLightColorScheme(@Suppress("UNUSED_PARAMETER") accentColor: AccentColor): ColorScheme =
-    ShareFlowBrandColorScheme
-
 /**
- * Preview swatch color for settings badges — strictly bounded to official Share Flow brand colors.
+ * Complete Material 3 Dark Theme ColorScheme built on the adapted Marple visual identity.
  */
-fun AccentColor.swatchColor(@Suppress("UNUSED_PARAMETER") darkTheme: Boolean): Color = when (this) {
-    AccentColor.COBALT -> ShareFlowBrandColors.RoyalBlue
-    AccentColor.CYAN -> ShareFlowBrandColors.SkyBlue
-    AccentColor.EMERALD -> ShareFlowBrandColors.SoftCream
-    AccentColor.CORAL -> ShareFlowBrandColors.GoldenYellow
-    AccentColor.VIOLET -> ShareFlowBrandColors.DeepNavy
+val DarkColorScheme: ColorScheme = darkColorScheme(
+    primary = ShareFlowMarpleColors.DarkPrimary,
+    onPrimary = ShareFlowMarpleColors.DarkOnPrimary,
+    primaryContainer = ShareFlowMarpleColors.DarkPrimaryContainer,
+    onPrimaryContainer = ShareFlowMarpleColors.DarkOnPrimaryContainer,
+    inversePrimary = ShareFlowMarpleColors.Ruby,
+
+    secondary = ShareFlowMarpleColors.DarkSecondary,
+    onSecondary = ShareFlowMarpleColors.DarkOnSecondary,
+    secondaryContainer = ShareFlowMarpleColors.DarkSecondaryContainer,
+    onSecondaryContainer = ShareFlowMarpleColors.DarkOnSecondaryContainer,
+
+    tertiary = ShareFlowMarpleColors.DarkTertiary,
+    onTertiary = ShareFlowMarpleColors.DarkOnTertiary,
+    tertiaryContainer = ShareFlowMarpleColors.DarkTertiaryContainer,
+    onTertiaryContainer = ShareFlowMarpleColors.DarkOnTertiaryContainer,
+
+    background = ShareFlowMarpleColors.DarkBackground,
+    onBackground = ShareFlowMarpleColors.DarkTextPrimary,
+    surface = ShareFlowMarpleColors.DarkSurface,
+    onSurface = ShareFlowMarpleColors.DarkTextPrimary,
+    surfaceVariant = ShareFlowMarpleColors.DarkSurfaceContainer,
+    onSurfaceVariant = ShareFlowMarpleColors.DarkTextSecondary,
+
+    surfaceContainerLowest = ShareFlowMarpleColors.DarkSurfaceLowest,
+    surfaceContainerLow = ShareFlowMarpleColors.DarkSurfaceContainerLow,
+    surfaceContainer = ShareFlowMarpleColors.DarkSurfaceContainer,
+    surfaceContainerHigh = ShareFlowMarpleColors.DarkSurfaceElevated,
+    surfaceContainerHighest = ShareFlowMarpleColors.DarkSurfaceHighest,
+
+    inverseSurface = ShareFlowMarpleColors.LightSurface,
+    inverseOnSurface = ShareFlowMarpleColors.LightTextPrimary,
+
+    outline = ShareFlowMarpleColors.DarkOutline,
+    outlineVariant = ShareFlowMarpleColors.DarkBorder,
+
+    error = ShareFlowMarpleColors.DarkError,
+    onError = ShareFlowMarpleColors.DarkOnError,
+    errorContainer = ShareFlowMarpleColors.DarkErrorContainer,
+    onErrorContainer = ShareFlowMarpleColors.DarkOnErrorContainer,
+    scrim = ShareFlowMarpleColors.Scrim
+)
+
+val ShareFlowBrandColorScheme: ColorScheme = LightColorScheme
+
+fun shareFlowLightColorScheme(accentColor: AccentColor = AccentColor.COBALT): ColorScheme {
+    val primarySeed = when (accentColor) {
+        AccentColor.COBALT, AccentColor.VIOLET -> ShareFlowMarpleColors.Ruby
+        AccentColor.CORAL -> ShareFlowMarpleColors.Coral
+        AccentColor.CYAN -> ShareFlowMarpleColors.Peach
+        AccentColor.EMERALD -> ShareFlowMarpleColors.Ruby
+    }
+    return LightColorScheme.copy(primary = primarySeed)
+}
+
+fun shareFlowDarkColorScheme(accentColor: AccentColor = AccentColor.COBALT): ColorScheme {
+    val primarySeed = when (accentColor) {
+        AccentColor.COBALT, AccentColor.VIOLET -> ShareFlowMarpleColors.DarkPrimary
+        AccentColor.CORAL -> ShareFlowMarpleColors.DarkSecondary
+        AccentColor.CYAN -> ShareFlowMarpleColors.DarkTertiary
+        AccentColor.EMERALD -> ShareFlowMarpleColors.DarkPrimary
+    }
+    return DarkColorScheme.copy(primary = primarySeed)
 }
 
 /**
- * Semantic status and Liquid Glass brand tokens complementing Material 3 ColorScheme.
+ * Preview swatch color for settings badges — bounded to the 4 Marple reference colors.
+ */
+fun AccentColor.swatchColor(darkTheme: Boolean): Color = when (this) {
+    AccentColor.COBALT -> if (darkTheme) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
+    AccentColor.CORAL -> if (darkTheme) ShareFlowMarpleColors.DarkSecondary else ShareFlowMarpleColors.Coral
+    AccentColor.CYAN -> if (darkTheme) ShareFlowMarpleColors.DarkTertiary else ShareFlowMarpleColors.Peach
+    AccentColor.EMERALD -> ShareFlowMarpleColors.Cream
+    AccentColor.VIOLET -> ShareFlowMarpleColors.Ruby
+}
+
+/**
+ * Semantic status, Marple accent, and iOS Glassmorphism tokens complementing Material 3 ColorScheme.
  */
 @Immutable
 data class ShareFlowSemanticColors(
+    val isDark: Boolean,
+    val ruby: Color,
+    val coral: Color,
+    val peach: Color,
+    val cream: Color,
     val sendAccent: Color,
     val onSendAccent: Color,
     val receiveAccent: Color,
     val onReceiveAccent: Color,
+    val success: Color,
+    val onSuccess: Color,
+    val successContainer: Color,
     val verifiedBadge: Color,
     val onVerifiedBadge: Color,
     val verifiedContainer: Color,
     val warningAccent: Color,
     val warningContainer: Color,
+    val disabled: Color,
+    val onDisabled: Color,
+    val scrim: Color,
     val heroScrimStart: Color,
     val heroScrimEnd: Color,
-    val glassNavBackground: Color = ShareFlowBrandColors.GlassNavBackground,
-    val glassNavBorder: Color = ShareFlowBrandColors.GlassNavBorder,
-    val glassCardBorder: Color = ShareFlowBrandColors.GlassCardBorder,
-    val softCreamAccent: Color = ShareFlowBrandColors.SoftCream,
-    val goldenHighlight: Color = ShareFlowBrandColors.GoldenYellow,
-    val skyBlueIcon: Color = ShareFlowBrandColors.SkyBlue
+    val glassNavBackground: Color,
+    val glassNavOverlay: Color,
+    val glassNavBorder: Color,
+    val glassNavActivePill: Color,
+    val glassNavSelectedContent: Color,
+    val glassNavUnselectedContent: Color,
+    val glassCardBorder: Color,
+    val softCreamAccent: Color = ShareFlowMarpleColors.Cream,
+    val goldenHighlight: Color = ShareFlowMarpleColors.Peach,
+    val skyBlueIcon: Color = ShareFlowMarpleColors.Coral,
+    val warning: Color = warningAccent
 )
 
-val OfficialShareFlowSemanticColors = ShareFlowSemanticColors(
-    sendAccent = ShareFlowBrandColors.RoyalBlue,
-    onSendAccent = ShareFlowBrandColors.InkOnRoyalBlue,
-    receiveAccent = ShareFlowBrandColors.SkyBlue,
-    onReceiveAccent = ShareFlowBrandColors.InkOnSkyBlue,
-    verifiedBadge = ShareFlowBrandColors.DeepNavy,
-    onVerifiedBadge = ShareFlowBrandColors.SoftCream,
-    verifiedContainer = ShareFlowBrandColors.GoldenYellowContainer,
-    warningAccent = ShareFlowBrandColors.DeepNavy,
-    warningContainer = ShareFlowBrandColors.GoldenYellowContainer,
-    heroScrimStart = Color(0xF20A1821),
-    heroScrimEnd = Color(0xA60A1821),
-    glassNavBackground = ShareFlowBrandColors.GlassNavBackground,
-    glassNavBorder = ShareFlowBrandColors.GlassNavBorder,
-    glassCardBorder = ShareFlowBrandColors.GlassCardBorder,
-    softCreamAccent = ShareFlowBrandColors.SoftCream,
-    goldenHighlight = ShareFlowBrandColors.GoldenYellow,
-    skyBlueIcon = ShareFlowBrandColors.SkyBlue
+val LightShareFlowSemanticColors = ShareFlowSemanticColors(
+    isDark = false,
+    ruby = ShareFlowMarpleColors.Ruby,
+    coral = ShareFlowMarpleColors.Coral,
+    peach = ShareFlowMarpleColors.Peach,
+    cream = ShareFlowMarpleColors.Cream,
+    sendAccent = ShareFlowMarpleColors.Ruby,
+    onSendAccent = Color.White,
+    receiveAccent = ShareFlowMarpleColors.Coral,
+    onReceiveAccent = Color.White,
+    success = ShareFlowMarpleColors.LightSuccess,
+    onSuccess = ShareFlowMarpleColors.LightOnSuccess,
+    successContainer = ShareFlowMarpleColors.LightSuccessContainer,
+    verifiedBadge = ShareFlowMarpleColors.Ruby,
+    onVerifiedBadge = Color.White,
+    verifiedContainer = ShareFlowMarpleColors.Cream,
+    warningAccent = ShareFlowMarpleColors.LightWarning,
+    warningContainer = ShareFlowMarpleColors.LightWarningContainer,
+    disabled = ShareFlowMarpleColors.LightDisabled,
+    onDisabled = ShareFlowMarpleColors.LightOnDisabled,
+    scrim = ShareFlowMarpleColors.Scrim,
+    heroScrimStart = Color(0xE629151D),
+    heroScrimEnd = Color(0x99521B2D),
+    glassNavBackground = ShareFlowMarpleColors.LightGlassNavSurface,
+    glassNavOverlay = ShareFlowMarpleColors.LightGlassNavOverlay,
+    glassNavBorder = ShareFlowMarpleColors.LightGlassNavBorder,
+    glassNavActivePill = ShareFlowMarpleColors.LightGlassNavActiveIndicator,
+    glassNavSelectedContent = ShareFlowMarpleColors.Ruby,
+    glassNavUnselectedContent = ShareFlowMarpleColors.LightTextSecondary,
+    glassCardBorder = ShareFlowMarpleColors.LightBorder
 )
 
-val LightShareFlowSemanticColors: ShareFlowSemanticColors = OfficialShareFlowSemanticColors
-val DarkShareFlowSemanticColors: ShareFlowSemanticColors = OfficialShareFlowSemanticColors
+val DarkShareFlowSemanticColors = ShareFlowSemanticColors(
+    isDark = true,
+    ruby = ShareFlowMarpleColors.DarkPrimary,
+    coral = ShareFlowMarpleColors.DarkSecondary,
+    peach = ShareFlowMarpleColors.DarkTertiary,
+    cream = ShareFlowMarpleColors.DarkAccent,
+    sendAccent = ShareFlowMarpleColors.Ruby,
+    onSendAccent = Color.White,
+    receiveAccent = ShareFlowMarpleColors.Coral,
+    onReceiveAccent = ShareFlowMarpleColors.DarkBackground,
+    success = ShareFlowMarpleColors.DarkSuccess,
+    onSuccess = ShareFlowMarpleColors.DarkOnSuccess,
+    successContainer = ShareFlowMarpleColors.DarkSuccessContainer,
+    verifiedBadge = ShareFlowMarpleColors.DarkAccent,
+    onVerifiedBadge = ShareFlowMarpleColors.DarkBackground,
+    verifiedContainer = ShareFlowMarpleColors.DarkPrimaryContainer,
+    warningAccent = ShareFlowMarpleColors.DarkWarning,
+    warningContainer = ShareFlowMarpleColors.DarkWarningContainer,
+    disabled = ShareFlowMarpleColors.DarkDisabled,
+    onDisabled = ShareFlowMarpleColors.DarkOnDisabled,
+    scrim = ShareFlowMarpleColors.Scrim,
+    heroScrimStart = Color(0xF0171316),
+    heroScrimEnd = Color(0xAA2B2026),
+    glassNavBackground = ShareFlowMarpleColors.DarkGlassNavSurface,
+    glassNavOverlay = ShareFlowMarpleColors.DarkGlassNavOverlay,
+    glassNavBorder = ShareFlowMarpleColors.DarkGlassNavBorder,
+    glassNavActivePill = ShareFlowMarpleColors.DarkGlassNavActiveIndicator,
+    glassNavSelectedContent = ShareFlowMarpleColors.DarkPrimary,
+    glassNavUnselectedContent = ShareFlowMarpleColors.DarkTextSecondary,
+    glassCardBorder = ShareFlowMarpleColors.DarkBorder
+)
 
-val LocalShareFlowSemanticColors = staticCompositionLocalOf { OfficialShareFlowSemanticColors }
+val OfficialShareFlowSemanticColors: ShareFlowSemanticColors = LightShareFlowSemanticColors
+
+val LocalShareFlowSemanticColors = staticCompositionLocalOf { LightShareFlowSemanticColors }

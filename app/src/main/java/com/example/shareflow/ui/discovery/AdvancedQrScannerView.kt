@@ -414,7 +414,7 @@ fun AdvancedQrScannerView(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f))
+                    .background(com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f))
                     .testTag("qr_scanner_connecting_overlay"),
                 contentAlignment = Alignment.Center
             ) {
@@ -454,7 +454,7 @@ fun AdvancedQrScannerView(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.80f))
+                    .background(com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.84f))
                     .testTag("qr_scanner_error_overlay"),
                 contentAlignment = Alignment.Center
             ) {
@@ -472,13 +472,13 @@ fun AdvancedQrScannerView(
                     Text(
                         text = stringResource(errorTitleRes),
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextPrimary,
                         textAlign = TextAlign.Center
                     )
                     Text(
                         text = stringResource(errorBodyRes),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.88f),
+                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextSecondary,
                         textAlign = TextAlign.Center
                     )
                     Button(
@@ -488,6 +488,7 @@ fun AdvancedQrScannerView(
                             scanLocked.set(false)
                             onRetryScan()
                         },
+                        shape = ShareFlowDesign.shapes.button,
                         modifier = Modifier
                             .minimumInteractiveComponentSize()
                             .testTag("qr_scanner_retry_button")
@@ -519,7 +520,7 @@ fun AdvancedQrScannerView(
                 if (scannerState == QrScannerUiState.SCANNING) {
                     Surface(
                         shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.74f),
+                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f),
                         modifier = Modifier.testTag("qr_scanner_state_badge")
                     ) {
                         Row(
@@ -529,21 +530,21 @@ fun AdvancedQrScannerView(
                         ) {
                             CircularProgressIndicator(
                                 strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Coral,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = stringResource(stateLabelRes),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color.White
+                                color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextPrimary
                             )
                         }
                     }
                 } else {
                     StatusPill(
                         label = stringResource(stateLabelRes),
-                        containerColor = Color.Black.copy(alpha = 0.72f),
-                        contentColor = Color.White,
+                        containerColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f),
+                        contentColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream,
                         modifier = Modifier.testTag("qr_scanner_state_badge")
                     )
                 }

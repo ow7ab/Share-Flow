@@ -59,14 +59,47 @@ class CloudUpdateManagerTest {
     """.trimIndent()
 
     @Test
-    fun `version metadata is incremented to 1_0_3 versionCode 4 with default GitHub release manifest`() {
-        assertEquals(4, BuildConfig.VERSION_CODE)
-        assertEquals("1.0.3", BuildConfig.VERSION_NAME)
+    fun `version metadata and default GitHub release manifest URL are valid and consistent`() {
+        assertTrue("VERSION_CODE must be monotonic >= 11", BuildConfig.VERSION_CODE >= 11)
+        assertTrue(
+            "VERSION_NAME must follow semantic versioning",
+            Regex("^\\d+\\.\\d+\\.\\d+([-.][0-9A-Za-z.]+)?$").matches(BuildConfig.VERSION_NAME)
+        )
+        assertEquals("com.aistudio.shareflow.kxrvnm", BuildConfig.APPLICATION_ID)
         assertEquals(
             "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
         )
         assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(BuildConfig.CLOUD_UPDATE_MANIFEST_URL))
+    }
+
+    @Test
+    fun `manifest parser accepts exact release workflow version json schema with Share-Flow apk`() {
+        val workflowManifest = """
+            {
+              "versionCode": 12,
+              "versionName": "1.0.11",
+              "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.11/Share-Flow.apk",
+              "sha256": "$sampleApkSha256",
+              "fileSizeBytes": ${sampleApkBytes.size},
+              "minSupportedAndroidSdk": 24,
+              "mandatory": false,
+              "releaseNotesAr": "إصدار رسمي موقّع وموثّق من تطبيق Share Flow جاهز للتثبيت المباشر.",
+              "releaseNotesEn": "Verified signed Share Flow Android release ready for direct APK installation.",
+              "portalUrl": "https://ow7ab.github.io/Share-Flow/",
+              "publishedAt": "2026-11-22T09:00:00Z",
+              "releaseTag": "v1.0.11",
+              "signingCertSha256": "$sampleApkSha256"
+            }
+        """.trimIndent()
+
+        val parsed = CloudUpdateValidator.parseManifestJson(workflowManifest)
+        assertTrue("Workflow version.json must parse cleanly", parsed is AppResult.Success)
+        val data = (parsed as AppResult.Success).data
+        assertEquals(12, data.versionCode)
+        assertEquals("1.0.11", data.versionName)
+        assertTrue(data.apkDownloadUrl.endsWith("/Share-Flow.apk"))
+        assertEquals("https://ow7ab.github.io/Share-Flow/", data.portalUrl)
     }
 
     @Test

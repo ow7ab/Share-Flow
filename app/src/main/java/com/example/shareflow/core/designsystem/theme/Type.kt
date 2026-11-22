@@ -34,6 +34,8 @@ val IbmPlexSansArabicFontFamily = FontFamily(
     Font(R.font.ibm_plex_sans_arabic, FontWeight.Bold)
 )
 
+val NotoSansArabicFontFamily = IbmPlexSansArabicFontFamily
+
 val ShareFlowMonoStyle = TextStyle(
     fontFamily = JetBrainsMonoFontFamily,
     fontWeight = FontWeight.Medium,
@@ -47,10 +49,10 @@ private fun buildShareFlowTypography(
     bodyFamily: FontFamily,
     isArabic: Boolean
 ): Typography {
-    // Arabic script benefits from slightly taller line heights and zero negative letter-spacing
+    // Arabic script benefits from taller line heights and zero negative letter-spacing
     val lineBoost = if (isArabic) 4 else 0
-    val tightTracking = if (isArabic) 0.sp else (-0.25).sp
-    val labelTracking = if (isArabic) 0.sp else 0.3.sp
+    val tightTracking = if (isArabic) 0.sp else (-0.2).sp
+    val labelTracking = if (isArabic) 0.sp else 0.25.sp
 
     return Typography(
         displayLarge = TextStyle(
@@ -62,7 +64,7 @@ private fun buildShareFlowTypography(
         ),
         displayMedium = TextStyle(
             fontFamily = displayFamily,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             fontSize = 32.sp,
             lineHeight = (38 + lineBoost).sp,
             letterSpacing = tightTracking
@@ -76,7 +78,7 @@ private fun buildShareFlowTypography(
         ),
         headlineLarge = TextStyle(
             fontFamily = displayFamily,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             fontSize = 26.sp,
             lineHeight = (32 + lineBoost).sp,
             letterSpacing = 0.sp
@@ -111,7 +113,7 @@ private fun buildShareFlowTypography(
         ),
         titleSmall = TextStyle(
             fontFamily = bodyFamily,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
             lineHeight = (18 + lineBoost).sp,
             letterSpacing = if (isArabic) 0.sp else 0.1.sp

@@ -1,12 +1,15 @@
 package com.example.shareflow.navigation
 
+import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,12 +21,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -42,8 +47,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -51,6 +64,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -65,8 +79,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
+import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.AppSettings
@@ -204,9 +218,11 @@ fun ShareFlowApp(
 
             Row(modifier = Modifier.fillMaxSize()) {
                 if (useNavigationRail && isTopLevel) {
+                    val semantic = ShareFlowDesign.semanticColors
+                    val inactiveNeutral = if (semantic.isDark) Color(0xFFC4B9BE) else Color(0xFF6E6469)
                     NavigationRail(
-                        containerColor = ShareFlowBrandColors.GlassNavBackground,
-                        contentColor = ShareFlowBrandColors.SoftCream,
+                        containerColor = semantic.glassNavBackground,
+                        contentColor = ShareFlowMarpleColors.Ruby,
                         modifier = Modifier.testTag("shareflow_navigation_rail")
                     ) {
                         TopLevelDestination.entries.forEach { destination ->
@@ -215,11 +231,11 @@ fun ShareFlowApp(
                                 selected = selected,
                                 onClick = { navigateTopLevel(destination.route) },
                                 colors = NavigationRailItemDefaults.colors(
-                                    selectedIconColor = ShareFlowBrandColors.SoftCream,
-                                    selectedTextColor = ShareFlowBrandColors.SoftCream,
-                                    indicatorColor = ShareFlowBrandColors.RoyalBlue,
-                                    unselectedIconColor = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.80f),
-                                    unselectedTextColor = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.78f)
+                                    selectedIconColor = ShareFlowMarpleColors.Ruby,
+                                    selectedTextColor = if (semantic.isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby,
+                                    indicatorColor = semantic.glassNavActivePill,
+                                    unselectedIconColor = inactiveNeutral,
+                                    unselectedTextColor = inactiveNeutral
                                 ),
                                 icon = {
                                     Icon(
@@ -261,87 +277,293 @@ fun ShareFlowApp(
 }
 
 /**
- * Floating Liquid Glass bottom navigation capsule implementing the Official Share Flow Brand System:
- * - Translucent Deep Navy (#0A1821) glass surface
- * - Subtle Sky Blue (#76B9FF) outer border
- * - Royal Blue (#1D59BB) active-state pill with Signature Gradient hairline
- * - Soft Cream (#FEF3B3) selected icon & label accents
- * - Subtle Golden Yellow (#FEBD19) active highlight dot
+ * Premium iOS-Inspired Glassmorphism Floating Bottom Navigation Bar for ShareFlow:
+ * - Floating rounded capsule container with soft ambient shadow and proper Android gesture navigation insets.
+ * - Real GPU-accelerated RenderEffect blur (`Modifier.blur`) on Android 12+ (API 31+) scoped exclusively to
+ *   the translucent glass backdrop layer so foreground icons/text remain razor-sharp with low GPU overhead.
+ * - Graceful multi-layer translucent frosted glass fallback on Android 7.0–11 (API 24–30) — never flat opaque.
+ * - Light Mode: Translucent white and warm cream (#FFE3B3) glass with delicate specular white-to-rose bevel border.
+ * - Dark Mode: Translucent dark glass (#211A1E / #2B2026) with subtle luminous rim border.
+ * - Exact Ruby (#CA2851) active icons, neutral inactive icons, and smooth spring selection animations.
  */
 @Composable
-private fun ShareFlowFloatingGlassNavBar(
+internal fun ShareFlowFloatingGlassNavBar(
     currentRoute: String?,
     onNavigateTopLevel: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val capsuleShape = RoundedCornerShape(28.dp)
-    val pillShape = RoundedCornerShape(20.dp)
+    val semantic = ShareFlowDesign.semanticColors
+    val isDark = semantic.isDark
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val supportsRealBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val capsuleShape = RoundedCornerShape(30.dp)
+    val pillShape = RoundedCornerShape(22.dp)
+
+    val destinations = TopLevelDestination.entries
+    val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+    val rawSelectedFraction = if (destinations.size > 1) {
+        selectedIndex.toFloat() / (destinations.size - 1).toFloat()
+    } else {
+        0.5f
+    }
+    val visualTargetFraction = if (isRtl) 1f - rawSelectedFraction else rawSelectedFraction
+    val animatedBloomFraction by animateFloatAsState(
+        targetValue = visualTargetFraction,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "glass_nav_bloom_position"
+    )
+
+    // Theme-specific iOS Glassmorphism palette (always translucent, never flat opaque)
+    val rubyActive = ShareFlowMarpleColors.Ruby
+    val activeLabelColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
+    val neutralInactiveIcon = if (isDark) Color(0xFFC4B9BE).copy(alpha = 0.80f) else Color(0xFF6E6469).copy(alpha = 0.84f)
+    val neutralInactiveLabel = if (isDark) Color(0xFFB5A9AE).copy(alpha = 0.78f) else Color(0xFF75676D).copy(alpha = 0.82f)
+
+    val ambientShadowColor = if (isDark) {
+        Color(0xFF000000).copy(alpha = 0.56f)
+    } else {
+        ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.20f)
+    }
+    val spotShadowColor = if (isDark) {
+        ShareFlowMarpleColors.Ruby.copy(alpha = 0.24f)
+    } else {
+        ShareFlowMarpleColors.Ruby.copy(alpha = 0.16f)
+    }
+
+    val specularBorderBrush = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.22f),
+                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.70f),
+                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.36f)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.92f),
+                    ShareFlowMarpleColors.Cream.copy(alpha = 0.55f),
+                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.82f)
+                )
+            )
+        }
+    }
+
+    val frostedGlazeBrush = remember(isDark, supportsRealBlur) {
+        if (isDark) {
+            if (supportsRealBlur) {
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.08f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.42f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.52f)
+                    )
+                )
+            } else {
+                // Graceful translucent dark glass fallback when hardware RenderEffect blur is unavailable
+                Brush.verticalGradient(
+                    colors = listOf(
+                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.82f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.78f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.84f)
+                    )
+                )
+            }
+        } else {
+            if (supportsRealBlur) {
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.62f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.48f),
+                        ShareFlowMarpleColors.Cream.copy(alpha = 0.34f)
+                    )
+                )
+            } else {
+                // Graceful translucent white & cream glass fallback when hardware RenderEffect blur is unavailable
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.84f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.78f),
+                        ShareFlowMarpleColors.Cream.copy(alpha = 0.62f)
+                    )
+                )
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = capsuleShape,
-            color = ShareFlowBrandColors.GlassNavBackground,
-            border = BorderStroke(1.dp, ShareFlowBrandColors.GlassNavBorder),
-            shadowElevation = 10.dp,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 520.dp)
+                .shadow(
+                    elevation = if (isDark) 18.dp else 14.dp,
+                    shape = capsuleShape,
+                    clip = false,
+                    ambientColor = ambientShadowColor,
+                    spotColor = spotShadowColor
+                )
+                .clip(capsuleShape)
+                .border(
+                    width = 1.dp,
+                    brush = specularBorderBrush,
+                    shape = capsuleShape
+                )
                 .testTag("shareflow_navigation_bar")
         ) {
+            // Layer 1: Real GPU-accelerated RenderEffect blur backdrop on API 31+ (skipped cleanly on API < 31)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .then(
+                        if (supportsRealBlur) {
+                            Modifier.blur(
+                                radiusX = 22.dp,
+                                radiusY = 22.dp,
+                                edgeTreatment = BlurredEdgeTreatment.Rectangle
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .drawBehind {
+                        // Base translucent glass tint
+                        drawRect(
+                            color = if (isDark) {
+                                ShareFlowMarpleColors.DarkSurface.copy(alpha = if (supportsRealBlur) 0.56f else 0.72f)
+                            } else {
+                                Color.White.copy(alpha = if (supportsRealBlur) 0.54f else 0.76f)
+                            }
+                        )
+                        // Subtle warm cream/plum chromatic refraction wash
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = if (isDark) {
+                                    listOf(
+                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.34f),
+                                        ShareFlowMarpleColors.DarkSurfaceContainer.copy(alpha = 0.24f),
+                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.34f)
+                                    )
+                                } else {
+                                    listOf(
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.42f),
+                                        Color.White.copy(alpha = 0.28f),
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.42f)
+                                    )
+                                }
+                            )
+                        )
+                        // Smooth gliding Ruby ambient glass refraction bloom under the selected destination
+                        val bloomCenterX = (0.10f + 0.80f * animatedBloomFraction) * size.width
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = if (isDark) {
+                                    listOf(
+                                        ShareFlowMarpleColors.Ruby.copy(alpha = 0.34f),
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.10f),
+                                        Color.Transparent
+                                    )
+                                } else {
+                                    listOf(
+                                        ShareFlowMarpleColors.Ruby.copy(alpha = 0.16f),
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.36f),
+                                        Color.Transparent
+                                    )
+                                },
+                                center = Offset(bloomCenterX, size.height * 0.52f),
+                                radius = size.height * 1.45f
+                            ),
+                            center = Offset(bloomCenterX, size.height * 0.52f),
+                            radius = size.height * 1.45f
+                        )
+                    }
+            )
+
+            // Layer 2: Unblurred translucent glass surface glaze + crisp top inner specular sheen
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(brush = frostedGlazeBrush)
+            )
+
+            // Layer 3: Crisp Material 3 interactive navigation items
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .padding(horizontal = 7.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TopLevelDestination.entries.forEach { destination ->
+                destinations.forEach { destination ->
                     val isSelected = currentRoute == destination.route
                     val label = stringResource(destination.labelRes)
+
                     val iconTint by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            ShareFlowBrandColors.SoftCream
-                        } else {
-                            ShareFlowBrandColors.SkyBlue.copy(alpha = 0.78f)
-                        },
-                        animationSpec = tween(durationMillis = 180),
+                        targetValue = if (isSelected) rubyActive else neutralInactiveIcon,
+                        animationSpec = tween(durationMillis = 200),
                         label = "nav_icon_tint_${destination.route}"
                     )
                     val textTint by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            ShareFlowBrandColors.SoftCream
-                        } else {
-                            ShareFlowBrandColors.InkSecondaryOnDeepNavy.copy(alpha = 0.82f)
-                        },
-                        animationSpec = tween(durationMillis = 180),
+                        targetValue = if (isSelected) activeLabelColor else neutralInactiveLabel,
+                        animationSpec = tween(durationMillis = 200),
                         label = "nav_text_tint_${destination.route}"
                     )
-                    val indicatorDotWidth by animateDpAsState(
-                        targetValue = if (isSelected) 16.dp else 0.dp,
+                    val pillContainerColor by animateColorAsState(
+                        targetValue = when {
+                            isSelected && isDark -> ShareFlowMarpleColors.Cream.copy(alpha = 0.14f)
+                            isSelected -> ShareFlowMarpleColors.Ruby.copy(alpha = 0.11f)
+                            else -> Color.Transparent
+                        },
+                        animationSpec = tween(durationMillis = 220),
+                        label = "nav_pill_bg_${destination.route}"
+                    )
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.12f else 1.0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "nav_icon_scale_${destination.route}"
+                    )
+                    val iconLift by animateDpAsState(
+                        targetValue = if (isSelected) (-1.5).dp else 0.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "nav_icon_lift_${destination.route}"
+                    )
+                    val indicatorWidth by animateDpAsState(
+                        targetValue = if (isSelected) 18.dp else 0.dp,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
                             stiffness = Spring.StiffnessMediumLow
                         ),
-                        label = "nav_dot_${destination.route}"
+                        label = "nav_indicator_${destination.route}"
                     )
 
                     Surface(
                         shape = pillShape,
-                        color = if (isSelected) {
-                            ShareFlowBrandColors.RoyalBlue.copy(alpha = 0.92f)
-                        } else {
-                            Color.Transparent
-                        },
+                        color = pillContainerColor,
                         border = if (isSelected) {
                             BorderStroke(
-                                width = 1.dp,
-                                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.72f)
+                                width = 0.75.dp,
+                                color = if (isDark) {
+                                    ShareFlowMarpleColors.Ruby.copy(alpha = 0.45f)
+                                } else {
+                                    ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f)
+                                }
                             )
                         } else {
                             null
@@ -354,7 +576,7 @@ private fun ShareFlowFloatingGlassNavBar(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = androidx.compose.material3.ripple(
-                                    color = ShareFlowBrandColors.SkyBlue
+                                    color = rubyActive
                                 ),
                                 role = Role.Tab,
                                 onClick = { onNavigateTopLevel(destination.route) }
@@ -370,7 +592,13 @@ private fun ShareFlowFloatingGlassNavBar(
                                 imageVector = if (isSelected) destination.selectedIcon else destination.unselectedIcon,
                                 contentDescription = label,
                                 tint = iconTint,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .offset(y = iconLift)
+                                    .graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    }
                             )
                             Text(
                                 text = label,
@@ -382,13 +610,13 @@ private fun ShareFlowFloatingGlassNavBar(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (indicatorDotWidth > 1.dp) {
+                            if (indicatorWidth > 1.dp) {
                                 Box(
                                     modifier = Modifier
-                                        .width(indicatorDotWidth)
+                                        .width(indicatorWidth)
                                         .height(2.5.dp)
                                         .clip(CircleShape)
-                                        .background(ShareFlowBrandColors.GoldenYellow)
+                                        .background(rubyActive)
                                 )
                             }
                         }

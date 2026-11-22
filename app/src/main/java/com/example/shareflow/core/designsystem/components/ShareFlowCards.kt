@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -221,6 +222,7 @@ fun TransferCard(
                 .semantics(mergeDescendants = true) {},
             shape = ShareFlowDesign.shapes.card,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) { cardContent() }
     } else {
@@ -230,6 +232,7 @@ fun TransferCard(
                 .semantics(mergeDescendants = true) {},
             shape = ShareFlowDesign.shapes.card,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shadowElevation = ShareFlowDesign.elevation.card,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) { cardContent() }
     }
@@ -278,6 +281,7 @@ fun DeviceCard(
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
         border = if (selected) {
             BorderStroke(
                 width = 1.5.dp,
@@ -383,12 +387,12 @@ fun DeviceCard(
                 }
                 val (peerPillContainer, peerPillContent) = when (device.connectionStatus) {
                     com.example.shareflow.domain.model.PeerConnectionStatus.CONNECTED ->
-                        semantic.verifiedContainer to semantic.verifiedBadge
+                        semantic.successContainer to semantic.success
                     com.example.shareflow.domain.model.PeerConnectionStatus.REJECTED ->
                         MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
                     com.example.shareflow.domain.model.PeerConnectionStatus.CONNECTING,
                     com.example.shareflow.domain.model.PeerConnectionStatus.AWAITING_APPROVAL ->
-                        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                        MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
                     else ->
                         MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurfaceVariant
                 }
@@ -442,7 +446,7 @@ fun FileItem(
                     stateDescription = selectedStateText
                 }
             },
-        shape = MaterialTheme.shapes.medium,
+        shape = ShareFlowDesign.shapes.card,
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
@@ -450,6 +454,7 @@ fun FileItem(
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
         border = if (selected) {
             BorderStroke(
                 width = 1.25.dp,
@@ -471,14 +476,22 @@ fun FileItem(
         ) {
             Surface(
                 shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                },
                 modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = fileCategoryIcon(file.category, file.isDirectory),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = if (selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        },
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -509,6 +522,11 @@ fun FileItem(
                 Checkbox(
                     checked = selected,
                     onCheckedChange = { checked -> onSelectionChange?.invoke(checked) },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedColor = MaterialTheme.colorScheme.outline
+                    ),
                     modifier = Modifier.minimumInteractiveComponentSize()
                 )
             } else if (trailingContent != null) {
@@ -540,6 +558,7 @@ fun CategoryCard(
         modifier = modifier.semantics(mergeDescendants = true) {},
         shape = ShareFlowDesign.shapes.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(

@@ -734,6 +734,9 @@ private fun VideoControlDeck(
             AssistChip(
                 onClick = onCycleSpeed,
                 label = { Text(text = String.format(Locale.US, "%.2gx", playbackSpeed)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier.testTag("video_speed_chip")
             )
             IconButton(

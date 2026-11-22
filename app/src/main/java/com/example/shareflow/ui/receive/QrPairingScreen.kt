@@ -231,6 +231,9 @@ fun QrPairingScreen(
                             leadingIcon = {
                                 Icon(Icons.Filled.QrCode2, contentDescription = null, modifier = Modifier.size(18.dp))
                             },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = !scanMode),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -246,6 +249,9 @@ fun QrPairingScreen(
                             leadingIcon = {
                                 Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
                             },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = scanMode),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -557,6 +563,8 @@ fun QrPairingScreen(
                                     onValueChange = { manualUriInput = it },
                                     label = { Text(stringResource(R.string.smart_scanner_manual_code_label)) },
                                     placeholder = { Text(stringResource(R.string.smart_scanner_manual_code_placeholder)) },
+                                    shape = ShareFlowDesign.shapes.input,
+                                    colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                                     singleLine = false,
                                     maxLines = 3,
                                     modifier = Modifier

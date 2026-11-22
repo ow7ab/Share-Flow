@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ShareFlow" parent="android:Theme.DeviceDefault.NoActionBar">
-        <item name="android:windowBackground">#FEF3B3</item>
+        <item name="android:windowBackground">#FFF9F5</item>
     </style>
 </resources>

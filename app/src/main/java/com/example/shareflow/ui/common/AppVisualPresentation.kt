@@ -66,8 +66,8 @@ import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.R
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
+import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.FileSource
 import com.example.shareflow.domain.model.LocalFileEntry
@@ -565,7 +565,7 @@ fun TransferItemVisualAvatar(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(MaterialTheme.shapes.medium)
-                        .background(ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f))
+                        .background(ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.72f))
                         .semantics {
                             contentDescription = progressCd
                             progressBarRangeInfo = ProgressBarRangeInfo(animatedProgress, 0f..1f)
@@ -584,9 +584,9 @@ fun TransferItemVisualAvatar(
                             height = (this.size.height - strokePx).coerceAtLeast(1f)
                         )
                         val topLeft = Offset(inset, inset)
-                        // Subtle Sky Blue circular track
+                        // Subtle Coral circular track
                         drawArc(
-                            color = ShareFlowBrandColors.SkyBlue.copy(alpha = 0.28f),
+                            color = ShareFlowMarpleColors.Coral.copy(alpha = 0.30f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -594,7 +594,7 @@ fun TransferItemVisualAvatar(
                             size = arcSize,
                             style = Stroke(width = strokePx, cap = StrokeCap.Round)
                         )
-                        // Official Share Flow Signature Gradient arc
+                        // Official Marple Signature Gradient arc
                         val sweep = (animatedProgress * 360f).coerceIn(0f, 360f)
                         if (sweep > 0.5f) {
                             drawArc(
@@ -615,7 +615,7 @@ fun TransferItemVisualAvatar(
                             fontWeight = FontWeight.Bold,
                             lineHeight = 12.sp
                         ),
-                        color = ShareFlowBrandColors.SoftCream,
+                        color = ShareFlowMarpleColors.Cream,
                         maxLines = 1
                     )
                 }
@@ -626,8 +626,8 @@ fun TransferItemVisualAvatar(
 
 /**
  * Animated application icon for received apps appearing in the receiving device's transfer history.
- * Plays a crisp spring scale-up entrance animation paired with a subtle radial brand glow halo
- * (Sky Blue -> Golden Yellow over Deep Navy).
+ * Plays a crisp spring scale-up entrance animation paired with a subtle radial Marple brand glow halo
+ * (Coral -> Peach).
  */
 @Composable
 fun ReceivedHistoryAppIcon(
@@ -638,8 +638,8 @@ fun ReceivedHistoryAppIcon(
     modifier: Modifier = Modifier
 ) {
     val appIcon = rememberAppIconBitmap(apkPathOrUri = apkPathOrUri)
-    val glowPrimary = ShareFlowBrandColors.SkyBlue
-    val glowSecondary = ShareFlowBrandColors.GoldenYellow
+    val glowPrimary = ShareFlowMarpleColors.Coral
+    val glowSecondary = ShareFlowMarpleColors.Peach
 
     val scaleAnim = remember(recordKey) { Animatable(0.76f) }
     val glowAlphaAnim = remember(recordKey) { Animatable(0f) }

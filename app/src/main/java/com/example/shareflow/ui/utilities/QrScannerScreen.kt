@@ -366,6 +366,7 @@ fun QrScannerScreen(
                     Surface(
                         shape = ShareFlowDesign.shapes.card,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shadowElevation = ShareFlowDesign.elevation.card,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Column(
@@ -379,6 +380,8 @@ fun QrScannerScreen(
                                 onValueChange = { manualUri = it },
                                 label = { Text(stringResource(R.string.smart_scanner_manual_code_label)) },
                                 placeholder = { Text(stringResource(R.string.smart_scanner_manual_code_placeholder)) },
+                                shape = ShareFlowDesign.shapes.input,
+                                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()

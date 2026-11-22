@@ -171,7 +171,7 @@ fun FileDetailsSheet(
         FileSource.PHOTO_PICKER -> stringResource(R.string.files_source_photo_picker)
     }
 
-    ModalBottomSheet(
+    com.example.shareflow.core.designsystem.components.ShareFlowModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("file_details_sheet")
     ) {
@@ -302,6 +302,11 @@ fun FileMediaPreviewDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("file_preview_dialog"),
         title = {
             Row(
@@ -534,6 +539,11 @@ fun RenameFileDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("file_rename_dialog"),
         title = { Text(stringResource(R.string.files_rename_title)) },
         text = {
@@ -541,6 +551,8 @@ fun RenameFileDialog(
                 value = draft,
                 onValueChange = { draft = it },
                 label = { Text(stringResource(R.string.files_rename_label)) },
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 isError = draft.isNotBlank() && !FileNameValidator.isValid(draft),
                 supportingText = if (draft.isNotBlank() && !FileNameValidator.isValid(draft)) {
                     { Text(stringResource(R.string.files_rename_error)) }
@@ -578,6 +590,11 @@ fun CreateFolderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("create_folder_dialog"),
         title = { Text(stringResource(R.string.files_create_folder_title)) },
         text = {
@@ -585,6 +602,8 @@ fun CreateFolderDialog(
                 value = draft,
                 onValueChange = { draft = it },
                 label = { Text(stringResource(R.string.files_create_folder_label)) },
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 isError = draft.isNotBlank() && !isValid,
                 supportingText = if (draft.isNotBlank() && !isValid) {
                     { Text(stringResource(R.string.files_rename_error)) }
@@ -623,7 +642,7 @@ fun SortOptionsSheet(
     var selectedField by remember { mutableStateOf(currentSpec.field) }
     var selectedDirection by remember { mutableStateOf(currentSpec.direction) }
 
-    ModalBottomSheet(
+    com.example.shareflow.core.designsystem.components.ShareFlowModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("files_sort_sheet")
     ) {
@@ -649,10 +668,14 @@ fun SortOptionsSheet(
                     FileSortField.SIZE to R.string.files_sort_size,
                     FileSortField.TYPE to R.string.files_sort_type
                 ).forEach { (field, labelRes) ->
+                    val fieldSelected = selectedField == field
                     FilterChip(
-                        selected = selectedField == field,
+                        selected = fieldSelected,
                         onClick = { selectedField = field },
                         label = { Text(stringResource(labelRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = fieldSelected),
                         modifier = Modifier
                             .weight(1f)
                             .minimumInteractiveComponentSize()
@@ -669,6 +692,9 @@ fun SortOptionsSheet(
                     selected = selectedDirection == SortDirection.ASCENDING,
                     onClick = { selectedDirection = SortDirection.ASCENDING },
                     label = { Text(stringResource(R.string.files_sort_asc)) },
+                    shape = ShareFlowDesign.shapes.chip,
+                    colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                    border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = selectedDirection == SortDirection.ASCENDING),
                     modifier = Modifier
                         .weight(1f)
                         .minimumInteractiveComponentSize()
@@ -678,6 +704,9 @@ fun SortOptionsSheet(
                     selected = selectedDirection == SortDirection.DESCENDING,
                     onClick = { selectedDirection = SortDirection.DESCENDING },
                     label = { Text(stringResource(R.string.files_sort_desc)) },
+                    shape = ShareFlowDesign.shapes.chip,
+                    colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                    border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = selectedDirection == SortDirection.DESCENDING),
                     modifier = Modifier
                         .weight(1f)
                         .minimumInteractiveComponentSize()
@@ -714,6 +743,11 @@ fun TargetDirectoryPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("target_directory_dialog"),
         title = { Text(stringResource(titleRes)) },
         text = {

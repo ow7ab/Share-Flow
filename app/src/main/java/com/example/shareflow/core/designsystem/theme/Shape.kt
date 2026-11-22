@@ -25,10 +25,12 @@ val ShareFlowShapes = Shapes(
 @Immutable
 data class ShareFlowShapeTokens(
     val button: Shape = RoundedCornerShape(14.dp),
+    val input: Shape = RoundedCornerShape(14.dp),
     val card: Shape = RoundedCornerShape(18.dp),
     val featuredCard: Shape = RoundedCornerShape(24.dp),
     val dialog: Shape = RoundedCornerShape(28.dp),
-    val chip: Shape = RoundedCornerShape(10.dp),
+    val bottomSheet: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    val chip: Shape = RoundedCornerShape(12.dp),
     val badge: Shape = RoundedCornerShape(8.dp),
     val progressTrack: Shape = CircleShape,
     val avatar: Shape = CircleShape

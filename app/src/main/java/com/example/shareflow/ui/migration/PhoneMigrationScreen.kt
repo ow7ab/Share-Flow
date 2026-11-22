@@ -40,10 +40,10 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -64,6 +64,7 @@ import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -204,6 +205,11 @@ fun PhoneMigrationContent(
                             selected = uiState.role == MigrationRole.SENDER_OLD_PHONE,
                             onClick = { onSelectRole(MigrationRole.SENDER_OLD_PHONE) },
                             label = { Text(stringResource(R.string.migration_role_sender)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = uiState.role == MigrationRole.SENDER_OLD_PHONE
+                            ),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -213,6 +219,11 @@ fun PhoneMigrationContent(
                             selected = uiState.role == MigrationRole.RECEIVER_NEW_PHONE,
                             onClick = { onSelectRole(MigrationRole.RECEIVER_NEW_PHONE) },
                             label = { Text(stringResource(R.string.migration_role_receiver)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = uiState.role == MigrationRole.RECEIVER_NEW_PHONE
+                            ),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -787,7 +798,15 @@ private fun MigrationCategoryRow(
             .testTag("migration_category_${summary.category.name.lowercase()}"),
         shape = ShareFlowDesign.shapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shadowElevation = ShareFlowDesign.elevation.card,
+        border = BorderStroke(
+            width = if (summary.selected) 1.25.dp else 1.dp,
+            color = if (summary.selected) {
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            }
+        )
     ) {
         Row(
             modifier = Modifier
@@ -825,6 +844,11 @@ private fun MigrationCategoryRow(
             Checkbox(
                 checked = summary.selected,
                 onCheckedChange = onToggle,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                    uncheckedColor = MaterialTheme.colorScheme.outline
+                ),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("migration_checkbox_${summary.category.name.lowercase()}")

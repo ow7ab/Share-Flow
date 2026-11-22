@@ -527,6 +527,8 @@ fun SettingsContent(
                             onValueChange = onDeviceNameDraftChange,
                             label = { Text(stringResource(R.string.settings_device_name_label)) },
                             placeholder = { Text(stringResource(R.string.settings_device_name_placeholder)) },
+                            shape = ShareFlowDesign.shapes.input,
+                            colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                             isError = uiState.deviceNameError,
                             supportingText = if (uiState.deviceNameError) {
                                 { Text(stringResource(R.string.settings_device_name_error)) }
@@ -677,6 +679,8 @@ fun SettingsContent(
                                 value = uiState.portDraft,
                                 onValueChange = onPortDraftChange,
                                 label = { Text(stringResource(R.string.settings_port_label)) },
+                                shape = ShareFlowDesign.shapes.input,
+                                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                                 isError = uiState.portError,
                                 supportingText = if (uiState.portError) {
                                     { Text(stringResource(R.string.settings_port_error)) }
@@ -1176,10 +1180,16 @@ private fun AccentColorSwatch(
                     )
             ) {
                 if (selected) {
+                    val isLightSwatch = color == com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream ||
+                        color == com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Peach
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (isLightSwatch) {
+                            com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.LightTextPrimary
+                        } else {
+                            Color.White
+                        },
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1212,6 +1222,7 @@ private fun SettingsGroupCard(
             .testTag(testTag),
         shape = ShareFlowDesign.shapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
@@ -1242,6 +1253,9 @@ private fun OptionChip(
         selected = selected,
         onClick = onClick,
         label = { Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        shape = ShareFlowDesign.shapes.chip,
+        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = selected),
         modifier = modifier
             .minimumInteractiveComponentSize()
             .testTag(testTag)

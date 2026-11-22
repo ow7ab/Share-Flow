@@ -51,6 +51,7 @@ import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.ConfirmationDialog
 import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.LoadingState
+import com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
@@ -221,6 +222,11 @@ fun LargeFilesScreen(
                                 selected = uiState.threshold == threshold,
                                 onClick = { viewModel.setThreshold(threshold) },
                                 label = { Text(stringResource(labelRes)) },
+                                shape = ShareFlowDesign.shapes.chip,
+                                colors = ShareFlowChipDefaults.filterChipColors(),
+                                border = ShareFlowChipDefaults.filterChipBorder(
+                                    selected = uiState.threshold == threshold
+                                ),
                                 modifier = Modifier
                                     .minimumInteractiveComponentSize()
                                     .testTag("large_threshold_${threshold.name.lowercase()}")
@@ -249,6 +255,7 @@ fun LargeFilesScreen(
                             Surface(
                                 shape = ShareFlowDesign.shapes.card,
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shadowElevation = ShareFlowDesign.elevation.card,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Row(

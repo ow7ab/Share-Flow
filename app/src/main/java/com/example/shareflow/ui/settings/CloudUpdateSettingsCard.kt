@@ -162,6 +162,8 @@ fun CloudUpdateSettingsCard(
                 onValueChange = onPortalUrlDraftChange,
                 label = { Text(stringResource(R.string.settings_update_portal_url_label)) },
                 placeholder = { Text(stringResource(R.string.settings_update_portal_url_placeholder)) },
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 isError = portalUrlError,
                 supportingText = if (portalUrlError) {
                     { Text(stringResource(R.string.settings_update_portal_url_error)) }
@@ -217,6 +219,8 @@ fun CloudUpdateSettingsCard(
                     ) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
@@ -439,6 +443,8 @@ fun CloudUpdateSettingsCard(
                     ) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(

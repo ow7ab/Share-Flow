@@ -316,6 +316,8 @@ fun ReceiveScreen(
                                 ) {
                                     CircularProgressIndicator(
                                         strokeWidth = 2.5.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                         modifier = Modifier.size(22.dp)
                                     )
                                     Text(
@@ -364,6 +366,8 @@ fun ReceiveScreen(
                                 ) {
                                     CircularProgressIndicator(
                                         strokeWidth = 2.5.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                         modifier = Modifier.size(22.dp)
                                     )
                                     Text(

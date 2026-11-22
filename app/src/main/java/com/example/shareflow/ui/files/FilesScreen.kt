@@ -588,6 +588,8 @@ private fun FileManagerBody(
                 value = uiState.searchQuery,
                 onValueChange = onSearchQueryChange,
                 placeholder = { Text(stringResource(R.string.files_search_placeholder)) },
+                shape = ShareFlowDesign.shapes.input,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
@@ -624,7 +626,10 @@ private fun FileManagerBody(
                         label = { Text(crumb.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = if (idx == 0) {
                             { Icon(Icons.Filled.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null
+                        } else null,
+                        shape = ShareFlowDesign.shapes.chip,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(supportingPeach = idx == 0),
+                        border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(supportingPeach = idx == 0)
                     )
                 }
             }
@@ -938,6 +943,9 @@ private fun OverviewQuickActionsRow(
                 onClick = onSelectFolder,
                 label = { Text(stringResource(R.string.files_browse_folder_action)) },
                 leadingIcon = { Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(supportingPeach = true),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(supportingPeach = true),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("files_select_folder_button")
@@ -948,6 +956,9 @@ private fun OverviewQuickActionsRow(
                 onClick = onScanMedia,
                 label = { Text(stringResource(R.string.files_scan_media_action)) },
                 leadingIcon = { Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("files_scan_media_button")
@@ -958,6 +969,9 @@ private fun OverviewQuickActionsRow(
                 onClick = onPickMedia,
                 label = { Text(stringResource(R.string.files_pick_media_action)) },
                 leadingIcon = { Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("files_pick_media_button")
@@ -968,6 +982,9 @@ private fun OverviewQuickActionsRow(
                 onClick = onPickFiles,
                 label = { Text(stringResource(R.string.files_pick_saf_action)) },
                 leadingIcon = { Icon(Icons.Filled.Description, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("files_pick_saf_button")
@@ -1054,13 +1071,21 @@ private fun CategoryPairRow(
     ) {
         pair.forEach { cat ->
             val summaryData = summaries[cat.domainCategory] ?: CategoryCountSummary()
+            val (catContainer, catContent) = when (cat.domainCategory) {
+                FileCategory.IMAGES, FileCategory.APKS ->
+                    MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                FileCategory.VIDEOS, FileCategory.AUDIO ->
+                    MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+                else ->
+                    MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+            }
             CategoryCard(
                 title = stringResource(cat.titleRes),
                 icon = cat.icon,
                 itemCount = summaryData.count,
                 totalBytes = summaryData.totalBytes,
-                accentContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                accentContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                accentContainerColor = catContainer,
+                accentContentColor = catContent,
                 onClick = { onOpenCategory(cat) },
                 modifier = Modifier
                     .weight(1f)
@@ -1089,6 +1114,9 @@ private fun CategoryToolbarActions(
                 onClick = onPickFiles,
                 label = { Text(stringResource(R.string.files_pick_saf_action)) },
                 leadingIcon = { Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(supportingPeach = true),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(supportingPeach = true),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .testTag("files_category_pick_button")
@@ -1099,6 +1127,9 @@ private fun CategoryToolbarActions(
                 onClick = onPickMedia,
                 label = { Text(stringResource(R.string.files_pick_media_action)) },
                 leadingIcon = { Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier.minimumInteractiveComponentSize()
             )
         }
@@ -1107,6 +1138,9 @@ private fun CategoryToolbarActions(
                 onClick = onScanMedia,
                 label = { Text(stringResource(R.string.files_scan_media_action)) },
                 leadingIcon = { Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier.minimumInteractiveComponentSize()
             )
         }

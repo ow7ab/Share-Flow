@@ -198,14 +198,42 @@ fun ShareFlowTheme(
         LayoutDirection.Ltr
     }
 
-    // Enforce the mandatory Official Share Flow Brand Color System consistently across all screens.
-    val targetColorScheme = ShareFlowBrandColorScheme
+    val systemInDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDarkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> systemInDark
+    }
+
+    val targetColorScheme = remember(isDarkTheme, useDynamicColor, accentColor, localizedContext) {
+        if (useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (isDarkTheme) {
+                androidx.compose.material3.dynamicDarkColorScheme(localizedContext)
+            } else {
+                androidx.compose.material3.dynamicLightColorScheme(localizedContext)
+            }
+        } else if (isDarkTheme) {
+            shareFlowDarkColorScheme(accentColor)
+        } else {
+            shareFlowLightColorScheme(accentColor)
+        }
+    }
     val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme)
-    val semanticColors = OfficialShareFlowSemanticColors
+    val semanticColors = if (isDarkTheme) DarkShareFlowSemanticColors else LightShareFlowSemanticColors
     val typography = if (activeLocale.language == "ar") {
         ShareFlowArabicTypography
     } else {
         ShareFlowTypography
+    }
+
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = hostActivity?.window ?: return@SideEffect
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDarkTheme
+            insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+        }
     }
 
     val activityResultRegistryOwner = LocalActivityResultRegistryOwner.current
@@ -246,8 +274,12 @@ private fun animateShareFlowColorScheme(target: ColorScheme): ColorScheme {
     val onPrimary by animateColorAsState(target.onPrimary, spec, label = "onPrimary")
     val primaryContainer by animateColorAsState(target.primaryContainer, spec, label = "primaryContainer")
     val onPrimaryContainer by animateColorAsState(target.onPrimaryContainer, spec, label = "onPrimaryContainer")
+    val secondary by animateColorAsState(target.secondary, spec, label = "secondary")
+    val tertiary by animateColorAsState(target.tertiary, spec, label = "tertiary")
     val background by animateColorAsState(target.background, spec, label = "background")
+    val onBackground by animateColorAsState(target.onBackground, spec, label = "onBackground")
     val surface by animateColorAsState(target.surface, spec, label = "surface")
+    val onSurface by animateColorAsState(target.onSurface, spec, label = "onSurface")
     val surfaceContainerLow by animateColorAsState(target.surfaceContainerLow, spec, label = "surfaceContainerLow")
 
     return target.copy(
@@ -255,8 +287,12 @@ private fun animateShareFlowColorScheme(target: ColorScheme): ColorScheme {
         onPrimary = onPrimary,
         primaryContainer = primaryContainer,
         onPrimaryContainer = onPrimaryContainer,
+        secondary = secondary,
+        tertiary = tertiary,
         background = background,
+        onBackground = onBackground,
         surface = surface,
+        onSurface = onSurface,
         surfaceContainerLow = surfaceContainerLow
     )
 }

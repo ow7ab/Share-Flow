@@ -233,6 +233,8 @@ fun SmartSenderProgressCard(
                             )
                             active -> CircularProgressIndicator(
                                 strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 modifier = Modifier.size(18.dp)
                             )
                             else -> Icon(

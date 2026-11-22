@@ -53,6 +53,8 @@ import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults
+import com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -311,6 +313,11 @@ fun CompressionContent(
                             selected = uiState.activeTab == CompressionTab.COMPRESS,
                             onClick = { onSelectTab(CompressionTab.COMPRESS) },
                             label = { Text(stringResource(R.string.compression_tab_compress)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = uiState.activeTab == CompressionTab.COMPRESS
+                            ),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -320,6 +327,11 @@ fun CompressionContent(
                             selected = uiState.activeTab == CompressionTab.EXTRACT,
                             onClick = { onSelectTab(CompressionTab.EXTRACT) },
                             label = { Text(stringResource(R.string.compression_tab_extract)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = uiState.activeTab == CompressionTab.EXTRACT
+                            ),
                             modifier = Modifier
                                 .weight(1f)
                                 .minimumInteractiveComponentSize()
@@ -343,6 +355,7 @@ fun CompressionContent(
                         Surface(
                             shape = ShareFlowDesign.shapes.card,
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shadowElevation = ShareFlowDesign.elevation.card,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -388,6 +401,8 @@ fun CompressionContent(
                                     label = { Text(stringResource(R.string.compression_archive_name_label)) },
                                     placeholder = { Text(stringResource(R.string.compression_archive_name_placeholder)) },
                                     singleLine = true,
+                                    shape = ShareFlowDesign.shapes.input,
+                                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("compression_archive_name_input")
@@ -493,6 +508,7 @@ fun CompressionContent(
                         Surface(
                             shape = ShareFlowDesign.shapes.card,
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shadowElevation = ShareFlowDesign.elevation.card,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(

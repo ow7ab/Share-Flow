@@ -64,7 +64,6 @@ import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -272,7 +271,7 @@ fun SendScreen(
                         Text(
                             text = stringResource(R.string.send_apps_extracting_status),
                             style = MaterialTheme.typography.labelSmall,
-                            color = ShareFlowBrandColors.RoyalBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = spacing.screenHorizontal, vertical = 4.dp)
                         )
                     }
@@ -359,8 +358,8 @@ fun SendScreen(
             val selectedTabIndex = tabs.indexOfFirst { it.first == uiState.activeTab }.coerceAtLeast(0)
             PrimaryTabRow(
                 selectedTabIndex = selectedTabIndex,
-                containerColor = ShareFlowBrandColors.SoftCream,
-                contentColor = ShareFlowBrandColors.DeepNavy,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
                 indicator = {
                     ShareFlowSignatureTabIndicator(
                         modifier = Modifier.tabIndicatorOffset(selectedTabIndex, matchContentSize = false)
@@ -375,8 +374,8 @@ fun SendScreen(
                     Tab(
                         selected = uiState.activeTab == tab,
                         onClick = { viewModel.selectTab(tab) },
-                        selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                        unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         text = {
                             Text(
                                 text = stringResource(labelRes),

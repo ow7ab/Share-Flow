@@ -66,7 +66,6 @@ import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.components.StorageIndicator
 import com.example.shareflow.core.designsystem.components.TransferCard
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
@@ -513,15 +512,15 @@ private fun HeroIdentityCard(
                         )
                         StatusPill(
                             label = statusText,
-                            containerColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.78f),
-                            contentColor = ShareFlowBrandColors.SoftCream,
+                            containerColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.78f),
+                            contentColor = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream,
                             modifier = Modifier.testTag("home_connection_status")
                         )
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.62f),
-                        border = BorderStroke(1.dp, ShareFlowBrandColors.SkyBlue.copy(alpha = 0.38f))
+                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.64f),
+                        border = BorderStroke(1.dp, com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Coral.copy(alpha = 0.42f))
                     ) {
                         IconButton(
                             onClick = onSettingsClick,
@@ -532,7 +531,7 @@ private fun HeroIdentityCard(
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = stringResource(R.string.cd_open_settings),
-                                tint = ShareFlowBrandColors.SoftCream
+                                tint = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream
                             )
                         }
                     }
@@ -546,18 +545,18 @@ private fun HeroIdentityCard(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
-                            color = ShareFlowBrandColors.InkOnDeepNavy
+                            color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkTextPrimary
                         )
                         Text(
                             text = "TCP :${ShareFlowFormatters.formatInteger(port.toLong(), locale)}",
                             style = ShareFlowMonoStyle,
-                            color = ShareFlowBrandColors.GoldenYellow
+                            color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Peach
                         )
                     }
                     Text(
                         text = stringResource(R.string.home_device_identity_format, deviceName),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = ShareFlowBrandColors.SoftCream.copy(alpha = 0.92f),
+                        color = com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream.copy(alpha = 0.94f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.testTag("home_device_name_text")
@@ -593,7 +592,7 @@ private fun PrimaryActionTile(
         border = if (useSignatureBorder) {
             BorderStroke(1.4.dp, ShareFlowBrandGradients.signatureBorder(alpha = 0.9f))
         } else {
-            BorderStroke(1.dp, ShareFlowBrandColors.SoftCream.copy(alpha = 0.45f))
+            BorderStroke(1.dp, com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.Cream.copy(alpha = 0.45f))
         },
         tonalElevation = ShareFlowDesign.elevation.raised
     ) {
@@ -654,6 +653,7 @@ private fun QuickToolTile(
             .testTag(testTag),
         shape = ShareFlowDesign.shapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = ShareFlowDesign.elevation.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
@@ -665,14 +665,14 @@ private fun QuickToolTile(
         ) {
             Surface(
                 shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.size(20.dp)
                     )
                 }

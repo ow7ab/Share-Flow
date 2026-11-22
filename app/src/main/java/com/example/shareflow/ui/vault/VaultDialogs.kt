@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -50,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults
+import com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.DecryptedVaultItem
@@ -65,7 +69,26 @@ internal fun VaultRecoveryKeyReceiptDialog(
     AlertDialog(
         onDismissRequest = {},
         modifier = Modifier.testTag("vault_recovery_receipt_dialog"),
-        icon = { Icon(imageVector = Icons.Filled.Key, contentDescription = null) },
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        icon = {
+            Surface(
+                shape = ShareFlowDesign.shapes.badge,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Key,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        },
         title = { Text(stringResource(R.string.vault_recovery_receipt_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -120,7 +143,26 @@ internal fun VaultRecoverPinDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("vault_recover_pin_dialog"),
-        icon = { Icon(imageVector = Icons.Filled.Key, contentDescription = null) },
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        icon = {
+            Surface(
+                shape = ShareFlowDesign.shapes.badge,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Key,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        },
         title = { Text(stringResource(R.string.vault_recover_pin_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -134,6 +176,8 @@ internal fun VaultRecoverPinDialog(
                     onValueChange = { recoveryKey = it },
                     label = { Text(stringResource(R.string.vault_recovery_key_input_label)) },
                     singleLine = true,
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_recovery_key_input")
@@ -145,6 +189,8 @@ internal fun VaultRecoverPinDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_recover_new_pin_input")
@@ -156,6 +202,8 @@ internal fun VaultRecoverPinDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_recover_confirm_pin_input")
@@ -199,7 +247,26 @@ internal fun VaultItemDetailsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("vault_item_details_dialog"),
-        icon = { Icon(imageVector = Icons.Filled.Shield, contentDescription = null) },
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        icon = {
+            Surface(
+                shape = ShareFlowDesign.shapes.badge,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        },
         title = { Text(text = item.displayName) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -282,6 +349,11 @@ internal fun VaultInMemoryPreviewDialog(
     AlertDialog(
         onDismissRequest = onClose,
         modifier = Modifier.testTag("vault_preview_dialog"),
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(preview.item.displayName) },
         text = {
             Column(
@@ -344,6 +416,11 @@ internal fun VaultSecuritySettingsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("vault_security_settings_dialog"),
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(stringResource(R.string.vault_security_settings_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -390,6 +467,11 @@ internal fun VaultSecuritySettingsDialog(
                             selected = status.autoLockTimeout == timeout,
                             onClick = { onSelectTimeout(timeout) },
                             label = { Text(autoLockLabel(timeout)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = status.autoLockTimeout == timeout
+                            ),
                             modifier = Modifier.testTag("vault_autolock_${timeout.name.lowercase()}")
                         )
                     }
@@ -429,6 +511,11 @@ internal fun VaultChangePinDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("vault_change_pin_dialog"),
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(stringResource(R.string.vault_change_pin_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -439,6 +526,8 @@ internal fun VaultChangePinDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_current_pin_input")
@@ -450,6 +539,8 @@ internal fun VaultChangePinDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_change_new_pin_input")
@@ -461,6 +552,8 @@ internal fun VaultChangePinDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("vault_change_confirm_pin_input")

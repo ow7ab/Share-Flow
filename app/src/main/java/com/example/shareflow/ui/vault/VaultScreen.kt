@@ -45,7 +45,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -81,6 +80,8 @@ import com.example.shareflow.core.designsystem.components.ConfirmationDialog
 import com.example.shareflow.core.designsystem.components.EmptyState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
+import com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults
+import com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.components.StatusPill
@@ -432,6 +433,8 @@ private fun VaultSetupContent(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                shape = ShareFlowDesign.shapes.input,
+                colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("vault_setup_pin_input")
@@ -444,6 +447,8 @@ private fun VaultSetupContent(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                shape = ShareFlowDesign.shapes.input,
+                colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("vault_setup_confirm_pin_input")
@@ -492,7 +497,10 @@ private fun VaultSetupContent(
                         FilterChip(
                             selected = timeout == option,
                             onClick = { timeout = option },
-                            label = { Text(autoLockLabel(option)) }
+                            label = { Text(autoLockLabel(option)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(selected = timeout == option)
                         )
                     }
                 }
@@ -592,6 +600,8 @@ private fun VaultLockedContent(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                shape = ShareFlowDesign.shapes.input,
+                colors = ShareFlowInputDefaults.outlinedTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("vault_pin_input")
@@ -674,6 +684,7 @@ private fun VaultUnlockedDashboard(
                 Surface(
                     shape = ShareFlowDesign.shapes.featuredCard,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shadowElevation = ShareFlowDesign.elevation.card,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
@@ -771,6 +782,9 @@ private fun VaultUnlockedDashboard(
                             selected = selectedCategory == null,
                             onClick = { onSelectCategory(null) },
                             label = { Text(stringResource(R.string.vault_category_all, items.size)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(selected = selectedCategory == null),
                             modifier = Modifier.testTag("vault_chip_all")
                         )
                     }
@@ -779,6 +793,11 @@ private fun VaultUnlockedDashboard(
                             selected = selectedCategory == VaultCategory.PHOTOS,
                             onClick = { onSelectCategory(VaultCategory.PHOTOS) },
                             label = { Text(stringResource(R.string.vault_category_photos)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = selectedCategory == VaultCategory.PHOTOS
+                            ),
                             modifier = Modifier.testTag("vault_chip_photos")
                         )
                     }
@@ -787,6 +806,11 @@ private fun VaultUnlockedDashboard(
                             selected = selectedCategory == VaultCategory.VIDEOS,
                             onClick = { onSelectCategory(VaultCategory.VIDEOS) },
                             label = { Text(stringResource(R.string.vault_category_videos)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = selectedCategory == VaultCategory.VIDEOS
+                            ),
                             modifier = Modifier.testTag("vault_chip_videos")
                         )
                     }
@@ -795,6 +819,11 @@ private fun VaultUnlockedDashboard(
                             selected = selectedCategory == VaultCategory.DOCUMENTS,
                             onClick = { onSelectCategory(VaultCategory.DOCUMENTS) },
                             label = { Text(stringResource(R.string.vault_category_documents)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = ShareFlowChipDefaults.filterChipColors(),
+                            border = ShareFlowChipDefaults.filterChipBorder(
+                                selected = selectedCategory == VaultCategory.DOCUMENTS
+                            ),
                             modifier = Modifier.testTag("vault_chip_documents")
                         )
                     }
@@ -840,7 +869,9 @@ private fun VaultEncryptedFileCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        shape = ShareFlowDesign.shapes.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(

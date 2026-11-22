@@ -81,7 +81,6 @@ import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureTabIndicator
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
-import com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.di.LocalAppContainer
@@ -332,8 +331,8 @@ fun AppSharingContent(
             val selectedAppTab = if (uiState.activeTab == AppSharingTab.INSTALLED) 0 else 1
             PrimaryTabRow(
                 selectedTabIndex = selectedAppTab,
-                containerColor = ShareFlowBrandColors.SoftCream,
-                contentColor = ShareFlowBrandColors.DeepNavy,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
                 indicator = {
                     ShareFlowSignatureTabIndicator(
                         modifier = Modifier.tabIndicatorOffset(selectedAppTab, matchContentSize = false)
@@ -344,16 +343,16 @@ fun AppSharingContent(
                 Tab(
                     selected = uiState.activeTab == AppSharingTab.INSTALLED,
                     onClick = { onSelectTab(AppSharingTab.INSTALLED) },
-                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = { Text(text = stringResource(R.string.apps_tab_installed)) },
                     modifier = Modifier.testTag("apps_tab_installed")
                 )
                 Tab(
                     selected = uiState.activeTab == AppSharingTab.RECEIVED,
                     onClick = { onSelectTab(AppSharingTab.RECEIVED) },
-                    selectedContentColor = ShareFlowBrandColors.RoyalBlue,
-                    unselectedContentColor = ShareFlowBrandColors.DeepNavy.copy(alpha = 0.68f),
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = {
                         val suffix = if (uiState.receivedApks.isNotEmpty()) {
                             " (${ShareFlowFormatters.formatCount(uiState.receivedApks.size, locale)})"
@@ -461,6 +460,8 @@ private fun InstalledAppsTabContent(
                         value = uiState.searchQuery,
                         onValueChange = onSearchQueryChange,
                         singleLine = true,
+                        shape = ShareFlowDesign.shapes.input,
+                        colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                         placeholder = { Text(text = stringResource(R.string.apps_search_placeholder)) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Filled.Search, contentDescription = null)
@@ -491,6 +492,9 @@ private fun InstalledAppsTabContent(
                             selected = uiState.includeSystemApps,
                             onClick = onToggleSystemApps,
                             label = { Text(text = stringResource(R.string.apps_filter_show_system)) },
+                            shape = ShareFlowDesign.shapes.chip,
+                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipColors(),
+                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.filterChipBorder(selected = uiState.includeSystemApps),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
                                 .testTag("apps_filter_system_chip")

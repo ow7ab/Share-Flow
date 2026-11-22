@@ -342,6 +342,8 @@ fun SendConfirmScreen(
                                 ) {
                                     CircularProgressIndicator(
                                         strokeWidth = 2.5.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                         modifier = Modifier.size(22.dp)
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
@@ -552,11 +554,9 @@ fun SendConfirmScreen(
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             },
-                                            colors = AssistChipDefaults.assistChipColors(
-                                                containerColor = MaterialTheme.colorScheme.surface,
-                                                labelColor = MaterialTheme.colorScheme.onSurface,
-                                                leadingIconContentColor = semantic.verifiedBadge
-                                            ),
+                                            shape = ShareFlowDesign.shapes.chip,
+                                            colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                                            border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                                             modifier = Modifier
                                                 .minimumInteractiveComponentSize()
                                                 .testTag("send_quick_nearby_peer_${peer.deviceId}")
@@ -607,6 +607,14 @@ fun SendConfirmScreen(
                                         selected = connectMode == mode,
                                         onClick = { connectMode = mode },
                                         shape = SegmentedButtonDefaults.itemShape(index = idx, count = modes.size),
+                                        colors = SegmentedButtonDefaults.colors(
+                                            activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            activeBorderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.72f),
+                                            inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                                            inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                        ),
                                         modifier = Modifier.testTag("send_connect_mode_${mode.name.lowercase()}")
                                     ) {
                                         Text(text = stringResource(labelRes), maxLines = 1)
@@ -731,6 +739,8 @@ fun SendConfirmScreen(
                                             onValueChange = { manualCodeInput = it },
                                             label = { Text(stringResource(R.string.smart_scanner_manual_code_label)) },
                                             placeholder = { Text(stringResource(R.string.smart_scanner_manual_code_placeholder)) },
+                                            shape = ShareFlowDesign.shapes.input,
+                                            colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                                             singleLine = false,
                                             maxLines = 3,
                                             modifier = Modifier

@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; connect-src 'self' https://api.github.com https:; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self';"
+  />
   <meta name="description" content="Share Flow — التحميل المباشر لأحدث إصدار رسمي موقّع من تطبيق مشاركة الملفات المحلي لأندرويد (Share-Flow.apk)." />
   <title>Share Flow — التحميل المباشر لأندرويد</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="heritage-ribbon" aria-hidden="true"></div>
+  <div class="marple-ribbon" aria-hidden="true"></div>
   <main class="container">
     <header class="topbar">
       <div class="brand">
@@ -22,7 +26,7 @@
     </header>
 
     <section class="hero" aria-labelledby="hero-title">
-      <span class="sudan-badge" id="sudan-badge">البوابة السودانية الرسمية للتحميل المباشر</span>
+      <span class="official-badge" id="sudan-badge">البوابة الرسمية للتحميل المباشر (APK)</span>
       <h1 id="hero-title">حمّل أحدث إصدار من تطبيق Share Flow لأندرويد</h1>
       <p class="hero-desc" id="hero-desc">
         تطبيق أندرويد متكامل لمشاركة الصور والفيديوهات والتطبيقات والملفات بسرعة فائقة عبر شبكة Wi-Fi المحلية ورموز QR مباشرة دون الحاجة إلى إنترنت أو خوادم وسيطة.
@@ -96,7 +100,7 @@
       </article>
     </section>
 
-    <section class="card" style="margin-top: 18px;" aria-labelledby="history-title">
+    <section class="card history-section" aria-labelledby="history-title">
       <h2 id="history-title">سجل الإصدارات السابقة</h2>
       <div id="history-list" class="history-list"></div>
     </section>

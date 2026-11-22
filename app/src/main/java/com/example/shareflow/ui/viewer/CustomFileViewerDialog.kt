@@ -262,6 +262,11 @@ fun CustomFileViewerDialog(
         AlertDialog(
             onDismissRequest = { showVaultNotSetupDialog = false },
             modifier = Modifier.testTag("viewer_vault_setup_dialog"),
+            shape = ShareFlowDesign.shapes.dialog,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = ShareFlowDesign.elevation.modal,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             icon = {
                 Icon(
                     imageVector = Icons.Filled.Lock,
@@ -278,6 +283,7 @@ fun CustomFileViewerDialog(
                         onOpenVaultSetup?.invoke()
                     },
                     enabled = onOpenVaultSetup != null,
+                    shape = ShareFlowDesign.shapes.button,
                     modifier = Modifier.testTag("viewer_vault_setup_confirm")
                 ) {
                     Text(stringResource(R.string.viewer_vault_setup_action))
@@ -305,7 +311,7 @@ fun CustomFileViewerDialog(
                 .fillMaxSize()
                 .testTag("custom_file_viewer_dialog"),
             color = if (isMediaDarkStage) {
-                com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavy
+                com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBackground
             } else {
                 MaterialTheme.colorScheme.background
             }
@@ -314,7 +320,7 @@ fun CustomFileViewerDialog(
                 // Top Bar
                 Surface(
                     color = if (isMediaDarkStage) {
-                        Color.Black.copy(alpha = 0.72f)
+                        com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.85f)
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
@@ -504,14 +510,18 @@ fun CustomFileViewerDialog(
                 // Bottom Action Dock: Send via ShareFlow + Move to Private Vault (+ Install APK)
                 Surface(
                     color = if (isMediaDarkStage) {
-                        com.example.shareflow.core.designsystem.theme.ShareFlowBrandColors.DeepNavyGlassSurface
+                        com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkSurface
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
                     tonalElevation = 3.dp,
                     border = BorderStroke(
                         0.5.dp,
-                        if (isMediaDarkStage) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.outlineVariant
+                        if (isMediaDarkStage) {
+                            com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkBorder
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        }
                     )
                 ) {
                     Column(
@@ -816,6 +826,9 @@ private fun Media3VideoStage(
                         )
                     )
                 },
+                shape = ShareFlowDesign.shapes.chip,
+                colors = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipColors(),
+                border = com.example.shareflow.core.designsystem.components.ShareFlowChipDefaults.assistChipBorder(),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(12.dp)
@@ -1173,6 +1186,11 @@ private fun VaultQuickUnlockDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("viewer_vault_pin_dialog"),
+        shape = ShareFlowDesign.shapes.dialog,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = ShareFlowDesign.elevation.modal,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         icon = {
             Icon(
                 imageVector = Icons.Filled.Lock,
@@ -1193,6 +1211,8 @@ private fun VaultQuickUnlockDialog(
                     onValueChange = { next -> pin = next.filter { it.isDigit() }.take(12) },
                     label = { Text(stringResource(R.string.viewer_vault_pin_label)) },
                     singleLine = true,
+                    shape = ShareFlowDesign.shapes.input,
+                    colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     isError = errorMessage != null,
@@ -1207,6 +1227,7 @@ private fun VaultQuickUnlockDialog(
             Button(
                 onClick = { onConfirmPin(pin) },
                 enabled = pin.length >= 4 && !isUnlocking,
+                shape = ShareFlowDesign.shapes.button,
                 modifier = Modifier.testTag("viewer_vault_pin_confirm")
             ) {
                 Text(stringResource(R.string.viewer_vault_unlock_and_move))
