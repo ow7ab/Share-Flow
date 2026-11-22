@@ -126,7 +126,13 @@ class SmartConnectionUiRobolectricTest {
         composeTestRule.onNodeWithTag("settings_section_cloud_update").assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_update_sudan_badge").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_update_current_version").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_update_url_input").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_update_official_source").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_check_updates_button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_open_official_website_button").performScrollTo().assertIsDisplayed()
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("settings_update_url_input", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
     }
 }

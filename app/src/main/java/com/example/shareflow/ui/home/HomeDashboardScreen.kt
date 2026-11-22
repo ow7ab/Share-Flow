@@ -75,24 +75,25 @@ import com.example.shareflow.network.DeviceNetworkStatus
 fun HomeDashboardScreen(
     onNavigateToRoute: (String) -> Unit,
     bottomBarClearance: Dp = 0.dp,
+    activeTransferCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
-    val viewModel: HomeViewModel = viewModel(
-        factory = shareFlowViewModelFactory {
+    val factory = androidx.compose.runtime.remember(container) {
+        shareFlowViewModelFactory {
             HomeViewModel(
                 settingsRepository = container.settingsRepository,
                 transferHistoryRepository = container.transferHistoryRepository,
                 trustedDeviceRepository = container.trustedDeviceRepository,
                 storageAnalyzerRepository = container.storageAnalyzerRepository,
                 sessionController = container.localSessionController,
-                discoveryRepository = container.deviceDiscoveryRepository,
-                connectionRepository = container.connectionRepository
+                discoveryRepository = null,
+                connectionRepository = null
             )
         }
-    )
+    }
+    val viewModel: HomeViewModel = viewModel(factory = factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val activeTransfers by container.transferManager.activeSessions.collectAsStateWithLifecycle()
 
     HomeDashboardContent(
         uiState = uiState,
@@ -101,7 +102,7 @@ fun HomeDashboardScreen(
             viewModel.selectFileForSend(file)
             onNavigateToRoute(ShareFlowRoutes.SEND)
         },
-        activeTransferCount = activeTransfers.size,
+        activeTransferCount = activeTransferCount,
         bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )

@@ -1148,20 +1148,21 @@
     <string name="receive_screen_awake_badge">Screen Kept Awake</string>
     <string name="receive_hotspot_ready_ssid_format">Hotspot: %1$s</string>
 
-    <!-- Cloud Updates & Sudanese Official Download Portal -->
+    <!-- Cloud Updates & Official ShareFlow Update Website -->
     <string name="settings_section_cloud_update">Version Check &amp; Cloud Updates</string>
-    <string name="settings_update_sudan_portal_badge">Sudanese Official Portal Ready</string>
-    <string name="settings_update_sudan_portal_desc">Check for new verified ShareFlow releases directly from the official Sudanese download website once launched. All updates require HTTPS, SHA-256 checksum, and matching signing certificate verification.</string>
+    <string name="settings_update_sudan_portal_badge">Connected to Official Website</string>
+    <string name="settings_update_sudan_portal_desc">Check and install verified ShareFlow updates directly from the official update website — no manual link needed. All updates enforce HTTPS, SHA-256 checksum, and matching signing certificate verification.</string>
     <string name="settings_update_current_version_label">Installed Version</string>
+    <string name="settings_update_official_source_label">Official Update Website</string>
     <string name="settings_update_portal_url_label">Official Portal Manifest URL (HTTPS)</string>
-    <string name="settings_update_portal_url_placeholder">https://your-sudan-portal.sd/shareflow/version.json</string>
-    <string name="settings_update_portal_url_error">Enter a valid public HTTPS URL (e.g., https://example.sd/version.json).</string>
+    <string name="settings_update_portal_url_placeholder">https://ow7ab.github.io/Share-Flow-Releases/version.json</string>
+    <string name="settings_update_portal_url_error">Enter a valid public HTTPS URL.</string>
     <string name="settings_update_check_action">Check for Updates</string>
-    <string name="settings_update_checking_status">Checking official cloud portal…</string>
+    <string name="settings_update_checking_status">Checking official ShareFlow update website…</string>
     <string name="settings_update_up_to_date_title">ShareFlow is up to date</string>
     <string name="settings_update_up_to_date_body">You are running the latest verified release: v%1$s (Build %2$s).</string>
-    <string name="settings_update_not_configured_title">Official Sudanese Portal Not Linked Yet</string>
-    <string name="settings_update_not_configured_body">Enter the HTTPS version manifest URL of your Sudanese website above once live to enable instant verified cloud updates.</string>
+    <string name="settings_update_not_configured_title">Update Service Unavailable</string>
+    <string name="settings_update_not_configured_body">The official update endpoint could not be reached. Please try again shortly or open the official ShareFlow website.</string>
     <string name="settings_update_available_title">New Update Available: v%1$s (Build %2$s)</string>
     <string name="settings_update_release_notes_label">What\'s New</string>
     <string name="settings_update_download_action">Download &amp; Verify Update</string>

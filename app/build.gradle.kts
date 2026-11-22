@@ -24,6 +24,11 @@ android {
       "CLOUD_UPDATE_MANIFEST_URL",
       "\"https://ow7ab.github.io/Share-Flow-Releases/version.json\""
     )
+    buildConfigField(
+      "String",
+      "CLOUD_UPDATE_PORTAL_URL",
+      "\"https://ow7ab.github.io/Share-Flow-Releases/\""
+    )
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

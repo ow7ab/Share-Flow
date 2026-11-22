@@ -19,6 +19,7 @@ import com.example.shareflow.data.update.AndroidApkPackageSecurityInspector
 import com.example.shareflow.data.update.CloudUpdateManager
 import com.example.shareflow.data.update.HttpsCloudUpdateHttpClient
 import com.example.shareflow.data.local.database.ShareFlowDatabase
+import com.example.shareflow.data.local.preferences.StartupAppearanceCache
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
 import com.example.shareflow.data.repository.AndroidAppSharingRepository
 import com.example.shareflow.data.repository.AndroidFileManagerRepository
@@ -130,6 +131,14 @@ interface AppContainer {
     val utilitiesRepository: UtilitiesRepository
     val contactsMigrationExporter: ContactsMigrationExporter
     val cloudUpdateManager: CloudUpdateManager
+
+    /** True only after [vaultManager] has been accessed, preventing eager DB/Keystore init on app launch. */
+    val isVaultInitialized: Boolean
+        get() = true
+
+    /** True only after [smartConnectionCoordinator] has been accessed, avoiding unnecessary startup work. */
+    val isSmartCoordinatorInitialized: Boolean
+        get() = true
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -144,10 +153,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
         ShareFlowDatabase.create(appContext)
     }
 
+    private val startupAppearanceCache: StartupAppearanceCache by lazy {
+        StartupAppearanceCache(appContext)
+    }
+
     override val settingsRepository: SettingsRepository by lazy {
         SettingsRepositoryImpl(
             dataStore = appContext.shareFlowSettingsDataStore,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
+            appearanceCache = startupAppearanceCache
         )
     }
 
@@ -288,7 +302,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
-    override val smartConnectionCoordinator: SmartConnectionCoordinator by lazy {
+    private val smartConnectionCoordinatorLazy = lazy {
         SmartConnectionCoordinator(
             baseCoordinator = defaultConnectionCoordinator,
             receiverHotspotController = localOnlyHotspotStrategy,
@@ -302,6 +316,11 @@ class DefaultAppContainer(context: Context) : AppContainer {
             clock = clock
         )
     }
+
+    override val smartConnectionCoordinator: SmartConnectionCoordinator by smartConnectionCoordinatorLazy
+
+    override val isSmartCoordinatorInitialized: Boolean
+        get() = smartConnectionCoordinatorLazy.isInitialized()
 
     override val deviceDiscoveryRepository: DeviceDiscoveryRepository by lazy {
         DeviceDiscoveryRepositoryImpl(coordinator = connectionCoordinator)
@@ -420,7 +439,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         AndroidVaultKeystoreProvider()
     }
 
-    override val vaultManager: VaultManager by lazy {
+    private val vaultManagerLazy = lazy {
         VaultManager(
             context = appContext,
             vaultConfigDao = database.vaultConfigDao(),
@@ -431,6 +450,11 @@ class DefaultAppContainer(context: Context) : AppContainer {
             clock = clock
         )
     }
+
+    override val vaultManager: VaultManager by vaultManagerLazy
+
+    override val isVaultInitialized: Boolean
+        get() = vaultManagerLazy.isInitialized()
 
     override val duplicateFileFinderEngine: DuplicateFileFinderEngine by lazy {
         DuplicateFileFinderEngine(

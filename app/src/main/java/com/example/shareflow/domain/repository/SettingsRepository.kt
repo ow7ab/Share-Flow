@@ -17,6 +17,12 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository {
     val settings: Flow<AppSettings>
 
+    /**
+     * Synchronously returns the last persisted appearance settings (theme, accent, dynamic color, language)
+     * so MainActivity and ShareFlowApp render Frame 1 in the exact user-selected theme without flashing.
+     */
+    fun peekInitialSettings(): AppSettings = AppSettings()
+
     suspend fun updateDeviceName(deviceName: String): AppResult<Unit>
     suspend fun updateThemeMode(themeMode: ThemeMode): AppResult<Unit>
     suspend fun updateDynamicColor(enabled: Boolean): AppResult<Unit>

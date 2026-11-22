@@ -44,7 +44,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -116,41 +119,55 @@ import com.example.shareflow.ui.utilities.QrScannerScreen
 import com.example.shareflow.ui.utilities.RecentFilesScreen
 import com.example.shareflow.ui.vault.VaultScreen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ShareFlowApp(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    initialSettings: AppSettings? = null
 ) {
     val container = LocalAppContainer.current
+    val resolvedInitialSettings = remember(container, initialSettings) {
+        initialSettings ?: container.settingsRepository.peekInitialSettings()
+    }
     val settings by container.settingsRepository.settings.collectAsStateWithLifecycle(
-        initialValue = AppSettings()
+        initialValue = resolvedInitialSettings
     )
-    val pendingIncoming by container.connectionRepository.pendingIncomingRequest
-        .collectAsStateWithLifecycle()
-    val pendingTransferOffer by container.unifiedConnectionManager.pendingIncomingOffer
-        .collectAsStateWithLifecycle()
     val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val activeTransferSessions by container.transferManager.activeSessions
-        .collectAsStateWithLifecycle()
+    // Defer heavy networking/transfer DI graph initialization off the Main Thread until after Frame 1
+    var backgroundServicesReady by remember(container) { mutableStateOf(false) }
+    var activeTransferCount by remember(container) { mutableIntStateOf(0) }
 
-    LaunchedEffect(activeTransferSessions) {
-        val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
-        container.smartConnectionCoordinator.notifyTransferActivity(isTransferring)
+    LaunchedEffect(container) {
+        withContext(container.dispatchers.io) {
+            container.connectionRepository
+            container.transferManager
+            container.unifiedConnectionManager
+        }
+        backgroundServicesReady = true
     }
 
     DisposableEffect(lifecycleOwner, container) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    approvalScope.launch {
-                        container.vaultManager.onAppBackgrounded()
-                        container.smartConnectionCoordinator.onAppBackgrounded()
+                    approvalScope.launch(container.dispatchers.io) {
+                        if (container.isVaultInitialized) {
+                            container.vaultManager.onAppBackgrounded()
+                        }
+                        if (container.isSmartCoordinatorInitialized) {
+                            container.smartConnectionCoordinator.onAppBackgrounded()
+                        }
                     }
                 }
                 Lifecycle.Event.ON_START -> {
-                    approvalScope.launch { container.vaultManager.checkAutoLock() }
+                    if (container.isVaultInitialized) {
+                        approvalScope.launch(container.dispatchers.io) {
+                            container.vaultManager.checkAutoLock()
+                        }
+                    }
                 }
                 else -> Unit
             }
@@ -167,46 +184,27 @@ fun ShareFlowApp(
         accentColor = settings.accentColor,
         appLanguage = settings.appLanguage
     ) {
-        pendingIncoming?.let { request ->
-            com.example.shareflow.ui.discovery.IncomingConnectionApprovalDialog(
-                request = request,
-                onApprove = { rememberTrusted ->
-                    approvalScope.launch {
-                        container.connectionRepository.approveIncomingConnection(
-                            requestId = request.requestId,
-                            rememberAsTrusted = rememberTrusted
-                        )
-                    }
-                },
-                onReject = {
-                    approvalScope.launch {
-                        container.connectionRepository.rejectIncomingConnection(request.requestId)
-                    }
-                }
+        if (backgroundServicesReady) {
+            ShareFlowActiveSessionBridge(
+                onActiveTransferCountChanged = { count -> activeTransferCount = count }
             )
         }
-        pendingTransferOffer?.let { offer ->
-            com.example.shareflow.ui.receive.IncomingTransferOfferDialog(
-                offer = offer,
-                onAccept = {
-                    container.unifiedConnectionManager.approveIncomingTransferOffer(offer.sessionId)
-                },
-                onReject = {
-                    container.unifiedConnectionManager.rejectIncomingTransferOffer(offer.sessionId)
-                }
-            )
-        }
-        val backStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = backStackEntry?.destination?.route
-        val isTopLevel = TopLevelDestination.entries.any { it.route == currentRoute }
 
-        fun navigateTopLevel(route: String) {
-            navController.navigate(route) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = backStackEntry?.destination?.route ?: ShareFlowRoutes.HOME
+        val isTopLevel = remember(currentRoute) {
+            TopLevelDestination.entries.any { it.route == currentRoute }
+        }
+
+        val navigateTopLevel = remember(navController) {
+            { route: String ->
+                navController.navigate(route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-                launchSingleTop = true
-                restoreState = true
             }
         }
 
@@ -259,30 +257,86 @@ fun ShareFlowApp(
                         if (!useNavigationRail && isTopLevel) {
                             ShareFlowFloatingGlassNavBar(
                                 currentRoute = currentRoute,
-                                onNavigateTopLevel = ::navigateTopLevel
+                                onNavigateTopLevel = navigateTopLevel
                             )
                         }
                     }
                 ) { innerPadding ->
                     val layoutDirection = LocalLayoutDirection.current
-                    val floatOverHome = currentRoute == ShareFlowRoutes.HOME && !useNavigationRail
+                    // Float the unified glass bottom bar over ALL 5 top-level tabs so scrollable
+                    // content visibly shines behind the translucent glass capsule on every tab.
+                    val floatOverTopLevel = isTopLevel && !useNavigationRail
                     val bottomInset = innerPadding.calculateBottomPadding()
                     ShareFlowNavHost(
                         navController = navController,
-                        onNavigateTopLevel = ::navigateTopLevel,
-                        homeBottomBarClearance = if (floatOverHome) bottomInset else 0.dp,
+                        onNavigateTopLevel = navigateTopLevel,
+                        topLevelBottomBarClearance = if (floatOverTopLevel) bottomInset else 0.dp,
+                        activeTransferCount = activeTransferCount,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
                                 top = innerPadding.calculateTopPadding(),
                                 start = innerPadding.calculateStartPadding(layoutDirection),
                                 end = innerPadding.calculateEndPadding(layoutDirection),
-                                bottom = if (floatOverHome) 0.dp else bottomInset
+                                bottom = if (floatOverTopLevel) 0.dp else bottomInset
                             )
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ShareFlowActiveSessionBridge(
+    onActiveTransferCountChanged: (Int) -> Unit
+) {
+    val container = LocalAppContainer.current
+    val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
+    val pendingIncoming by container.connectionRepository.pendingIncomingRequest
+        .collectAsStateWithLifecycle()
+    val pendingTransferOffer by container.unifiedConnectionManager.pendingIncomingOffer
+        .collectAsStateWithLifecycle()
+    val activeTransferSessions by container.transferManager.activeSessions
+        .collectAsStateWithLifecycle()
+
+    LaunchedEffect(activeTransferSessions) {
+        onActiveTransferCountChanged(activeTransferSessions.size)
+        val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
+        if (isTransferring || container.isSmartCoordinatorInitialized) {
+            container.smartConnectionCoordinator.notifyTransferActivity(isTransferring)
+        }
+    }
+
+    pendingIncoming?.let { request ->
+        com.example.shareflow.ui.discovery.IncomingConnectionApprovalDialog(
+            request = request,
+            onApprove = { rememberTrusted ->
+                approvalScope.launch {
+                    container.connectionRepository.approveIncomingConnection(
+                        requestId = request.requestId,
+                        rememberAsTrusted = rememberTrusted
+                    )
+                }
+            },
+            onReject = {
+                approvalScope.launch {
+                    container.connectionRepository.rejectIncomingConnection(request.requestId)
+                }
+            }
+        )
+    }
+
+    pendingTransferOffer?.let { offer ->
+        com.example.shareflow.ui.receive.IncomingTransferOfferDialog(
+            offer = offer,
+            onAccept = {
+                container.unifiedConnectionManager.approveIncomingTransferOffer(offer.sessionId)
+            },
+            onReject = {
+                container.unifiedConnectionManager.rejectIncomingTransferOffer(offer.sessionId)
+            }
+        )
     }
 }
 
@@ -307,8 +361,8 @@ internal fun ShareFlowFloatingGlassNavBar(
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val supportsRealBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val capsuleShape = RoundedCornerShape(32.dp)
-    val pillShape = RoundedCornerShape(20.dp)
+    val capsuleShape = remember { RoundedCornerShape(32.dp) }
+    val pillShape = remember { RoundedCornerShape(20.dp) }
 
     val destinations = TopLevelDestination.entries
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
@@ -331,11 +385,11 @@ internal fun ShareFlowFloatingGlassNavBar(
     val activeIconColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
     val activeLabelColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
     val activeIndicatorColor = ShareFlowMarpleColors.Ruby
-    val neutralInactiveIcon = if (isDark) Color(0xFFB8ADB2).copy(alpha = 0.84f) else Color(0xFF72696E).copy(alpha = 0.86f)
-    val neutralInactiveLabel = if (isDark) Color(0xFFABA0A5).copy(alpha = 0.82f) else Color(0xFF786E73).copy(alpha = 0.86f)
+    val neutralInactiveIcon = if (isDark) Color(0xFFB8ADB2).copy(alpha = 0.88f) else Color(0xFF6B6267).copy(alpha = 0.90f)
+    val neutralInactiveLabel = if (isDark) Color(0xFFABA0A5).copy(alpha = 0.86f) else Color(0xFF72686D).copy(alpha = 0.90f)
 
     val ambientShadowColor = if (isDark) {
-        Color(0xFF000000).copy(alpha = 0.58f)
+        Color(0xFF000000).copy(alpha = 0.56f)
     } else {
         ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.16f)
     }
@@ -349,8 +403,8 @@ internal fun ShareFlowFloatingGlassNavBar(
         if (isDark) {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.20f),
-                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.58f),
+                    Color.White.copy(alpha = 0.24f),
+                    ShareFlowMarpleColors.DarkBorder.copy(alpha = 0.52f),
                     Color.White.copy(alpha = 0.08f)
                 )
             )
@@ -358,30 +412,31 @@ internal fun ShareFlowFloatingGlassNavBar(
             Brush.verticalGradient(
                 colors = listOf(
                     Color.White.copy(alpha = 0.94f),
-                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.78f),
-                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.92f)
+                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.72f),
+                    ShareFlowMarpleColors.LightBorder.copy(alpha = 0.88f)
                 )
             )
         }
     }
 
+    // Balanced specular top-glaze brush so combined Layer 1 + Layer 2 stays truly translucent
+    // (letting scrolled content softly appear behind the frosted glass on every tab).
     val frostedGlazeBrush = remember(isDark, supportsRealBlur) {
         if (isDark) {
             if (supportsRealBlur) {
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.09f),
-                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.58f),
-                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.68f)
+                        Color.White.copy(alpha = 0.12f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.34f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.44f)
                     )
                 )
             } else {
-                // Translucent dark glass fallback on devices without RenderEffect blur
                 Brush.verticalGradient(
                     colors = listOf(
-                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.80f),
-                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.84f),
-                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.88f)
+                        Color.White.copy(alpha = 0.08f),
+                        ShareFlowMarpleColors.DarkSurface.copy(alpha = 0.52f),
+                        ShareFlowMarpleColors.DarkBackground.copy(alpha = 0.62f)
                     )
                 )
             }
@@ -389,18 +444,17 @@ internal fun ShareFlowFloatingGlassNavBar(
             if (supportsRealBlur) {
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.74f),
-                        Color.White.copy(alpha = 0.60f),
-                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.56f)
+                        Color.White.copy(alpha = 0.44f),
+                        Color.White.copy(alpha = 0.28f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.24f)
                     )
                 )
             } else {
-                // Translucent frosted white & cream glass fallback on devices without RenderEffect blur
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.88f),
-                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.82f),
-                        ShareFlowMarpleColors.Cream.copy(alpha = 0.30f)
+                        Color.White.copy(alpha = 0.58f),
+                        ShareFlowMarpleColors.LightBackground.copy(alpha = 0.46f),
+                        ShareFlowMarpleColors.Cream.copy(alpha = 0.22f)
                     )
                 )
             }
@@ -433,15 +487,15 @@ internal fun ShareFlowFloatingGlassNavBar(
                 )
                 .testTag("shareflow_navigation_bar")
         ) {
-            // Layer 1: Real GPU-accelerated RenderEffect blur backdrop on API 31+ (skipped cleanly on API < 31)
+            // Layer 1: Real GPU-accelerated RenderEffect blur backdrop on API 31+ (translucent fallback on API < 31)
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .then(
                         if (supportsRealBlur) {
                             Modifier.blur(
-                                radiusX = 22.dp,
-                                radiusY = 22.dp,
+                                radiusX = 24.dp,
+                                radiusY = 24.dp,
                                 edgeTreatment = BlurredEdgeTreatment.Rectangle
                             )
                         } else {
@@ -452,9 +506,9 @@ internal fun ShareFlowFloatingGlassNavBar(
                         // Base translucent glass tint
                         drawRect(
                             color = if (isDark) {
-                                ShareFlowMarpleColors.DarkSurface.copy(alpha = if (supportsRealBlur) 0.56f else 0.72f)
+                                ShareFlowMarpleColors.DarkSurface.copy(alpha = if (supportsRealBlur) 0.44f else 0.62f)
                             } else {
-                                Color.White.copy(alpha = if (supportsRealBlur) 0.54f else 0.76f)
+                                Color.White.copy(alpha = if (supportsRealBlur) 0.44f else 0.62f)
                             }
                         )
                         // Subtle warm cream/plum chromatic refraction wash
@@ -462,15 +516,15 @@ internal fun ShareFlowFloatingGlassNavBar(
                             brush = Brush.horizontalGradient(
                                 colors = if (isDark) {
                                     listOf(
-                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.34f),
-                                        ShareFlowMarpleColors.DarkSurfaceContainer.copy(alpha = 0.24f),
-                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.34f)
+                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.22f),
+                                        ShareFlowMarpleColors.DarkSurfaceContainer.copy(alpha = 0.16f),
+                                        ShareFlowMarpleColors.DarkSurfaceElevated.copy(alpha = 0.22f)
                                     )
                                 } else {
                                     listOf(
-                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.42f),
-                                        Color.White.copy(alpha = 0.28f),
-                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.42f)
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.24f),
+                                        Color.White.copy(alpha = 0.16f),
+                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.24f)
                                     )
                                 }
                             )
@@ -630,15 +684,18 @@ internal fun ShareFlowFloatingGlassNavBar(
 private fun ShareFlowNavHost(
     navController: NavHostController,
     onNavigateTopLevel: (String) -> Unit,
-    homeBottomBarClearance: Dp = 0.dp,
+    topLevelBottomBarClearance: Dp = 0.dp,
+    activeTransferCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    fun navigateToRoute(route: String) {
-        if (TopLevelDestination.entries.any { it.route == route }) {
-            onNavigateTopLevel(route)
-        } else {
-            navController.navigate(route) {
-                launchSingleTop = true
+    val navigateToRoute = remember(navController, onNavigateTopLevel) {
+        { route: String ->
+            if (TopLevelDestination.entries.any { it.route == route }) {
+                onNavigateTopLevel(route)
+            } else {
+                navController.navigate(route) {
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -692,11 +749,12 @@ private fun ShareFlowNavHost(
         },
         modifier = modifier
     ) {
-        // Top-level destinations: Home, Files, Media, Tools, Settings
+        // Top-level destinations: Home, Files, Media, Tools, Settings — ALL share the unified floating glass nav bar
         composable(route = ShareFlowRoutes.HOME) {
             HomeDashboardScreen(
-                onNavigateToRoute = ::navigateToRoute,
-                bottomBarClearance = homeBottomBarClearance
+                onNavigateToRoute = navigateToRoute,
+                bottomBarClearance = topLevelBottomBarClearance,
+                activeTransferCount = activeTransferCount
             )
         }
         composable(route = ShareFlowRoutes.FILES_HUB) {
@@ -706,18 +764,26 @@ private fun ShareFlowNavHost(
                 },
                 onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
                 onNavigateToStorageAnalyzer = { navigateToRoute(ShareFlowRoutes.STORAGE_ANALYZER) },
-                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
+                bottomBarClearance = topLevelBottomBarClearance
             )
         }
         composable(route = ShareFlowRoutes.MEDIA_HUB) {
-            MediaScreen(onNavigateToRoute = ::navigateToRoute)
+            MediaScreen(
+                onNavigateToRoute = navigateToRoute,
+                bottomBarClearance = topLevelBottomBarClearance
+            )
         }
         composable(route = ShareFlowRoutes.TOOLS_HUB) {
-            ToolsScreen(onNavigateToRoute = ::navigateToRoute)
+            ToolsScreen(
+                onNavigateToRoute = navigateToRoute,
+                bottomBarClearance = topLevelBottomBarClearance
+            )
         }
         composable(route = ShareFlowRoutes.SETTINGS) {
             SettingsScreen(
-                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) }
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
+                bottomBarClearance = topLevelBottomBarClearance
             )
         }
 

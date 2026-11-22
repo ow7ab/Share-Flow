@@ -853,6 +853,8 @@ class CloudUpdateManager(
 
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"
+        const val OFFICIAL_PORTAL_URL = "https://ow7ab.github.io/Share-Flow-Releases/"
+        const val OFFICIAL_PORTAL_HOST = "ow7ab.github.io/Share-Flow-Releases"
         const val DEFAULT_FALLBACK_MANIFEST_URL =
             "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json"
     }

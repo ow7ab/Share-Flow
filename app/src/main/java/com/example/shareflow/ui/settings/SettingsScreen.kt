@@ -107,12 +107,13 @@ import com.example.shareflow.domain.model.ThemeMode
 @Composable
 fun SettingsScreen(
     onOpenVault: (() -> Unit)? = null,
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
-    val viewModel: SettingsViewModel = viewModel(
-        factory = shareFlowViewModelFactory {
+    val factory = remember(container) {
+        shareFlowViewModelFactory {
             SettingsViewModel(
                 settingsRepository = container.settingsRepository,
                 keystoreCipher = container.keystoreCipher,
@@ -124,7 +125,8 @@ fun SettingsScreen(
                 clock = container.clock
             )
         }
-    )
+    }
+    val viewModel: SettingsViewModel = viewModel(factory = factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val receiveFolderPicker = rememberLauncherForActivityResult(
@@ -186,6 +188,7 @@ fun SettingsScreen(
                 }
             )
         },
+        bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
 }
@@ -228,6 +231,7 @@ fun SettingsContent(
     onDownloadCloudUpdate: (CloudUpdateManifest) -> Unit = {},
     onCancelCloudUpdateDownload: () -> Unit = {},
     onInstallVerifiedCloudUpdate: (String) -> Unit = {},
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -380,7 +384,13 @@ fun SettingsContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = bottomBarClearance)
+            )
+        }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -394,8 +404,10 @@ fun SettingsContent(
                     .widthIn(max = spacing.maxContentWidth)
                     .testTag("settings_list"),
                 contentPadding = PaddingValues(
-                    horizontal = spacing.screenHorizontal,
-                    vertical = spacing.md
+                    start = spacing.screenHorizontal,
+                    end = spacing.screenHorizontal,
+                    top = spacing.md,
+                    bottom = spacing.md + bottomBarClearance
                 ),
                 verticalArrangement = Arrangement.spacedBy(spacing.md)
             ) {
@@ -992,16 +1004,10 @@ fun SettingsContent(
                     }
                 }
 
-                // 8. Cloud Updates & Sudanese Download Portal Section
+                // 8. Cloud Updates & Official ShareFlow Website Section
                 item(key = "section_cloud_update") {
                     CloudUpdateSettingsCard(
                         updateState = uiState.cloudUpdateState,
-                        portalUrlDraft = uiState.cloudUpdateUrlDraft,
-                        persistedPortalUrl = uiState.settings.cloudUpdateManifestUrl,
-                        portalUrlError = uiState.cloudUpdateUrlError,
-                        isSaving = uiState.isSaving,
-                        onPortalUrlDraftChange = onCloudUpdateUrlDraftChange,
-                        onSavePortalUrl = onSaveCloudUpdateUrl,
                         onCheckForUpdates = onCheckForCloudUpdates,
                         onDownloadUpdate = onDownloadCloudUpdate,
                         onCancelDownload = onCancelCloudUpdateDownload,

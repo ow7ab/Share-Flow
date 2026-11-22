@@ -128,12 +128,12 @@ fun FilesScreen(
     onNavigateToSend: () -> Unit = {},
     onNavigateToStorageAnalyzer: () -> Unit = {},
     onOpenVault: () -> Unit = {},
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
-    val viewModel: FileManagerViewModel = viewModel(
-        key = "file_manager_main",
-        factory = shareFlowViewModelFactory {
+    val factory = remember(container) {
+        shareFlowViewModelFactory {
             FileManagerViewModel(
                 fileManagerRepository = container.fileManagerRepository,
                 storageAnalyzerRepository = container.storageAnalyzerRepository,
@@ -141,6 +141,10 @@ fun FilesScreen(
                 initialCategory = null
             )
         }
+    }
+    val viewModel: FileManagerViewModel = viewModel(
+        key = "file_manager_main",
+        factory = factory
     )
 
     FileManagerHost(
@@ -151,6 +155,7 @@ fun FilesScreen(
         onNavigateToSend = onNavigateToSend,
         onNavigateToStorageAnalyzer = onNavigateToStorageAnalyzer,
         onOpenVault = onOpenVault,
+        bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
 }
@@ -197,6 +202,7 @@ internal fun FileManagerHost(
     onNavigateToSend: () -> Unit,
     onNavigateToStorageAnalyzer: () -> Unit,
     onOpenVault: () -> Unit = {},
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -393,7 +399,13 @@ internal fun FileManagerHost(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = bottomBarClearance)
+            )
+        },
         topBar = {
             if (uiState.isSelectionMode) {
                 FileSelectionActionBar(
@@ -477,7 +489,9 @@ internal fun FileManagerHost(
             if (uiState.browseMode == FileBrowseMode.DIRECTORY && uiState.currentDirectoryWritable) {
                 FloatingActionButton(
                     onClick = { viewModel.openCreateFolderDialog(true) },
-                    modifier = Modifier.testTag("files_create_folder_fab")
+                    modifier = Modifier
+                        .padding(bottom = bottomBarClearance)
+                        .testTag("files_create_folder_fab")
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CreateNewFolder,
@@ -491,6 +505,7 @@ internal fun FileManagerHost(
             uiState = uiState,
             pagedFiles = pagedFiles,
             fixedCategory = fixedCategory,
+            bottomBarClearance = bottomBarClearance,
             onSearchQueryChange = viewModel::onSearchQueryChange,
             onClearSearch = { viewModel.setSearchActive(false) },
             onSelectFolder = { showFolderPermissionInfo = true },
@@ -543,6 +558,7 @@ private fun FileManagerBody(
     uiState: FileManagerUiState,
     pagedFiles: LazyPagingItems<LocalFileEntry>,
     fixedCategory: FilesHubCategory?,
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     onSearchQueryChange: (String) -> Unit,
     onClearSearch: () -> Unit,
     onSelectFolder: () -> Unit,
@@ -649,8 +665,10 @@ private fun FileManagerBody(
                         .widthIn(max = spacing.maxContentWidth)
                         .testTag(listTag),
                     contentPadding = PaddingValues(
-                        horizontal = spacing.screenHorizontal,
-                        vertical = spacing.md
+                        start = spacing.screenHorizontal,
+                        end = spacing.screenHorizontal,
+                        top = spacing.md,
+                        bottom = spacing.md + bottomBarClearance
                     ),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(spacing.sm)
@@ -727,8 +745,10 @@ private fun FileManagerBody(
                         .widthIn(max = spacing.maxContentWidth)
                         .testTag(listTag),
                     contentPadding = PaddingValues(
-                        horizontal = spacing.screenHorizontal,
-                        vertical = spacing.md
+                        start = spacing.screenHorizontal,
+                        end = spacing.screenHorizontal,
+                        top = spacing.md,
+                        bottom = spacing.md + bottomBarClearance
                     ),
                     verticalArrangement = Arrangement.spacedBy(spacing.sm)
                 ) {

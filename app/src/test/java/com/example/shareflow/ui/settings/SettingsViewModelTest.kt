@@ -1,5 +1,6 @@
 package com.example.shareflow.ui.settings
 
+import com.example.BuildConfig
 import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.testutil.FakeKeystoreCipher
 import com.example.shareflow.testutil.FakeSettingsRepository
@@ -67,5 +68,17 @@ class SettingsViewModelTest {
             viewModel.uiState.value.settings.cloudUpdateManifestUrl
         )
         assertEquals(SettingsFeedbackType.UPDATE_URL_SAVED, viewModel.uiState.value.feedbackEvent)
+    }
+
+    @Test
+    fun `build config exposes official ShareFlow update manifest and website HTTPS URLs`() {
+        assertEquals(
+            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            BuildConfig.CLOUD_UPDATE_MANIFEST_URL
+        )
+        assertEquals(
+            "https://ow7ab.github.io/Share-Flow-Releases/",
+            BuildConfig.CLOUD_UPDATE_PORTAL_URL
+        )
     }
 }

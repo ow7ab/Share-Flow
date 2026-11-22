@@ -233,6 +233,9 @@ fun ShareFlowTheme(
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !isDarkTheme
             insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+            window.decorView.setBackgroundColor(
+                if (isDarkTheme) 0xFF161114.toInt() else 0xFFFFF9F5.toInt()
+            )
         }
     }
 

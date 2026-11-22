@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.designsystem.components.ModuleDirectoryCard
 import com.example.shareflow.core.designsystem.components.SectionHeader
@@ -27,6 +29,7 @@ import com.example.shareflow.navigation.ShareFlowRoutes
 @Composable
 fun MediaScreen(
     onNavigateToRoute: (String) -> Unit,
+    bottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -41,8 +44,10 @@ fun MediaScreen(
                 .widthIn(max = spacing.maxContentWidth)
                 .testTag("media_screen_list"),
             contentPadding = PaddingValues(
-                horizontal = spacing.screenHorizontal,
-                vertical = spacing.md
+                start = spacing.screenHorizontal,
+                end = spacing.screenHorizontal,
+                top = spacing.md,
+                bottom = spacing.md + bottomBarClearance
             ),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {

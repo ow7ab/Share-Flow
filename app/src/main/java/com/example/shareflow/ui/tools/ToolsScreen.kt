@@ -75,6 +75,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ToolsScreen(
     onNavigateToRoute: (String) -> Unit,
+    bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -89,8 +90,10 @@ fun ToolsScreen(
                 .widthIn(max = spacing.maxContentWidth)
                 .testTag("tools_screen_list"),
             contentPadding = PaddingValues(
-                horizontal = spacing.screenHorizontal,
-                vertical = spacing.md
+                start = spacing.screenHorizontal,
+                end = spacing.screenHorizontal,
+                top = spacing.md,
+                bottom = spacing.md + bottomBarClearance
             ),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {

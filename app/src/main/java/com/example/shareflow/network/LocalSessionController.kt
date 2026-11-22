@@ -61,13 +61,19 @@ class LocalSessionController(
     private val _recentFiles = MutableStateFlow<List<LocalFileEntry>>(emptyList())
     val recentFiles: StateFlow<List<LocalFileEntry>> = _recentFiles.asStateFlow()
 
-    private val _networkStatus = MutableStateFlow(readNetworkStatus())
+    private val _networkStatus = MutableStateFlow(
+        DeviceNetworkStatus(isWifiConnected = false, localIpv4Address = null)
+    )
     val networkStatus: StateFlow<DeviceNetworkStatus> = _networkStatus.asStateFlow()
 
     fun refreshNetworkStatus(): DeviceNetworkStatus {
         val status = readNetworkStatus()
         _networkStatus.value = status
         return status
+    }
+
+    suspend fun refreshNetworkStatusAsync(): DeviceNetworkStatus = withContext(dispatchers.io) {
+        refreshNetworkStatus()
     }
 
     suspend fun startReceiving(deviceName: String, port: Int): AppResult<Unit> =

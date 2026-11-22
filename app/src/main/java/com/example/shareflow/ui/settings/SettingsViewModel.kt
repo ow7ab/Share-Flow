@@ -413,19 +413,9 @@ class SettingsViewModel(
 
     fun checkForCloudUpdates() {
         val updater = cloudUpdateManager ?: return
-        val draftUrl = _uiState.value.cloudUpdateUrlDraft.trim()
-        val persistedUrl = _uiState.value.settings.cloudUpdateManifestUrl.trim()
-        val targetUrl = draftUrl.ifEmpty { persistedUrl }
-        if (draftUrl.isNotEmpty() && !SettingsValidator.isValidOptionalHttpsUpdateUrl(draftUrl)) {
-            _uiState.update { it.copy(cloudUpdateUrlError = true) }
-            return
-        }
         activeUpdateJob?.cancel()
         activeUpdateJob = viewModelScope.launch {
-            if (draftUrl != persistedUrl && SettingsValidator.isValidOptionalHttpsUpdateUrl(draftUrl)) {
-                settingsRepository.updateCloudUpdateManifestUrl(draftUrl)
-            }
-            updater.checkForUpdates(targetUrl)
+            updater.checkForUpdates("")
         }
     }
 

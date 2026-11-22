@@ -213,4 +213,32 @@ class ShareFlowNavigationRobolectricTest {
         waitForTag("settings_list")
         composeTestRule.onNodeWithTag("settings_section_appearance").assertIsDisplayed()
     }
+
+    @Test
+    fun `unified glass bottom navigation bar stays consistently displayed across all five tabs and rapid switches`() {
+        waitForTag("home_send_button")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
+
+        val tabSequence = listOf(
+            "nav_item_files" to "files_screen_list",
+            "nav_item_media" to "media_screen_list",
+            "nav_item_tools" to "tools_screen_list",
+            "nav_item_settings" to "settings_list",
+            "nav_item_home" to "home_send_button",
+            // Rapid reverse & cross-tab switching
+            "nav_item_settings" to "settings_list",
+            "nav_item_files" to "files_screen_list",
+            "nav_item_tools" to "tools_screen_list",
+            "nav_item_media" to "media_screen_list",
+            "nav_item_home" to "home_send_button"
+        )
+
+        tabSequence.forEach { (navTag, screenTag) ->
+            composeTestRule.onNodeWithTag(navTag).performClick()
+            waitForTag(screenTag)
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
+        }
+    }
 }

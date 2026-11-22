@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -18,15 +17,12 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.BuildConfig
 import com.example.R
@@ -47,24 +43,19 @@ import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.data.update.CloudUpdateErrorReason
+import com.example.shareflow.data.update.CloudUpdateManager
 import com.example.shareflow.data.update.CloudUpdateManifest
 import com.example.shareflow.data.update.CloudUpdateState
 import com.example.shareflow.data.update.CloudUpdateValidator
 import kotlin.math.roundToInt
 
 /**
- * Dedicated Settings section for checking ShareFlow versions and installing cryptographically
- * verified HTTPS cloud updates from the upcoming Sudanese official download portal.
+ * Dedicated Settings section connected directly to the official ShareFlow HTTPS update website
+ * for one-tap version checking, SHA-256 verification, and Android system installer handoff.
  */
 @Composable
 fun CloudUpdateSettingsCard(
     updateState: CloudUpdateState,
-    portalUrlDraft: String,
-    persistedPortalUrl: String,
-    portalUrlError: Boolean,
-    isSaving: Boolean,
-    onPortalUrlDraftChange: (String) -> Unit,
-    onSavePortalUrl: () -> Unit,
     onCheckForUpdates: () -> Unit,
     onDownloadUpdate: (CloudUpdateManifest) -> Unit,
     onCancelDownload: () -> Unit,
@@ -76,6 +67,8 @@ fun CloudUpdateSettingsCard(
     val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
     val isArabicLocale = locale.language.equals("ar", ignoreCase = true)
+    val officialPortalUrl = BuildConfig.CLOUD_UPDATE_PORTAL_URL
+        .ifBlank { CloudUpdateManager.OFFICIAL_PORTAL_URL }
 
     fun openSafeHttpsWebsite(url: String?) {
         val candidate = url?.trim().orEmpty()
@@ -154,56 +147,72 @@ fun CloudUpdateSettingsCard(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Configurable HTTPS Official Sudanese Portal Manifest URL
-            OutlinedTextField(
-                value = portalUrlDraft,
-                onValueChange = onPortalUrlDraftChange,
-                label = { Text(stringResource(R.string.settings_update_portal_url_label)) },
-                placeholder = { Text(stringResource(R.string.settings_update_portal_url_placeholder)) },
-                shape = ShareFlowDesign.shapes.input,
-                colors = com.example.shareflow.core.designsystem.components.ShareFlowInputDefaults.outlinedTextFieldColors(),
-                isError = portalUrlError,
-                supportingText = if (portalUrlError) {
-                    { Text(stringResource(R.string.settings_update_portal_url_error)) }
-                } else null,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            // Direct Official ShareFlow Update Website source indicator (no manual URL entry required)
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("settings_update_url_input")
+                    .testTag("settings_update_official_source"),
+                shape = ShareFlowDesign.shapes.input,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.sm, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.VerifiedUser,
+                        contentDescription = null,
+                        tint = semantic.verifiedBadge,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_update_official_source_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CloudUpdateManager.OFFICIAL_PORTAL_HOST,
+                            style = ShareFlowMonoStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            PrimaryActionButton(
+                text = stringResource(R.string.settings_update_check_action),
+                onClick = onCheckForUpdates,
+                enabled = updateState !is CloudUpdateState.Checking &&
+                    updateState !is CloudUpdateState.Downloading &&
+                    updateState !is CloudUpdateState.Verifying,
+                isLoading = updateState is CloudUpdateState.Checking,
+                leadingIcon = Icons.Filled.Refresh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_check_updates_button")
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
-            ) {
-                if (portalUrlDraft.trim() != persistedPortalUrl.trim()) {
-                    SecondaryActionButton(
-                        text = stringResource(R.string.settings_save_action),
-                        onClick = onSavePortalUrl,
-                        enabled = !isSaving,
-                        outlined = true,
-                        leadingIcon = Icons.Filled.Save,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("settings_save_update_url_button")
-                    )
-                }
-                PrimaryActionButton(
-                    text = stringResource(R.string.settings_update_check_action),
-                    onClick = onCheckForUpdates,
-                    enabled = updateState !is CloudUpdateState.Checking &&
-                        updateState !is CloudUpdateState.Downloading &&
-                        updateState !is CloudUpdateState.Verifying,
-                    isLoading = updateState is CloudUpdateState.Checking,
-                    leadingIcon = Icons.Filled.Refresh,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("settings_check_updates_button")
-                )
-            }
+            SecondaryActionButton(
+                text = stringResource(R.string.settings_update_open_portal_action),
+                onClick = { openSafeHttpsWebsite(officialPortalUrl) },
+                outlined = true,
+                leadingIcon = Icons.Filled.Language,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_open_official_website_button")
+            )
 
             // Dynamic Cloud Update Status Panel
             when (updateState) {

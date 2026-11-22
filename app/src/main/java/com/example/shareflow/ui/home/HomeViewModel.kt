@@ -18,7 +18,10 @@ import com.example.shareflow.network.LocalSessionController
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface HomeUiState {
     data object Loading : HomeUiState
@@ -39,7 +42,7 @@ private data class HomePersistentSnapshot(
     val settings: AppSettings,
     val records: List<TransferRecord>,
     val trustedDevices: List<PeerDevice>,
-    val storageResult: AppResult<StorageSummary>
+    val storageResult: AppResult<StorageSummary>?
 )
 
 private data class HomeLiveSessionSnapshot(
@@ -59,11 +62,21 @@ class HomeViewModel(
     connectionRepository: com.example.shareflow.domain.repository.ConnectionRepository? = null
 ) : ViewModel() {
 
+    private val initialSettings: AppSettings = settingsRepository.peekInitialSettings()
+
+    init {
+        // Query real Wi-Fi/IPv4 status off the Main Thread right after HomeViewModel starts
+        viewModelScope.launch {
+            sessionController.refreshNetworkStatusAsync()
+        }
+    }
+
     private val persistentFlow = combine(
-        settingsRepository.settings,
-        transferHistoryRepository.observeAllRecords(),
-        trustedDeviceRepository.observeTrustedDevices(),
+        settingsRepository.settings.onStart { emit(initialSettings) },
+        transferHistoryRepository.observeAllRecords().onStart { emit(emptyList()) },
+        trustedDeviceRepository.observeTrustedDevices().onStart { emit(emptyList()) },
         storageAnalyzerRepository.observeStorageSummary()
+            .onStart<AppResult<StorageSummary>?> { emit(null) }
     ) { settings, records, trustedDevices, storageResult ->
         HomePersistentSnapshot(
             settings = settings,
@@ -87,6 +100,18 @@ class HomeViewModel(
         )
     }
 
+    private val initialReadyState = HomeUiState.Ready(
+        settings = initialSettings,
+        totalTransferCount = 0,
+        trustedDeviceCount = 0,
+        recentTransfers = emptyList(),
+        nearbyDevices = emptyList(),
+        recentFiles = sessionController.recentFiles.value.take(3),
+        storageSummary = null,
+        connectionState = connectionRepository?.connectionState?.value ?: sessionController.connectionState.value,
+        networkStatus = sessionController.networkStatus.value
+    )
+
     val uiState: StateFlow<HomeUiState> = combine(
         persistentFlow,
         liveSessionFlow
@@ -103,11 +128,13 @@ class HomeViewModel(
             connectionState = live.connectionState,
             networkStatus = live.networkStatus
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000L),
-        initialValue = HomeUiState.Loading
-    )
+    }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000L),
+            initialValue = initialReadyState
+        )
 
     fun selectFileForSend(file: LocalFileEntry) {
         sessionController.addSelectedFiles(listOf(file))

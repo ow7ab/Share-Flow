@@ -1148,20 +1148,21 @@
     <string name="receive_screen_awake_badge">الشاشة تبقى مضاءة</string>
     <string name="receive_hotspot_ready_ssid_format">الشبكة: %1$s</string>
 
-    <!-- فحص النسخة والتحديث السحابي وبوابة التحميل السودانية -->
+    <!-- فحص النسخة والتحديث السحابي والموقع الرسمي لتحديثات ShareFlow -->
     <string name="settings_section_cloud_update">فحص النسخة والتحديث السحابي</string>
-    <string name="settings_update_sudan_portal_badge">مهيأ لبوابة التحميل بالهوية السودانية</string>
-    <string name="settings_update_sudan_portal_desc">افحص وجود إصدارات جديدة وموثّقة من ShareFlow مباشرة عبر الموقع الإلكتروني السوداني الرسمي عند إطلاقه. تخضع جميع التحديثات لاتصال HTTPS والتحقق من SHA-256 وتطابق شهادة التوقيع.</string>
+    <string name="settings_update_sudan_portal_badge">متصل بالموقع الرسمي للتحديثات</string>
+    <string name="settings_update_sudan_portal_desc">افحص وثبّت إصدارات ShareFlow الموثّقة مباشرة من الموقع الرسمي للتحديثات دون الحاجة لإدخال أي رابط يدوياً. تخضع جميع التحديثات لاتصال HTTPS والتحقق من SHA-256 وتطابق شهادة التوقيع.</string>
     <string name="settings_update_current_version_label">النسخة المثبّتة حالياً</string>
+    <string name="settings_update_official_source_label">موقع التحديث الرسمي</string>
     <string name="settings_update_portal_url_label">رابط ملف التحديث السحابي للموقع (HTTPS)</string>
-    <string name="settings_update_portal_url_placeholder">https://your-sudan-portal.sd/shareflow/version.json</string>
-    <string name="settings_update_portal_url_error">أدخل رابط HTTPS عاماً وصالحاً (مثال: https://example.sd/version.json).</string>
+    <string name="settings_update_portal_url_placeholder">https://ow7ab.github.io/Share-Flow-Releases/version.json</string>
+    <string name="settings_update_portal_url_error">أدخل رابط HTTPS عاماً وصالحاً.</string>
     <string name="settings_update_check_action">فحص التحديثات الآن</string>
-    <string name="settings_update_checking_status">جارٍ فحص بوابة التحديث السحابي…</string>
+    <string name="settings_update_checking_status">جارٍ فحص موقع التحديث الرسمي…</string>
     <string name="settings_update_up_to_date_title">تطبيق ShareFlow محدث بالكامل</string>
     <string name="settings_update_up_to_date_body">أنت تستخدم أحدث إصدار موثّق حالياً: v%1$s (البناء %2$s).</string>
-    <string name="settings_update_not_configured_title">بوابة التحميل السودانية لم تُربط بعد</string>
-    <string name="settings_update_not_configured_body">أدخل رابط ملف الإصدارات HTTPS الخاص بالموقع السوداني أعلاه فور إطلاقه لتفعيل الفحص والتحديث السحابي المباشر.</string>
+    <string name="settings_update_not_configured_title">خدمة التحديث غير متاحة مؤقتاً</string>
+    <string name="settings_update_not_configured_body">تعذّر الوصول إلى خادم التحديث الرسمي حالياً. حاول مرة أخرى لاحقاً أو افتح الموقع الرسمي مباشرة.</string>
     <string name="settings_update_available_title">يتوفر إصدار جديد: v%1$s (البناء %2$s)</string>
     <string name="settings_update_release_notes_label">الجديد في هذا الإصدار</string>
     <string name="settings_update_download_action">تحميل التحديث والتحقق منه</string>

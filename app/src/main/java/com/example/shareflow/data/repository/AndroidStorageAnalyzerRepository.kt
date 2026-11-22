@@ -9,20 +9,28 @@ import com.example.shareflow.domain.model.StorageSummary
 import com.example.shareflow.domain.repository.StorageAnalyzerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 /**
  * Zero-permission real storage analyzer backed by Android's [StatFs].
- * Reports actual on-device internal storage capacity without requesting broad storage permissions.
+ * Reports actual on-device internal storage capacity without requesting broad storage permissions,
+ * executing filesystem inspection strictly off the Main Thread.
  */
 class AndroidStorageAnalyzerRepository(
     private val dispatchers: DispatcherProvider
 ) : StorageAnalyzerRepository {
 
-    private val storageState = MutableStateFlow<AppResult<StorageSummary>>(readStatFsSync())
+    private val storageState = MutableStateFlow<AppResult<StorageSummary>?>(null)
 
-    override fun observeStorageSummary(): Flow<AppResult<StorageSummary>> = storageState.asStateFlow()
+    override fun observeStorageSummary(): Flow<AppResult<StorageSummary>> = flow {
+        val current = storageState.value ?: refreshStorageSummary()
+        emit(current)
+        emitAll(storageState.filterNotNull())
+    }.distinctUntilChanged()
 
     override suspend fun refreshStorageSummary(): AppResult<StorageSummary> =
         withContext(dispatchers.io) {
