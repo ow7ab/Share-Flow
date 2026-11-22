@@ -44,6 +44,7 @@
 | `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح داخل Keystore (مثلاً `upload`) | **نعم** |
 | `EXPECTED_CERT_SHA256` | بصمة SHA-256 لشهادة التوقيع الدائمة (64 محرف Hex دون فواصل أو بنقطتين) لمنع أي انحراف في الشهادة | **نعم** |
 | `PUBLIC_RELEASES_TOKEN` | Fine-grained Personal Access Token مقيّد **فقط** بمستودع `ow7ab/Share-Flow-Releases` بصلاحية `Contents: Read and write` (و`Metadata: Read-only`) | **نعم** |
+| `ANDROID_DEBUG_KEYSTORE_BASE64` | محتوى `debug.keystore` الدائم بصيغة Base64 لتثبيت توقيع نسخ الاختبار (`blank.yml`) بشكل دائم دون انتهاء صلاحية الكاش | اختياري (موصى به لنسخ Debug) |
 
 > **لا تقم أبداً** بوضع `PUBLIC_RELEASES_TOKEN` أو أي مفتاح داخل `docs/` أو شيفرة المتصفح. يعمل الموقع العام بالوصول غير المصادق إلى `https://api.github.com/repos/ow7ab/Share-Flow-Releases/releases/latest`.
 
@@ -122,7 +123,7 @@
 للسماح لنظام Android بتثبيت التحديث الجديد مباشرة فوق النسخة المثبّتة (**تحديث / Update**) دون حذف النسخة القديمة ودون فقدان بيانات المستخدم، يفرض Android ثلاثة شروط إلزامية:
 
 1. **تطابق شهادة التوقيع (Same Signing Certificate):**
-   - **نسخ الاختبار (`Debug APK` عبر `blank.yml` أو AI Studio):** يفك `.github/workflows/blank.yml` تشفير المفتاح الدائم `debug.keystore.base64` ويتحقق من مطابقة بصمة SHA-256 عبر `apksigner` في كل بناء، دون إنشاء مفتاح عشوائي جديد أبداً. لذلك يتحدّث أي `Debug APK` جديد مباشرة فوق أي `Debug APK` سابق.
+   - **نسخ الاختبار (`Debug APK` عبر `blank.yml`):** يقرأ سير العمل المفتاح الدائم وفق الأولوية التالية: السر `ANDROID_DEBUG_KEYSTORE_BASE64` ← ملف `debug.keystore.base64` إن وُجد ← نسخة `debug.keystore` المحفوظة في كاش GitHub Actions (`shareflow-ci-debug-keystore-v1`)، ثم يتحقق عبر `apksigner` من مطابقة بصمة SHA-256 في كل بناء. ولضمان استمرارية دائمة لا تتأثر بانتهاء الكاش (بعد 7 أيام من عدم النشاط)، أضف السر `ANDROID_DEBUG_KEYSTORE_BASE64` في إعدادات المستودع.
    - **نسخ الإنتاج الرسمية (`Release APK` عبر `release.yml` والموقع):** يوقّع `.github/workflows/release.yml` دائماً بالمفتاح الإنتاجي الدائم `ANDROID_KEYSTORE_BASE64` ويتحقق من مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق قبل النشر. لذلك يتحدّث أي `Release APK` جديد مباشرة فوق الإصدار السابق.
    - **ملاحظة انتقال لمرة واحدة فقط:** إذا كانت النسخة المثبّتة حالياً على هاتفك مبنية بمفتاح مختلف (مثلاً نسخة `Debug` قديمة قبل الإصلاح أو عند الانتقال الأول من `Debug` إلى `Release`)، فسيطلب Android حذفها **مرة واحدة فقط** عند الانتقال، وبعدها ستتحدّث جميع الإصدارات اللاحقة من نفس المسار مباشرة دون حذف التطبيق أبداً.
 2. **تطابق معرّف الحزمة (`applicationId`):** ثابت دائماً على `com.aistudio.shareflow.kxrvnm`.

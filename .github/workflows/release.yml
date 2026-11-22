@@ -220,10 +220,27 @@ jobs:
       - name: Run full Android unit and Robolectric test suite
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          if [ -s "./debug.keystore.base64" ] && [ ! -s "./debug.keystore" ]; then
-            tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
+          if [ ! -s "./debug.keystore" ]; then
+            if [ -n "$DEBUG_KEYSTORE_B64" ]; then
+              printf '%s' "$DEBUG_KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > "./debug.keystore"
+            elif [ -s "./debug.keystore.base64" ]; then
+              tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
+            else
+              # Test-only debug keystore for :app:testDebugUnitTest (never used for Release APK signing)
+              keytool -genkeypair -v \
+                -keystore "./debug.keystore" \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+            fi
             chmod 600 "./debug.keystore"
           fi
           ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon

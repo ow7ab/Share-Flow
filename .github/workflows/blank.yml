@@ -68,32 +68,69 @@ jobs:
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: chmod +x ./gradlew
 
+      - name: Restore persistent CI debug keystore cache (fallback when secret is not set)
+        uses: actions/cache@v4
+        with:
+          path: ~/.shareflow-ci-keystore
+          key: shareflow-ci-debug-keystore-v1
+
       - name: Restore permanent project debug keystore for in-place APK updates
         id: prepare_debug_keystore
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
 
-          if [ ! -s "./debug.keystore.base64" ]; then
-            echo "::error::debug.keystore.base64 is missing or empty. Refusing to generate an ephemeral random debug keystore because that breaks in-place Android updates."
-            exit 1
+          CACHE_DIR="${HOME}/.shareflow-ci-keystore"
+          CACHED_KEYSTORE="${CACHE_DIR}/debug.keystore"
+          KEYSTORE_SOURCE=""
+
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
+            # Priority 1: Permanent GitHub Secret (never expires, never written to cache)
+            printf '%s' "$DEBUG_KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > "./debug.keystore"
+            KEYSTORE_SOURCE="GitHub Secret (ANDROID_DEBUG_KEYSTORE_BASE64)"
+          elif [ -s "./debug.keystore.base64" ]; then
+            # Priority 2: Repository-bundled permanent debug.keystore.base64
+            tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
+            KEYSTORE_SOURCE="Repository file (debug.keystore.base64)"
+          elif [ -s "$CACHED_KEYSTORE" ]; then
+            # Priority 3: Persistent cached CI debug keystore across runs
+            cp -f "$CACHED_KEYSTORE" "./debug.keystore"
+            KEYSTORE_SOURCE="GitHub Actions persistent cache (shareflow-ci-debug-keystore-v1)"
+            echo "::warning::Using cached CI debug keystore. For permanent non-expiring Debug APK updates (and exact parity with AI Studio builds), configure GitHub Secret ANDROID_DEBUG_KEYSTORE_BASE64."
+          else
+            # Priority 4: Generate one reusable standard Android debug keystore and cache it for subsequent runs
+            mkdir -p "$CACHE_DIR"
+            chmod 700 "$CACHE_DIR"
+            keytool -genkeypair -v \
+              -keystore "$CACHED_KEYSTORE" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+            chmod 600 "$CACHED_KEYSTORE"
+            cp -f "$CACHED_KEYSTORE" "./debug.keystore"
+            KEYSTORE_SOURCE="Newly initialized cached CI debug keystore"
+            echo "::warning::Initialized cached CI debug keystore because neither ANDROID_DEBUG_KEYSTORE_BASE64 nor debug.keystore.base64 was present. Set GitHub Secret ANDROID_DEBUG_KEYSTORE_BASE64 to prevent cache eviction from ever changing the debug certificate."
           fi
 
-          # Decode the repository's permanent debug keystore (identical to AI Studio builds)
-          # so every Debug APK update installs directly over previous versions without uninstalling.
-          tr -d '\r\n' < "./debug.keystore.base64" | base64 --decode > "./debug.keystore"
           chmod 600 "./debug.keystore"
 
           KEYSTORE_CERT_SHA256=$(keytool -list -v -keystore "./debug.keystore" -storepass android -alias androiddebugkey \
             | awk -F'SHA256: ' '/SHA256:/ {gsub(/[:[:space:]]/, "", $2); print tolower($2); exit}')
 
           if [ -z "$KEYSTORE_CERT_SHA256" ] || [ "${#KEYSTORE_CERT_SHA256}" -ne 64 ]; then
-            echo "::error::Failed to verify permanent androiddebugkey certificate inside debug.keystore.base64."
+            echo "::error::Failed to verify androiddebugkey certificate inside debug keystore (${KEYSTORE_SOURCE})."
             exit 1
           fi
 
-          echo "Verified permanent debug signing certificate SHA-256: $KEYSTORE_CERT_SHA256"
+          echo "Keystore source: $KEYSTORE_SOURCE"
+          echo "Verified debug signing certificate SHA-256: $KEYSTORE_CERT_SHA256"
           echo "expected_debug_cert_sha256=$KEYSTORE_CERT_SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Build Android Debug APK (permanent project debugConfig signing)
