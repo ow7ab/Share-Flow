@@ -80,33 +80,49 @@
 
 ---
 
-## 4. تشغيل النشر الإنتاجي (Controlled Release Workflow)
+## 4. تشغيل النشر الإنتاجي المؤتمت بالكامل (Automated Release Workflow)
 
 لا يقوم `.github/workflows/release.yml` بنشر إصدار تلقائياً عند كل commit عادي على `main`؛ بل يعمل فقط عند:
-1. **دفع وسم إصدار دلالي (Semantic Tag):** مثل `v1.0.12` (يجب أن يطابق `versionName` في `app/build.gradle.kts`):
+1. **دفع وسم إصدار دلالي تلقائي (`vX.Y.Z`):** في مستودع `ow7ab/Share-Flow` (يجب أن يطابق `versionName` في `app/build.gradle.kts` مع زيادة `versionCode`):
    ```bash
    git tag -a v1.0.12 -m "Share Flow v1.0.12 (Build 13)"
    git push origin v1.0.12
    ```
-2. **التشغيل اليدوي المحكوم (`workflow_dispatch`):** من تبويب **Actions → ShareFlow Production Release (Private Source -> Public APK & Pages) → Run workflow** مع إدخال ملاحظات الإصدار بالعربية والإنجليزية.
+   عند دفع الوسم دون ملاحظات يدوية، يستخرج `scripts/release_helpers.py` ملاحظات الإصدار تلقائياً من رسالة الوسم أو سجل الـ Commits منذ آخر إصدار.
+2. **التشغيل اليدوي المحكوم (`workflow_dispatch`):** من تبويب **Actions → ShareFlow Production Release & Public APK Distribution → Run workflow** مع خيارات:
+   - `release_tag`: اختياري (يقرأ `versionName` من `app/build.gradle.kts` تلقائياً إذا تُرك فارغاً).
+   - `release_notes_ar` / `release_notes_en`: اختيارية.
+   - `mandatory_update`: لتحديد هل التحديث إجباري في `version.json`.
+   - `sync_public_website`: لتحديث الموقع و`version.json` تلقائياً بعد النشر (مفعّل افتراضياً).
+   - `dry_run`: **وضع الاختبار الآمن** — ينفّذ جميع فحوصات الأمان، التحقق قبل البناء، الاختبارات، بناء APK/AAB، التوقيع، فحص `apksigner`/`zipalign`/`aapt2`، وتوليد وفحص `version.json` **دون نشر أي إصدار عام أو تعديل الموقع**.
 
-### ما يتحقق منه سير العمل تلقائياً قبل أي نشر:
-1. وجود جميع الأسرار الستة والمتغير `PUBLIC_RELEASES_REPO`، ومنع تطابق مستودع التوزيع مع المستودع الخاص.
-2. التحقق عبر GitHub API أن `ow7ab/Share-Flow-Releases` مستودع **Public** فعلاً وأن وسم الإصدار المطلوب **غير موجود مسبقاً** (لا يتم الكتابة فوق أي إصدار سابق أبداً).
-3. فك تشفير Keystore داخل `${RUNNER_TEMP}` بصلاحية `600` والتحقق من `PrivateKeyEntry` عبر `keytool -storepass:env`.
-4. اجتياز اختبارات بوابة التحميل (`node --test ./scripts/test-portal.js`) وفحص قائمة السماح والأسرار (`bash ./scripts/sync-public-docs.sh --dry-run`).
-5. اجتياز اختبارات وحدة Android (`./gradlew :app:testDebugUnitTest`).
-6. بناء Release APK وAAB (`./gradlew :app:assembleRelease :app:bundleRelease`).
-7. التحقق الصارم عبر:
-   - `apksigner verify --verbose --print-certs` + مطابقة `EXPECTED_CERT_SHA256`.
+### ما يتحقق منه سير العمل تلقائياً وبشكل ذرّي (Atomic & Fail-Fast):
+1. **منع التزامن (`concurrency`):** `group: shareflow-production-release` مع `cancel-in-progress: false` لمنع تشغيل عمليتي إصدار متزامنتين أو قطع عملية نشر جارية.
+2. **التحقق من الأسرار والمستودع العام:** وجود `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_PASSWORD`, `PUBLIC_RELEASES_TOKEN` (عند النشر الفعلي)، ومنع تطابق المستودع العام مع المستودع الخاص.
+3. **الفحص قبل البناء (`validate-prebuild` في `scripts/release_helpers.py`):** قبل تشغيل Gradle، يتحقق من:
+   - أن `ow7ab/Share-Flow-Releases` عام (`Public`) وأن الوسم `vX.Y.Z` غير منشور مسبقاً.
+   - ثبات `applicationId = com.aistudio.shareflow.kxrvnm`.
+   - صحة `versionName` (صيغة `X.Y.Z`) وتطابقه مع `release_tag`.
+   - زيادة `versionCode` بصرامة مقارنة بآخر `version.json` منشور.
+4. فك تشفير Keystore الأصلي داخل `${RUNNER_TEMP}` بصلاحية `600` والتحقق من `PrivateKeyEntry` عبر `keytool -storepass:env`.
+5. اجتياز اختبارات بوابة التحميل (`node --test ./scripts/test-portal.js`)، واختبارات سير عمل الإصدار (`node --test ./scripts/test-release-workflow.js`)، وفحص قائمة السماح والأسرار (`bash ./scripts/sync-public-docs.sh --dry-run`).
+6. اجتياز اختبارات وحدة Android (`./gradlew :app:testDebugUnitTest`).
+7. بناء Release APK وAAB (`./gradlew :app:assembleRelease :app:bundleRelease`) دون تعديل `applicationId` أو إعدادات التوقيع.
+8. التحقق الصارم بعد البناء عبر:
+   - `apksigner verify --verbose --print-certs` + مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق (`verify-postbuild`).
    - `zipalign -c -v 4`.
    - `aapt2 dump badging` (تطابق `com.aistudio.shareflow.kxrvnm`، تطابق `v${VERSION_NAME}` مع الوسم، ووجود النشاط الرئيسي).
    - `jarsigner -verify -strict` لملف AAB.
-   - عدم تراجع `versionCode` وعدم تغيّر شهادة التوقيع مقارنة بآخر `version.json` منشور.
-8. رفع `Share-Flow.apk` (بشكل مستقل دون ZIP)، و`Share-Flow.apk.sha256`، و`version.json` إلى `ow7ab/Share-Flow-Releases` عبر GitHub Releases (`--latest`).
-9. التحقق الفعلي (غير المصادق) عبر `curl -fsSLI` أن الرابط `https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk` يُرجع ملف APK ثنائياً مطابق الحجم وليس صفحة HTML أو 404.
-10. مزامنة مجلد `/docs` الثابت فقط (مع نسختي `version.json` و`latest-release.json`) إلى فرع `main` في `ow7ab/Share-Flow-Releases`.
-11. حذف Keystore المؤقت والملفات الحساسة دائماً (`if: always()`).
+   - توليد `version.json` موحّد (`versionCode`, `versionName`, `apkUrl`, `apkDownloadUrl`, `releaseNotes`, `sha256`, ...) والتحقق المباشر من قبوله داخل محلل الموقع `docs/app.js`.
+9. **نشر ذرّي آمن (`Draft → Verify → Promote`):**
+   - إنشاء الإصدار كـ **مسودة (`--draft`)** ورفع `Share-Flow.apk` (بلا ZIP) و`Share-Flow.apk.sha256` و`version.json`.
+   - فحص وجود الملفات الثلاثة ومطابقة حجم `Share-Flow.apk` وعدم وجود أي ملف `.zip` **قبل الظهور للجمهور**.
+   - عند أي خطأ، يُفعَّل `trap cleanup_failed_draft ERR` لحذف المسودة الناقصة تلقائياً دون تعريض أي إصدار ناقص أو تحديث الموقع.
+   - بعد اجتياز التحقق فقط، تتم ترقية المسودة (`--draft=false --latest`).
+10. التحقق الفعلي (غير المصادق، مع 3 محاولات متباعدة) عبر `curl -fsSLI` أن رابط التحميل المباشر لـ `Share-Flow.apk` يُرجع ملف APK ثنائياً مطابق الحجم.
+11. مزامنة مجلد `/docs` الثابت مع `version.json` و`latest-release.json` إلى `ow7ab/Share-Flow-Releases` لتحديث الموقع الرسمي وسجل الإصدارات تلقائياً (فقط بعد نجاح النشر).
+12. كتابة **ملخص النشر النهائي (`$GITHUB_STEP_SUMMARY`)** يتضمن حالة التشغيل، رقم الإصدار والبناء، رابط APK المباشر، رابط الموقع، رابط `version.json`، وبصمات SHA-256.
+13. حذف Keystore المؤقت والملفات الحساسة دائماً عبر `shred` (`if: always()`).
 
 ---
 

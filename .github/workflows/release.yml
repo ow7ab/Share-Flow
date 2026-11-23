@@ -7,24 +7,36 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Optional version tag (leave empty to auto-read versionName from app/build.gradle.kts, e.g. v1.0.11)"
+        description: "Optional version tag (leave empty to auto-read versionName from app/build.gradle.kts, e.g. v1.0.12)"
         required: false
         default: ""
         type: string
       release_notes_ar:
-        description: "ملاحظات الإصدار بالعربية (اختياري)"
+        description: "ملاحظات الإصدار بالعربية (اختياري — تُستخرج تلقائياً من Tag/Commits عند تركها فارغة)"
         required: false
         default: ""
       release_notes_en:
-        description: "English release notes (optional)"
+        description: "English release notes (optional — auto-extracted from tag/commits when empty)"
         required: false
         default: ""
+      mandatory_update:
+        description: "Mark this release as a mandatory update in version.json"
+        required: false
+        default: false
+        type: boolean
       sync_public_website:
-        description: "Synchronize static docs/ website to public repository after release"
+        description: "Synchronize static docs/ website and version.json to public repository after release"
         required: false
         default: true
         type: boolean
+      dry_run:
+        description: "Safe test mode: validate, test, build & sign locally WITHOUT publishing a public GitHub Release or updating the website"
+        required: false
+        default: false
+        type: boolean
 
+# Serialize production releases globally (prevents concurrent runs for the same version or racing docs/version.json updates).
+# cancel-in-progress is false so an active release is never terminated mid-flight.
 concurrency:
   group: shareflow-production-release
   cancel-in-progress: false
@@ -56,18 +68,28 @@ jobs:
           EXPECTED_CERT: ${{ secrets.EXPECTED_CERT_SHA256 }}
           PUB_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           PUB_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
+          PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
           SOURCE_REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
           INPUT_TAG: ${{ github.event.inputs.release_tag || '' }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || false }}
         run: |
           set -euo pipefail
+
+          DRY_RUN="false"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_DRY_RUN" = "true" ]; then
+            DRY_RUN="true"
+            echo "Running in SAFE DRY-RUN mode: no public GitHub Release or website changes will be published."
+          fi
 
           MISSING=()
           [ -z "$KEYSTORE_B64" ] && MISSING+=("Secret: ANDROID_KEYSTORE_BASE64")
           [ -z "$STORE_PW" ] && MISSING+=("Secret: ANDROID_STORE_PASSWORD")
           [ -z "$KEY_PW" ] && MISSING+=("Secret: ANDROID_KEY_PASSWORD")
-          [ -z "$PUB_TOKEN" ] && MISSING+=("Secret: PUBLIC_RELEASES_TOKEN")
+          if [ "$DRY_RUN" != "true" ]; then
+            [ -z "$PUB_TOKEN" ] && MISSING+=("Secret: PUBLIC_RELEASES_TOKEN")
+          fi
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "::error::Missing required production release secrets in ${SOURCE_REPO} (Settings -> Secrets and variables -> Actions -> Repository secrets):"
@@ -104,35 +126,15 @@ jobs:
           fi
 
           if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.11)."
+            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.12)."
             exit 1
           fi
 
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "public_repo=${PUB_REPO}" >> "$GITHUB_OUTPUT"
+          echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
           echo "key_alias=${RESOLVED_ALIAS}" >> "$GITHUB_OUTPUT"
-
-      - name: Verify public destination repository visibility and non-duplicate release tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
-          RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-
-          IS_PRIVATE=$(gh repo view "$PUBLIC_REPO" --json isPrivate --jq '.isPrivate')
-          if [ "$IS_PRIVATE" != "false" ]; then
-            echo "::error::Destination repository '${PUBLIC_REPO}' is not public (isPrivate=${IS_PRIVATE}). Public APK distribution requires a public releases repository."
-            exit 1
-          fi
-
-          if gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" >/dev/null 2>&1; then
-            echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and tag a new release."
-            exit 1
-          fi
-
-          echo "Verified '${PUBLIC_REPO}' is public and release tag '${RELEASE_TAG}' is available."
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
 
       - name: Locate Android Gradle project root and verify wrapper
         id: locate_project
@@ -159,6 +161,61 @@ jobs:
           fi
 
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Verify public destination repository, non-duplicate tag, and pre-build versionCode/versionName
+        id: prebuild_version_check
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
+          PORTAL_URL: ${{ steps.validate_config.outputs.portal_url }}
+          RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
+          DRY_RUN: ${{ steps.validate_config.outputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          PREV_MANIFEST="${RUNNER_TEMP}/prev-published-version.json"
+          rm -f "$PREV_MANIFEST"
+
+          if [ -n "${GH_TOKEN:-}" ]; then
+            IS_PRIVATE=$(gh repo view "$PUBLIC_REPO" --json isPrivate --jq '.isPrivate')
+            if [ "$IS_PRIVATE" != "false" ]; then
+              echo "::error::Destination repository '${PUBLIC_REPO}' is not public (isPrivate=${IS_PRIVATE}). Public APK distribution requires a public releases repository."
+              exit 1
+            fi
+
+            if gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" >/dev/null 2>&1; then
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "::warning::[DRY-RUN] Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'."
+              else
+                echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and tag a new release."
+                exit 1
+              fi
+            fi
+
+            gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1 || true
+          fi
+
+          # Fallback to public HTTPS version.json if gh token is absent (dry-run) or release asset wasn't found yet
+          if [ ! -s "$PREV_MANIFEST" ]; then
+            curl -fsSL --max-time 10 "${PORTAL_URL%/}/version.json" -o "$PREV_MANIFEST" >/dev/null 2>&1 || rm -f "$PREV_MANIFEST"
+          fi
+
+          PREBUILD_ARGS=(
+            --gradle "./app/build.gradle.kts"
+            --release-tag "$RELEASE_TAG"
+            --github-output "$GITHUB_OUTPUT"
+          )
+          if [ -s "$PREV_MANIFEST" ]; then
+            PREBUILD_ARGS+=(--prev-manifest "$PREV_MANIFEST")
+            echo "prev_manifest_path=${PREV_MANIFEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "prev_manifest_path=" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Fail fast BEFORE running Gradle if applicationId, versionName, tag sync, or monotonic versionCode is invalid
+          python3 ./scripts/release_helpers.py validate-prebuild "${PREBUILD_ARGS[@]}"
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
@@ -217,12 +274,15 @@ jobs:
             echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
           fi
 
-      - name: Run download portal and public sync safety tests
+      - name: Run download portal, release pipeline, and public sync safety tests
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: |
           set -euo pipefail
           node --test ./scripts/test-portal.js
+          if [ -f "./scripts/test-release-workflow.js" ]; then
+            node --test ./scripts/test-release-workflow.js
+          fi
           bash ./scripts/sync-public-docs.sh --dry-run
 
       - name: Run full Android unit and Robolectric test suite
@@ -268,18 +328,19 @@ jobs:
           fi
           ./gradlew :app:assembleRelease :app:bundleRelease "${EXTRA_ARGS[@]}" --stacktrace --no-daemon
 
-      - name: Verify APK signature, certificate pin, alignment, version sync, monotonic versionCode, and generate manifest
+      - name: Verify APK signature, certificate pin, alignment, version sync, and generate version.json
         id: verify_outputs
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           EXPECTED_CERT_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
-          PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
+          PORTAL_URL: ${{ steps.validate_config.outputs.portal_url }}
+          PREV_MANIFEST: ${{ steps.prebuild_version_check.outputs.prev_manifest_path }}
           INPUT_NOTES_AR: ${{ github.event.inputs.release_notes_ar || '' }}
           INPUT_NOTES_EN: ${{ github.event.inputs.release_notes_en || '' }}
+          INPUT_MANDATORY: ${{ github.event.inputs.mandatory_update || false }}
         run: |
           set -euo pipefail
 
@@ -364,28 +425,12 @@ jobs:
           AAB_ABS=$(realpath "$RELEASE_AAB")
           jarsigner -verify -strict "$AAB_ABS" >/dev/null
 
-          # 5. Strictly enforce monotonic increasing versionCode (never downgrade or reuse versionCode)
-          PREV_MANIFEST="${STAGE_DIR}/prev-version.json"
-          if gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1; then
-            VERSION_CODE="$VERSION_CODE" PREV_MANIFEST="$PREV_MANIFEST" CERT_SHA256="$CERT_SHA256" python3 - <<'PYEOF'
-          import json, os, sys
-          with open(os.environ["PREV_MANIFEST"], "r", encoding="utf-8") as f:
-              prev = json.load(f)
-          prev_code = int(prev.get("versionCode", 0))
-          new_code = int(os.environ["VERSION_CODE"])
-          if new_code <= prev_code:
-              print(f"::error::Production versionCode must strictly increase: new versionCode ({new_code}) <= latest published versionCode ({prev_code}).")
-              sys.exit(1)
-          prev_cert = str(prev.get("signingCertSha256", "")).strip().lower()
-          if prev_cert and prev_cert != os.environ["CERT_SHA256"].strip().lower():
-              print("::error::Signing certificate differs from previous published production release! Aborting to preserve user upgrades.")
-              sys.exit(1)
-          print(f"Verified monotonic upgrade compatibility (versionCode {prev_code} -> {new_code}, certificate unchanged).")
-          PYEOF
-            rm -f "$PREV_MANIFEST"
-          else
-            echo "No prior version.json found in ${PUBLIC_REPO}; treating ${RELEASE_TAG} as initial public release."
+          # 5. Double-check monotonic versionCode & unchanged signing cert against previous release
+          POSTBUILD_ARGS=(--version-code "$VERSION_CODE" --cert-sha256 "$CERT_SHA256")
+          if [ -n "${PREV_MANIFEST:-}" ] && [ -s "$PREV_MANIFEST" ]; then
+            POSTBUILD_ARGS+=(--prev-manifest "$PREV_MANIFEST")
           fi
+          python3 ./scripts/release_helpers.py verify-postbuild "${POSTBUILD_ARGS[@]}"
 
           # 6. Compute SHA-256 and exact byte size
           APK_SHA256=$(sha256sum "$FIXED_APK" | awk '{print $1}')
@@ -395,71 +440,47 @@ jobs:
           PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           DIRECT_APK_URL="https://github.com/${PUBLIC_REPO}/releases/download/${RELEASE_TAG}/Share-Flow.apk"
           LATEST_APK_URL="https://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk"
+          MANIFEST_PATH="${STAGE_DIR}/version.json"
 
-          # 7. Generate and validate unified version.json for official website and in-app CloudUpdateManager
-          VERSION_CODE="$VERSION_CODE" \
-          VERSION_NAME="$VERSION_NAME" \
-          DIRECT_APK_URL="$DIRECT_APK_URL" \
-          LATEST_APK_URL="$LATEST_APK_URL" \
-          APK_SHA256="$APK_SHA256" \
-          APK_SIZE="$APK_SIZE" \
-          MIN_SDK="${MIN_SDK:-24}" \
-          PUBLISHED_AT="$PUBLISHED_AT" \
-          RELEASE_TAG="$RELEASE_TAG" \
-          CERT_SHA256="$CERT_SHA256" \
-          STAGE_DIR="$STAGE_DIR" \
-          python3 - <<'PYEOF'
-          import json, os
-
-          v_name = os.environ["VERSION_NAME"]
-          v_code = int(os.environ["VERSION_CODE"])
-          notes_ar = os.environ.get("INPUT_NOTES_AR", "").strip() or (
-              f"إصدار رسمي موقّع وموثّق من تطبيق Share Flow (النسخة {v_name} - بناء {v_code}) جاهز للتثبيت المباشر."
+          # 7. Generate unified version.json (with auto-extracted tag/commit release notes if manual notes are blank)
+          MANIFEST_ARGS=(
+            --version-code "$VERSION_CODE"
+            --version-name "$VERSION_NAME"
+            --apk-url "$LATEST_APK_URL"
+            --apk-download-url "$DIRECT_APK_URL"
+            --sha256 "$APK_SHA256"
+            --file-size "$APK_SIZE"
+            --min-sdk "${MIN_SDK:-24}"
+            --published-at "$PUBLISHED_AT"
+            --release-tag "$RELEASE_TAG"
+            --cert-sha256 "$CERT_SHA256"
+            --portal-url "$PORTAL_URL"
+            --notes-ar "$INPUT_NOTES_AR"
+            --notes-en "$INPUT_NOTES_EN"
+            --repo-dir "."
+            --output "$MANIFEST_PATH"
           )
-          notes_en = os.environ.get("INPUT_NOTES_EN", "").strip() or (
-              f"Verified signed Share Flow Android release (v{v_name}, build {v_code}) ready for direct APK installation."
-          )
-          release_notes_list = [
-              line.lstrip("-*• ").strip()
-              for line in notes_ar.splitlines()
-              if line.strip()
-          ] or [notes_ar]
+          if [ "$INPUT_MANDATORY" = "true" ]; then
+            MANIFEST_ARGS+=(--mandatory)
+          fi
+          python3 ./scripts/release_helpers.py build-manifest "${MANIFEST_ARGS[@]}"
 
-          manifest = {
-              "versionCode": v_code,
-              "versionName": v_name,
-              "apkUrl": os.environ["LATEST_APK_URL"],
-              "apkDownloadUrl": os.environ["DIRECT_APK_URL"],
-              "latestApkDownloadUrl": os.environ["LATEST_APK_URL"],
-              "sha256": os.environ["APK_SHA256"],
-              "fileSizeBytes": int(os.environ["APK_SIZE"]),
-              "minSupportedAndroidSdk": int(os.environ.get("MIN_SDK", "24")),
-              "mandatory": False,
-              "releaseNotes": release_notes_list,
-              "releaseNotesAr": notes_ar,
-              "releaseNotesEn": notes_en,
-              "portalUrl": os.environ.get("PORTAL_URL", "https://ow7ab.github.io/Share-Flow-Releases/"),
-              "publishedAt": os.environ["PUBLISHED_AT"],
-              "releaseTag": os.environ["RELEASE_TAG"],
-              "signingCertSha256": os.environ["CERT_SHA256"],
-          }
-
-          assert manifest["versionCode"] > 0
-          assert len(manifest["sha256"]) == 64
-          assert manifest["apkUrl"].startswith("https://")
-          assert manifest["apkUrl"].endswith("/Share-Flow.apk")
-          assert manifest["apkDownloadUrl"].startswith("https://")
-          assert manifest["apkDownloadUrl"].endswith("/Share-Flow.apk")
-
-          out_path = os.path.join(os.environ["STAGE_DIR"], "version.json")
-          with open(out_path, "w", encoding="utf-8") as f:
-              json.dump(manifest, f, ensure_ascii=False, indent=2)
-          print("Generated and validated unified version.json successfully.")
-          PYEOF
+          # 8. Cross-verify generated version.json directly with the website parser (docs/app.js)
+          MANIFEST_PATH="$MANIFEST_PATH" node -e '
+            const fs = require("node:fs");
+            const assert = require("node:assert/strict");
+            const portal = require("./docs/app.js");
+            const raw = JSON.parse(fs.readFileSync(process.env.MANIFEST_PATH, "utf8"));
+            const parsed = portal.normalizeCustomManifest(raw);
+            assert.equal(parsed.status, "ready", "Website parser rejected generated version.json!");
+            assert.equal(parsed.data.sha256, raw.sha256);
+            assert.equal(parsed.data.buildNumber, raw.versionCode);
+            console.log("Verified version.json compatibility with docs/app.js:", parsed.data.versionLabel);
+          '
 
           echo "apk_path=${FIXED_APK}" >> "$GITHUB_OUTPUT"
           echo "sha_path=${STAGE_DIR}/Share-Flow.apk.sha256" >> "$GITHUB_OUTPUT"
-          echo "manifest_path=${STAGE_DIR}/version.json" >> "$GITHUB_OUTPUT"
+          echo "manifest_path=${MANIFEST_PATH}" >> "$GITHUB_OUTPUT"
           echo "aab_path=${AAB_ABS}" >> "$GITHUB_OUTPUT"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
@@ -467,12 +488,15 @@ jobs:
           echo "apk_size=${APK_SIZE}" >> "$GITHUB_OUTPUT"
           echo "cert_sha256=${CERT_SHA256}" >> "$GITHUB_OUTPUT"
           echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
+          echo "direct_apk_url=${DIRECT_APK_URL}" >> "$GITHUB_OUTPUT"
+          echo "latest_apk_url=${LATEST_APK_URL}" >> "$GITHUB_OUTPUT"
           if [ -n "$MAPPING_TXT" ]; then
             echo "mapping_path=$(realpath "$MAPPING_TXT")" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish verified Share-Flow.apk to public repository (ow7ab/Share-Flow-Releases)
+      - name: Atomically publish verified Share-Flow.apk to public repository (Draft -> Verify -> Promote)
         id: publish_public_release
+        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
@@ -487,12 +511,10 @@ jobs:
           APK_PATH: ${{ steps.verify_outputs.outputs.apk_path }}
           SHA_PATH: ${{ steps.verify_outputs.outputs.sha_path }}
           MANIFEST_PATH: ${{ steps.verify_outputs.outputs.manifest_path }}
-          INPUT_NOTES_AR: ${{ github.event.inputs.release_notes_ar || '' }}
-          INPUT_NOTES_EN: ${{ github.event.inputs.release_notes_en || '' }}
         run: |
           set -euo pipefail
 
-          # Final race-condition duplicate guard before creating release
+          # Final race-condition duplicate guard before creating draft release
           if gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" >/dev/null 2>&1; then
             echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Aborting to preserve immutable release history."
             exit 1
@@ -500,29 +522,64 @@ jobs:
 
           SIZE_MB=$(APK_SIZE="$APK_SIZE" python3 -c "import os; print(f'{int(os.environ[\"APK_SIZE\"]) / (1024 * 1024):.2f} MB')")
           NOTES_FILE="${RUNNER_TEMP}/release-notes.md"
-          EXTRA_NOTES=""
-          if [ -n "$INPUT_NOTES_AR" ]; then
-            EXTRA_NOTES="${EXTRA_NOTES}\n- **ملاحظات الإصدار:** ${INPUT_NOTES_AR}"
-          fi
-          if [ -n "$INPUT_NOTES_EN" ]; then
-            EXTRA_NOTES="${EXTRA_NOTES}\n- **Release Notes:** ${INPUT_NOTES_EN}"
-          fi
 
-          cat > "$NOTES_FILE" << EOF
-          ## Share Flow v${VERSION_NAME} (Build ${VERSION_CODE})
+          MANIFEST_PATH="$MANIFEST_PATH" \
+          PUBLIC_REPO="$PUBLIC_REPO" \
+          RELEASE_TAG="$RELEASE_TAG" \
+          VERSION_NAME="$VERSION_NAME" \
+          VERSION_CODE="$VERSION_CODE" \
+          SIZE_MB="$SIZE_MB" \
+          APK_SIZE="$APK_SIZE" \
+          PUBLISHED_AT="$PUBLISHED_AT" \
+          APK_SHA256="$APK_SHA256" \
+          CERT_SHA256="$CERT_SHA256" \
+          NOTES_FILE="$NOTES_FILE" \
+          python3 - <<'PYEOF'
+          import json, os
+
+          with open(os.environ["MANIFEST_PATH"], "r", encoding="utf-8") as f:
+              manifest = json.load(f)
+
+          notes_ar = str(manifest.get("releaseNotesAr", "")).strip()
+          notes_en = str(manifest.get("releaseNotesEn", "")).strip()
+          bullets = "\n".join(f"- {item}" for item in manifest.get("releaseNotes", []) if str(item).strip())
+
+          body = f"""## Share Flow v{os.environ['VERSION_NAME']} (Build {os.environ['VERSION_CODE']})
 
           ### Direct Android APK Download (No ZIP)
-          - **Latest Direct APK:** https://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk
-          - **This Release APK:** https://github.com/${PUBLIC_REPO}/releases/download/${RELEASE_TAG}/Share-Flow.apk
-          - **File Size:** ${SIZE_MB} (${APK_SIZE} bytes)
-          - **Published (UTC):** ${PUBLISHED_AT}
-          - **APK SHA-256:** \`${APK_SHA256}\`
-          - **Signing Certificate SHA-256:** \`${CERT_SHA256}\`
-          $(printf '%b' "$EXTRA_NOTES")
+          - **Latest Direct APK:** https://github.com/{os.environ['PUBLIC_REPO']}/releases/latest/download/Share-Flow.apk
+          - **This Release APK:** https://github.com/{os.environ['PUBLIC_REPO']}/releases/download/{os.environ['RELEASE_TAG']}/Share-Flow.apk
+          - **File Size:** {os.environ['SIZE_MB']} ({os.environ['APK_SIZE']} bytes)
+          - **Published (UTC):** {os.environ['PUBLISHED_AT']}
+          - **APK SHA-256:** `{os.environ['APK_SHA256']}`
+          - **Signing Certificate SHA-256:** `{os.environ['CERT_SHA256']}`
 
-          > Built and cryptographically signed from the private Share Flow source repository. Verified automatically via \`apksigner\`, \`zipalign\`, \`aapt2\`, and unit tests prior to publication.
-          EOF
+          ### Changelog / سجل التغييرات
+          {bullets}
+          """
+          if notes_en and notes_en != notes_ar:
+              body += f"\n**English Notes:**\n{notes_en}\n"
 
+          body += (
+              "\n> Built and cryptographically signed from the private Share Flow source repository. "
+              "Verified automatically via `apksigner`, `zipalign`, `aapt2`, and unit tests prior to publication.\n"
+          )
+
+          with open(os.environ["NOTES_FILE"], "w", encoding="utf-8") as out:
+              out.write(body)
+          PYEOF
+
+          # Atomic rollback guard: if draft upload or asset verification fails before promotion, delete the incomplete draft
+          DRAFT_CREATED="false"
+          cleanup_failed_draft() {
+            if [ "$DRAFT_CREATED" = "true" ]; then
+              echo "::warning::Rolling back incomplete draft release '${RELEASE_TAG}' in '${PUBLIC_REPO}' so no partial release is exposed."
+              gh release delete "$RELEASE_TAG" --repo "$PUBLIC_REPO" --yes >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup_failed_draft ERR
+
+          # Step 1: Create DRAFT release and upload all three verified artifacts
           gh release create "$RELEASE_TAG" \
             "$APK_PATH#Share-Flow.apk" \
             "$SHA_PATH#Share-Flow.apk.sha256" \
@@ -530,55 +587,78 @@ jobs:
             --repo "$PUBLIC_REPO" \
             --title "Share Flow v${VERSION_NAME} (Build ${VERSION_CODE})" \
             --notes-file "$NOTES_FILE" \
-            --latest
+            --draft
+          DRAFT_CREATED="true"
 
-      - name: Verify public release assets and unauthenticated direct APK download
+          # Step 2: Verify every asset on the DRAFT release BEFORE making it public
+          DRAFT_JSON=$(gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" --json tagName,url,assets,isDraft)
+          DRAFT_JSON="$DRAFT_JSON" EXPECTED_SIZE="$APK_SIZE" python3 - <<'PYEOF'
+          import json, os
+          data = json.loads(os.environ["DRAFT_JSON"])
+          assets = {a["name"]: a for a in data.get("assets", [])}
+          assert "Share-Flow.apk" in assets, "Share-Flow.apk asset missing from draft release!"
+          assert "Share-Flow.apk.sha256" in assets, "Share-Flow.apk.sha256 missing from draft release!"
+          assert "version.json" in assets, "version.json asset missing from draft release!"
+          assert not any(name.lower().endswith(".zip") for name in assets), "ZIP archive must never be published!"
+          assert assets["Share-Flow.apk"]["size"] == int(os.environ["EXPECTED_SIZE"]), "Uploaded APK size mismatch!"
+          print("Verified all 3 assets on draft release prior to promotion.")
+          PYEOF
+
+          # Step 3: Promote verified draft atomically to public Latest Release
+          gh release edit "$RELEASE_TAG" \
+            --repo "$PUBLIC_REPO" \
+            --draft=false \
+            --latest
+          DRAFT_CREATED="false"
+          trap - ERR
+
+          RELEASE_URL=$(gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" --json url --jq '.url')
+          echo "release_url=${RELEASE_URL}" >> "$GITHUB_OUTPUT"
+          echo "Promoted verified public GitHub Release: ${RELEASE_URL}"
+
+      - name: Verify unauthenticated public direct APK download
+        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
-          RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
           EXPECTED_SIZE: ${{ steps.verify_outputs.outputs.apk_size }}
         run: |
           set -euo pipefail
 
-          RELEASE_JSON=$(gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" --json tagName,url,assets,isLatest)
-          RELEASE_JSON="$RELEASE_JSON" python3 - <<'PYEOF'
-          import json, os
-          data = json.loads(os.environ["RELEASE_JSON"])
-          assets = {a["name"]: a for a in data.get("assets", [])}
-          assert "Share-Flow.apk" in assets, "Share-Flow.apk asset missing from public release!"
-          assert "Share-Flow.apk.sha256" in assets, "Share-Flow.apk.sha256 missing from public release!"
-          assert "version.json" in assets, "version.json asset missing from public release!"
-          assert not any(name.lower().endswith(".zip") for name in assets), "ZIP archive must never be published!"
-          assert assets["Share-Flow.apk"]["size"] == int(os.environ["EXPECTED_SIZE"]), "Published APK size mismatch!"
-          print("Verified public GitHub Release:", data["url"])
-          PYEOF
-
-          # Unauthenticated public download probe (zero tokens passed to curl)
+          # Unauthenticated public download probe (zero tokens passed to curl) with brief CDN propagation retry
           LATEST_APK_URL="https://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk"
-          HEADERS=$(curl -fsSLI --max-redirs 5 "$LATEST_APK_URL")
-          CONTENT_TYPE=$(printf '%s\n' "$HEADERS" | grep -i "^content-type:" | tail -n 1 | tr '[:upper:]' '[:lower:]')
-          CONTENT_LEN=$(printf '%s\n' "$HEADERS" | grep -i "^content-length:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+          VERIFIED="false"
+          for attempt in 1 2 3; do
+            if HEADERS=$(curl -fsSLI --max-redirs 5 "$LATEST_APK_URL" 2>/dev/null); then
+              CONTENT_TYPE=$(printf '%s\n' "$HEADERS" | grep -i "^content-type:" | tail -n 1 | tr '[:upper:]' '[:lower:]')
+              CONTENT_LEN=$(printf '%s\n' "$HEADERS" | grep -i "^content-length:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+              if ! printf '%s' "$CONTENT_TYPE" | grep -q "text/html"; then
+                if [ -z "$CONTENT_LEN" ] || [ "$CONTENT_LEN" = "$EXPECTED_SIZE" ]; then
+                  echo "Verified unauthenticated public direct APK download (${CONTENT_LEN:-unknown} bytes): ${LATEST_APK_URL}"
+                  VERIFIED="true"
+                  break
+                fi
+              fi
+            fi
+            echo "Attempt ${attempt}/3 waiting for GitHub Releases edge propagation..."
+            sleep 5
+          done
 
-          if printf '%s' "$CONTENT_TYPE" | grep -q "text/html"; then
-            echo "::error::Public direct APK URL returned HTML instead of binary APK ($CONTENT_TYPE)."
+          if [ "$VERIFIED" != "true" ]; then
+            echo "::error::Public direct APK probe failed or returned invalid size/content-type for ${LATEST_APK_URL}."
             exit 1
           fi
-          if [ -n "$CONTENT_LEN" ] && [ "$CONTENT_LEN" != "$EXPECTED_SIZE" ]; then
-            echo "::error::Public direct APK Content-Length ($CONTENT_LEN) != expected ($EXPECTED_SIZE)."
-            exit 1
-          fi
-          echo "Verified unauthenticated public direct APK download (${CONTENT_LEN:-unknown} bytes): ${LATEST_APK_URL}"
 
-      - name: Sync static docs/ website to public repository (GitHub Pages)
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.sync_public_website != false }}
+      - name: Sync static docs/ website and version.json to public repository (GitHub Pages)
+        id: sync_website
+        if: ${{ steps.validate_config.outputs.dry_run != 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.sync_public_website != false) }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
           PUBLIC_RELEASES_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           PUBLIC_RELEASES_REPO: ${{ steps.validate_config.outputs.public_repo }}
           LATEST_MANIFEST_FILE: ${{ steps.verify_outputs.outputs.manifest_path }}
+          SYNC_COMMIT_REASON: "Release ${{ steps.validate_config.outputs.release_tag }} (Build ${{ steps.verify_outputs.outputs.version_code }}): update version.json and official website"
         run: |
           set -euo pipefail
           bash ./scripts/sync-public-docs.sh
@@ -608,14 +688,77 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Write final release deployment summary
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+          DRY_RUN: ${{ steps.validate_config.outputs.dry_run || 'false' }}
+          RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag || github.ref_name }}
+          PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo || 'ow7ab/Share-Flow-Releases' }}
+          PORTAL_URL: ${{ steps.validate_config.outputs.portal_url || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
+          VERSION_NAME: ${{ steps.verify_outputs.outputs.version_name || steps.prebuild_version_check.outputs.gradle_version_name || 'N/A' }}
+          VERSION_CODE: ${{ steps.verify_outputs.outputs.version_code || steps.prebuild_version_check.outputs.gradle_version_code || 'N/A' }}
+          APK_SHA256: ${{ steps.verify_outputs.outputs.apk_sha256 || 'Not generated' }}
+          APK_SIZE: ${{ steps.verify_outputs.outputs.apk_size || '0' }}
+          CERT_SHA256: ${{ steps.verify_outputs.outputs.cert_sha256 || 'Not verified' }}
+          RELEASE_URL: ${{ steps.publish_public_release.outputs.release_url || '' }}
+          DIRECT_APK_URL: ${{ steps.verify_outputs.outputs.direct_apk_url || '' }}
+          LATEST_APK_URL: ${{ steps.verify_outputs.outputs.latest_apk_url || '' }}
+          WEBSITE_OUTCOME: ${{ steps.sync_website.outcome || 'skipped' }}
+        run: |
+          {
+            echo "## Share Flow Automated Release Summary"
+            echo ""
+            if [ "$DRY_RUN" = "true" ] && [ "$JOB_STATUS" = "success" ]; then
+              echo "> **SAFE DRY-RUN SUCCEEDED** — Build, signing, verification, and \`version.json\` validation all passed. No public GitHub Release or website update was published."
+            elif [ "$JOB_STATUS" = "success" ]; then
+              echo "> **PRODUCTION RELEASE PUBLISHED SUCCESSFULLY**"
+            else
+              echo "> **RELEASE PIPELINE FAILED (${JOB_STATUS})** — Atomic guards prevented incomplete public release or website updates."
+            fi
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| **Version** | \`v${VERSION_NAME}\` (Build \`${VERSION_CODE}\`) |"
+            echo "| **Release Tag** | \`${RELEASE_TAG}\` |"
+            echo "| **Application ID** | \`com.aistudio.shareflow.kxrvnm\` |"
+            echo "| **Public Releases Repo** | \`${PUBLIC_REPO}\` |"
+            echo "| **Official Website** | ${PORTAL_URL} |"
+            echo "| **Update Manifest (\`version.json\`)** | ${PORTAL_URL%/}/version.json |"
+            if [ -n "$LATEST_APK_URL" ]; then
+              echo "| **Latest Direct APK** | ${LATEST_APK_URL} |"
+            fi
+            if [ -n "$DIRECT_APK_URL" ]; then
+              echo "| **Versioned Direct APK** | ${DIRECT_APK_URL} |"
+            fi
+            if [ -n "$RELEASE_URL" ]; then
+              echo "| **GitHub Release** | ${RELEASE_URL} |"
+            fi
+            echo "| **Website & History Sync** | \`${WEBSITE_OUTCOME}\` |"
+            echo "| **APK Size (bytes)** | \`${APK_SIZE}\` |"
+            echo "| **APK SHA-256** | \`${APK_SHA256}\` |"
+            echo "| **Signing Cert SHA-256** | \`${CERT_SHA256}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Securely delete ephemeral keystore and staging files
         if: always()
         shell: bash
         run: |
-          rm -f "${RUNNER_TEMP}/shareflow-release-key.jks"
-          rm -f "${RUNNER_TEMP}/release-alias.init.gradle"
-          rm -f "${RUNNER_TEMP}/debug-test-fallback.init.gradle"
-          rm -f "${RUNNER_TEMP}/release-notes.md"
+          for sensitive_file in \
+            "${RUNNER_TEMP}/shareflow-release-key.jks" \
+            "${RUNNER_TEMP}/release-alias.init.gradle" \
+            "${RUNNER_TEMP}/debug-test-fallback.init.gradle" \
+            "${RUNNER_TEMP}/release-notes.md" \
+            "${RUNNER_TEMP}/prev-published-version.json"; do
+            if [ -f "$sensitive_file" ]; then
+              if command -v shred >/dev/null 2>&1; then
+                shred -u "$sensitive_file" 2>/dev/null || rm -f "$sensitive_file"
+              else
+                rm -f "$sensitive_file"
+              fi
+            fi
+          done
           rm -rf "${RUNNER_TEMP}/shareflow-release-stage"
           rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"
           if [ -n "${{ steps.locate_project.outputs.project_dir }}" ]; then
