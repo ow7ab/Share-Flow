@@ -1193,6 +1193,13 @@
     <string name="receive_app_quick_open_not_installed">Install this app first to open it.</string>
     <string name="receive_app_quick_open_failed">Unable to launch this app right now.</string>
     <string name="transfer_app_progress_cd">%1$s transfer progress %2$d%%</string>
+
+    <!-- Automatic Update Available Dialog -->
+    <string name="update_dialog_title">Update Available</string>
+    <string name="update_dialog_mandatory_badge">Mandatory Update Required</string>
+    <string name="update_dialog_download_now">Download Now</string>
+    <string name="update_dialog_later_action">Later</string>
+    <string name="update_dialog_default_notes">Performance improvements, bug fixes, and security updates for ShareFlow.</string>
 </resources>
 
 

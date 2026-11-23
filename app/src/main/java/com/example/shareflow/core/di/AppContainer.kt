@@ -18,6 +18,7 @@ import com.example.shareflow.data.files.ReceivedMediaStorePublisher
 import com.example.shareflow.data.update.AndroidApkPackageSecurityInspector
 import com.example.shareflow.data.update.CloudUpdateManager
 import com.example.shareflow.data.update.HttpsCloudUpdateHttpClient
+import com.example.shareflow.data.update.UpdateManager
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.StartupAppearanceCache
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
@@ -131,6 +132,7 @@ interface AppContainer {
     val utilitiesRepository: UtilitiesRepository
     val contactsMigrationExporter: ContactsMigrationExporter
     val cloudUpdateManager: CloudUpdateManager
+    val updateManager: UpdateManager
 
     /** True only after [vaultManager] has been accessed, preventing eager DB/Keystore init on app launch. */
     val isVaultInitialized: Boolean
@@ -501,6 +503,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
             packageInspector = AndroidApkPackageSecurityInspector(context = appContext),
             permissionManager = permissionManager,
             dispatchers = dispatchers
+        )
+    }
+
+    override val updateManager: UpdateManager by lazy {
+        UpdateManager(
+            dispatcher = dispatchers.io
         )
     }
 }

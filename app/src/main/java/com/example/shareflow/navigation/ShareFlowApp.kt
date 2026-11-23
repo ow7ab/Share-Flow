@@ -292,6 +292,7 @@ private fun ShareFlowActiveSessionBridge(
     onActiveTransferCountChanged: (Int) -> Unit
 ) {
     val container = LocalAppContainer.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
     val pendingIncoming by container.connectionRepository.pendingIncomingRequest
         .collectAsStateWithLifecycle()
@@ -299,6 +300,18 @@ private fun ShareFlowActiveSessionBridge(
         .collectAsStateWithLifecycle()
     val activeTransferSessions by container.transferManager.activeSessions
         .collectAsStateWithLifecycle()
+    val detectedUpdate by container.updateManager.detectedUpdate
+        .collectAsStateWithLifecycle()
+    val cloudUpdateState by container.cloudUpdateManager.state
+        .collectAsStateWithLifecycle()
+    var activeUpdateDownloadJob by remember(container) {
+        mutableStateOf<kotlinx.coroutines.Job?>(null)
+    }
+
+    // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher
+    LaunchedEffect(container) {
+        runCatching { container.updateManager.checkForUpdate() }
+    }
 
     LaunchedEffect(activeTransferSessions) {
         onActiveTransferCountChanged(activeTransferSessions.size)
@@ -306,6 +319,38 @@ private fun ShareFlowActiveSessionBridge(
         if (isTransferring || container.isSmartCoordinatorInitialized) {
             container.smartConnectionCoordinator.notifyTransferActivity(isTransferring)
         }
+    }
+
+    detectedUpdate?.let { update ->
+        com.example.shareflow.ui.update.UpdateAvailableDialog(
+            update = update,
+            downloadState = cloudUpdateState,
+            onDownloadNow = { targetUpdate ->
+                activeUpdateDownloadJob?.cancel()
+                activeUpdateDownloadJob = approvalScope.launch {
+                    container.cloudUpdateManager.downloadAndVerifyUpdate(
+                        targetUpdate.toCloudUpdateManifest()
+                    )
+                }
+            },
+            onCancelDownload = {
+                activeUpdateDownloadJob?.cancel()
+                activeUpdateDownloadJob = null
+                container.cloudUpdateManager.resetState()
+            },
+            onInstallVerifiedApk = { apkPath ->
+                when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
+                    com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
+                        val intent = container.permissionManager.createManageUnknownSourcesIntent()
+                        runCatching { context.startActivity(intent) }
+                    }
+                    else -> Unit
+                }
+            },
+            onDismiss = {
+                container.updateManager.dismissOptionalUpdate()
+            }
+        )
     }
 
     pendingIncoming?.let { request ->
