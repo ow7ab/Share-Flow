@@ -166,11 +166,7 @@ class ChunkProcessor(
                         AppError.Storage("Unexpected EOF while streaming source file at offset $currentOffset")
                     )
                 }
-                val chunkBytes = if (bytesRead == buffer.size) {
-                    buffer.copyOf(bytesRead)
-                } else {
-                    buffer.copyOf(bytesRead)
-                }
+                val chunkBytes = buffer.copyOf(bytesRead)
                 val digest = computeChunkSha256(chunkBytes)
                 val emitResult = onChunk(chunkIndex, currentOffset, chunkBytes, digest)
                 if (emitResult is AppResult.Failure) {
@@ -214,12 +210,44 @@ class ChunkProcessor(
 
     /**
      * Allocates or resolves the temporary staging `.part` file for an incoming item.
+     * Both [sessionId] and [itemId] are strictly sanitized so untrusted peer metadata
+     * can never traverse outside `.shareflow_staging`.
      */
     fun resolveTempPartFile(destinationRoot: File, sessionId: String, itemId: String): File {
-        val stagingDir = File(destinationRoot, ".shareflow_staging/$sessionId")
+        val safeSession = sanitizeStagingSegment(sessionId)
+        val stagingDir = File(destinationRoot, ".shareflow_staging/$safeSession")
         if (!stagingDir.exists()) stagingDir.mkdirs()
-        val safeItem = itemId.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        val safeItem = sanitizeStagingSegment(itemId)
         return File(stagingDir, "$safeItem.part")
+    }
+
+    /**
+     * Writes an authenticated chunk to an already-open [RandomAccessFile] handle at its exact byte offset,
+     * avoiding thousands of redundant open/close syscalls during large multi-gigabyte file transfers.
+     */
+    fun writeVerifiedChunkToOpenFile(
+        raf: RandomAccessFile,
+        byteOffset: Long,
+        data: ByteArray,
+        expectedChunkSha256: ByteArray
+    ): AppResult<Long> {
+        if (!verifyChunkSha256(data, expectedChunkSha256)) {
+            return AppResult.Failure(
+                AppError.IntegrityMismatch(
+                    message = "Corrupted chunk detected at offset $byteOffset",
+                    expectedHash = toHex(expectedChunkSha256),
+                    actualHash = toHex(computeChunkSha256(data))
+                )
+            )
+        }
+        return runCatching {
+            raf.seek(byteOffset)
+            raf.write(data)
+            raf.length()
+        }.fold(
+            onSuccess = { AppResult.Success(it) },
+            onFailure = { AppResult.Failure(AppError.Storage("Failed to write chunk to staging file", it)) }
+        )
     }
 
     /**
@@ -287,13 +315,17 @@ class ChunkProcessor(
         if (!TransferWireProtocol.isSafeRelativePath(relativePath)) {
             return AppResult.Failure(AppError.Security("Unsafe relative destination path blocked"))
         }
+        if (!isSafeDestinationFileName(fileName)) {
+            return AppResult.Failure(AppError.Security("Unsafe destination file name blocked"))
+        }
         val cleanRoot = destinationRoot.canonicalFile
+        val rootPrefix = cleanRoot.path.trimEnd(File.separatorChar) + File.separator
         val targetDir = if (relativePath.isBlank()) {
             cleanRoot
         } else {
             File(cleanRoot, relativePath).canonicalFile
         }
-        if (!targetDir.path.startsWith(cleanRoot.path)) {
+        if (targetDir.path != cleanRoot.path && !targetDir.path.startsWith(rootPrefix)) {
             return AppResult.Failure(AppError.Security("Destination directory escapes root boundary"))
         }
         if (!targetDir.exists() && !targetDir.mkdirs()) {
@@ -328,10 +360,15 @@ class ChunkProcessor(
     }
 
     /**
-     * Reserves a brand-new, non-existing file path atomically so no existing file is ever overwritten.
+     * Reserves a brand-new, non-existing file path atomically so no existing file is ever overwritten,
+     * while enforcing canonical confinement strictly inside [targetDir].
      */
     private fun allocateUniqueFile(targetDir: File, originalFileName: String): File? {
         val cleanName = originalFileName.trim()
+        if (!isSafeDestinationFileName(cleanName)) return null
+        val targetDirCanonical = runCatching { targetDir.canonicalFile }.getOrNull() ?: return null
+        val targetDirPrefix = targetDirCanonical.path.trimEnd(File.separatorChar) + File.separator
+
         val dotIndex = cleanName.lastIndexOf('.')
         val (baseName, extension) = if (dotIndex > 0 && dotIndex < cleanName.lastIndex) {
             cleanName.substring(0, dotIndex) to cleanName.substring(dotIndex)
@@ -346,11 +383,15 @@ class ChunkProcessor(
             } else {
                 "$baseName ($attempt)$extension"
             }
-            val candidate = File(targetDir, candidateName)
-            if (!candidate.exists()) {
+            val candidate = File(targetDirCanonical, candidateName)
+            val candidateCanonical = runCatching { candidate.canonicalFile }.getOrNull() ?: return null
+            if (!candidateCanonical.path.startsWith(targetDirPrefix)) {
+                return null
+            }
+            if (!candidateCanonical.exists()) {
                 // Atomically reserve placeholder only if file does not exist
-                if (runCatching { candidate.createNewFile() }.getOrDefault(false)) {
-                    return candidate
+                if (runCatching { candidateCanonical.createNewFile() }.getOrDefault(false)) {
+                    return candidateCanonical
                 }
             }
             attempt++
@@ -361,6 +402,33 @@ class ChunkProcessor(
     fun cleanupTempFile(tempFilePath: String?) {
         if (tempFilePath.isNullOrBlank()) return
         runCatching { File(tempFilePath).delete() }
+    }
+
+    /**
+     * Removes an empty session staging folder under `.shareflow_staging` after completion or cancellation
+     * so stale staging directories do not accumulate on storage over time.
+     */
+    fun cleanupSessionStagingDirIfEmpty(destinationRoot: File, sessionId: String) {
+        runCatching {
+            val safeSession = sanitizeStagingSegment(sessionId)
+            val stagingDir = File(destinationRoot, ".shareflow_staging/$safeSession")
+            if (stagingDir.exists() && stagingDir.isDirectory) {
+                val children = stagingDir.listFiles()
+                if (children == null || children.isEmpty()) {
+                    stagingDir.delete()
+                }
+            }
+        }
+    }
+
+    private fun sanitizeStagingSegment(raw: String): String =
+        raw.replace(Regex("[^A-Za-z0-9_-]"), "_").ifBlank { "staging_item" }.take(96)
+
+    private fun isSafeDestinationFileName(raw: String): Boolean {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || trimmed == "." || trimmed == "..") return false
+        if (trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains('\u0000')) return false
+        return trimmed.none { it.isISOControl() }
     }
 
     private fun skipFully(stream: InputStream, bytesToSkip: Long): Boolean {

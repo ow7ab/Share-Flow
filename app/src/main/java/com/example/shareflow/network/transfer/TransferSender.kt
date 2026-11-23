@@ -79,12 +79,27 @@ class TransferSender(
             updatedAtEpochMillis = clock.nowEpochMillis()
         )
 
+        var lastProgressEmitNanos = 0L
+
         fun publish(
             state: TransferState = currentSession.state,
             error: String? = currentSession.errorMessage,
             isResumable: Boolean = currentSession.isResumable,
             completedAt: Long? = currentSession.completedAtEpochMillis
         ) {
+            val nowNanos = System.nanoTime()
+            val isSteadyProgressUpdate = state == TransferState.TRANSFERRING &&
+                currentSession.state == TransferState.TRANSFERRING &&
+                error == null &&
+                completedAt == null &&
+                mutableItems.any { it.state == TransferState.TRANSFERRING && it.bytesTransferred < it.fileSizeBytes }
+            if (isSteadyProgressUpdate &&
+                lastProgressEmitNanos != 0L &&
+                nowNanos - lastProgressEmitNanos < PROGRESS_PUBLISH_INTERVAL_NANOS
+            ) {
+                return
+            }
+            lastProgressEmitNanos = nowNanos
             val speed = if (state == TransferState.TRANSFERRING) {
                 speedTracker.currentSpeedBytesPerSec()
             } else {
@@ -777,5 +792,6 @@ class TransferSender(
         private const val TRANSFER_IO_TIMEOUT_MS = 30_000
         private const val MAX_IN_FLIGHT_WINDOW_BYTES = 256 * 1024
         private const val CHECKPOINT_INTERVAL_CHUNKS = 8
+        private const val PROGRESS_PUBLISH_INTERVAL_NANOS = 100_000_000L // 100ms UI progress throttle
     }
 }

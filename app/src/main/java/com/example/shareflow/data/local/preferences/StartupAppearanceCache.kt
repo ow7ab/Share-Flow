@@ -34,6 +34,15 @@ class StartupAppearanceCache(context: Context) {
         prefs.getBoolean(KEY_INITIALIZED, false)
     }.getOrDefault(false)
 
+    /**
+     * Pre-warms the in-memory appearance snapshot and aligns Android 12+ per-app night mode
+     * inside [android.app.Application.onCreate] before the launcher Activity draws Frame 1.
+     */
+    fun syncSavedNightModeOnLaunch() {
+        val saved = readOrNull() ?: return
+        syncSystemApplicationNightMode(saved.themeMode)
+    }
+
     fun readOrNull(): AppSettings? {
         memorySnapshot?.let { return it }
         val initialized = runCatching { prefs.getBoolean(KEY_INITIALIZED, false) }.getOrDefault(false)

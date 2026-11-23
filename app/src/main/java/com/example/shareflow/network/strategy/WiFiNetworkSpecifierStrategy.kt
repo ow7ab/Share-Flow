@@ -161,7 +161,7 @@ class WiFiNetworkSpecifierStrategy(
                             // Android 10-15 often fires onAvailable slightly before DHCP populates LinkProperties.
                             // Wait up to 1.5s for onLinkPropertiesChanged, then resume with best available properties.
                             fallbackJob?.cancel()
-                            fallbackJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                            fallbackJob = kotlinx.coroutines.CoroutineScope(cont.context).launch {
                                 kotlinx.coroutines.delay(1_500L)
                                 val latestProps = runCatching { cm.getLinkProperties(network) }.getOrNull()
                                 resumeWithNetwork(network, latestProps)
@@ -181,7 +181,9 @@ class WiFiNetworkSpecifierStrategy(
                     override fun onUnavailable() {
                         fallbackJob?.cancel()
                         fallbackJob = null
-                        activeNetwork = null
+                        if (activeCallback === this) {
+                            activeNetwork = null
+                        }
                         if (cont.isActive) {
                             cont.resume(
                                 WifiJoinOutcome.Failed(
@@ -193,7 +195,7 @@ class WiFiNetworkSpecifierStrategy(
                     }
 
                     override fun onLost(network: Network) {
-                        if (activeNetwork == network) {
+                        if (activeCallback === this && activeNetwork == network) {
                             fallbackJob?.cancel()
                             fallbackJob = null
                             activeNetwork = null

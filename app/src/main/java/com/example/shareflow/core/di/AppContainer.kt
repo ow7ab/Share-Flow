@@ -163,7 +163,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
         SettingsRepositoryImpl(
             dataStore = appContext.shareFlowSettingsDataStore,
             dispatchers = dispatchers,
-            appearanceCache = startupAppearanceCache
+            appearanceCache = startupAppearanceCache,
+            dataStoreFileExists = {
+                java.io.File(appContext.filesDir, "datastore/shareflow_settings.preferences_pb").exists()
+            }
         )
     }
 

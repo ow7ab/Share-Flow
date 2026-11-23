@@ -18,6 +18,7 @@ import com.example.shareflow.domain.model.TransferStatus
 import com.example.shareflow.domain.repository.TransferRepository
 import com.example.shareflow.network.security.EncryptedPeerChannel
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.BitSet
 
 /**
@@ -192,12 +193,27 @@ class TransferReceiver(
             updatedAtEpochMillis = now
         )
 
+        var lastProgressEmitNanos = 0L
+
         fun publish(
             state: TransferState = currentSession.state,
             error: String? = currentSession.errorMessage,
             isResumable: Boolean = currentSession.isResumable,
-            completedAt: Long? = currentSession.completedAtEpochMillis
+            completedAt: Long? = currentSession.completedAtEpochMillis,
+            throttleIfTransferring: Boolean = false
         ) {
+            val nowNanos = System.nanoTime()
+            if (throttleIfTransferring &&
+                state == TransferState.TRANSFERRING &&
+                currentSession.state == TransferState.TRANSFERRING &&
+                error == null &&
+                completedAt == null &&
+                lastProgressEmitNanos != 0L &&
+                nowNanos - lastProgressEmitNanos < PROGRESS_PUBLISH_INTERVAL_NANOS
+            ) {
+                return
+            }
+            lastProgressEmitNanos = nowNanos
             val speed = if (state == TransferState.TRANSFERRING) {
                 speedTracker.currentSpeedBytesPerSec()
             } else {
@@ -237,7 +253,9 @@ class TransferReceiver(
         )
         val sendAccept = channel.sendEncryptedFrame(EncryptedPeerChannel.FRAME_TRANSFER_OFFER_RESPONSE, acceptPayload)
         if (sendAccept is AppResult.Failure) {
-            return interruptSession(currentSession, mutableItems, "Lost connection sending transfer acceptance", ::publish)
+            return interruptSession(currentSession, mutableItems, "Lost connection sending transfer acceptance") { s, e, r, c ->
+                publish(s, e, r, c)
+            }
         }
 
         val maxWindowByBytes = (MAX_IN_FLIGHT_WINDOW_BYTES / offer.chunkSizeBytes).coerceAtLeast(1)
@@ -252,228 +270,299 @@ class TransferReceiver(
             verifiedChunksByItem[item.itemId] = bs
         }
 
+        val openStagingFiles = HashMap<String, RandomAccessFile>()
+
+        fun closeStagingHandle(itemId: String) {
+            openStagingFiles.remove(itemId)?.let { raf ->
+                runCatching { raf.close() }
+            }
+        }
+
+        fun closeAllStagingHandles() {
+            val iterator = openStagingFiles.values.iterator()
+            while (iterator.hasNext()) {
+                runCatching { iterator.next().close() }
+                iterator.remove()
+            }
+        }
+
+        val publishImmediate: (TransferState, String?, Boolean, Long?) -> Unit = { s, e, r, c ->
+            publish(s, e, r, c, throttleIfTransferring = false)
+        }
+
         channel.setReadTimeout(TRANSFER_IO_TIMEOUT_MS)
 
-        // 4. Main streaming receive loop
-        while (true) {
-            if (controlHandle.isCancelled) {
-                return cancelReceiverSession(channel, currentSession, mutableItems, ::publish)
-            }
-
-            val frameRes = channel.receiveEncryptedFrame()
-            if (frameRes is AppResult.Failure) {
-                // Network dropped mid-transfer: preserve verified .part staging files & Room checkpoints
-                return interruptSession(
-                    currentSession,
-                    mutableItems,
-                    "Network interrupted while receiving transfer",
-                    ::publish
-                )
-            }
-            val frame = (frameRes as AppResult.Success).data
-
-            when (frame.frameType) {
-                EncryptedPeerChannel.FRAME_TRANSFER_CHUNK -> {
-                    val pktRes = TransferWireProtocol.decodeChunkPacket(frame.payload)
-                    if (pktRes is AppResult.Failure) {
-                        return failReceiverSession(currentSession, mutableItems, pktRes.error.message, false, ::publish)
-                    }
-                    val pkt = (pktRes as AppResult.Success).data
-                    val idx = itemIndexById[pkt.itemId]
-                        ?: return failReceiverSession(currentSession, mutableItems, "Unknown itemId ${pkt.itemId}", false, ::publish)
-                    val item = mutableItems[idx]
-
-                    val expectedOffset = pkt.chunkIndex.toLong() * offer.chunkSizeBytes.toLong()
-                    if (pkt.byteOffset != expectedOffset ||
-                        pkt.byteOffset + pkt.data.size.toLong() > item.fileSizeBytes
-                    ) {
-                        sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "OFFSET_OUT_OF_BOUNDS", windowCredits)
-                        continue
-                    }
-
-                    val tempFile = File(
-                        item.tempFilePath ?: chunkProcessor.resolveTempPartFile(destinationRoot, offer.sessionId, item.itemId).absolutePath
-                    )
-                    val writeRes = chunkProcessor.writeVerifiedChunkToTempFile(
-                        tempFile = tempFile,
-                        byteOffset = pkt.byteOffset,
-                        data = pkt.data,
-                        expectedChunkSha256 = pkt.chunkSha256
-                    )
-
-                    when (writeRes) {
-                        is AppResult.Failure -> {
-                            sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "CORRUPT_CHUNK", windowCredits)
-                        }
-
-                        is AppResult.Success -> {
-                            speedTracker.recordBytes(pkt.data.size.toLong())
-                            val bitSet = verifiedChunksByItem.getOrPut(item.itemId) { BitSet() }
-                            bitSet.set(pkt.chunkIndex)
-                            val contiguousChunks = bitSet.nextClearBit(0).coerceAtMost(item.totalChunks)
-                            val contiguousBytes = if (contiguousChunks >= item.totalChunks) {
-                                item.fileSizeBytes
-                            } else {
-                                (contiguousChunks.toLong() * offer.chunkSizeBytes.toLong())
-                                    .coerceAtMost(item.fileSizeBytes)
-                            }
-                            val writtenBytes = maxOf(item.bytesTransferred, contiguousBytes)
-                                .coerceAtMost(item.fileSizeBytes)
-
-                            mutableItems[idx] = item.copy(
-                                bytesTransferred = writtenBytes,
-                                nextChunkIndex = contiguousChunks,
-                                tempFilePath = tempFile.absolutePath,
-                                state = TransferState.TRANSFERRING,
-                                errorMessage = null,
-                                isRecoverable = true
-                            )
-
-                            val prevCkpt = lastCheckpointedChunk[item.itemId] ?: 0
-                            if (contiguousChunks - prevCkpt >= CHECKPOINT_INTERVAL_CHUNKS) {
-                                lastCheckpointedChunk[item.itemId] = contiguousChunks
-                                transferRepository.updateItemProgress(
-                                    itemId = item.itemId,
-                                    bytesTransferred = writtenBytes,
-                                    nextChunkIndex = contiguousChunks,
-                                    state = TransferState.TRANSFERRING,
-                                    tempFilePath = tempFile.absolutePath,
-                                    isRecoverable = true
-                                )
-                            }
-                            publish(TransferState.TRANSFERRING, null, true, null)
-                            sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, writtenBytes, true, "", windowCredits)
-                        }
-                    }
+        // 4. Main streaming receive loop (reuses one RandomAccessFile per active item and guarantees closure)
+        try {
+            while (true) {
+                if (controlHandle.isCancelled) {
+                    closeAllStagingHandles()
+                    val cancelled = cancelReceiverSession(channel, currentSession, mutableItems, publishImmediate)
+                    chunkProcessor.cleanupSessionStagingDirIfEmpty(destinationRoot, offer.sessionId)
+                    return cancelled
                 }
 
-                EncryptedPeerChannel.FRAME_TRANSFER_FILE_DONE -> {
-                    val doneRes = TransferWireProtocol.decodeFileDone(frame.payload)
-                    if (doneRes is AppResult.Failure) {
-                        return failReceiverSession(currentSession, mutableItems, doneRes.error.message, false, ::publish)
-                    }
-                    val doneMsg = (doneRes as AppResult.Success).data
-                    val idx = itemIndexById[doneMsg.itemId]
-                        ?: return failReceiverSession(currentSession, mutableItems, "Unknown itemId in FILE_DONE", false, ::publish)
-
-                    val bitSet = verifiedChunksByItem[doneMsg.itemId]
-                    val contiguousVerifiedCount = bitSet?.nextClearBit(0) ?: 0
-                    val verifyOutcome = finalizeAndVerifyItem(
-                        channel = channel,
-                        session = currentSession,
-                        item = mutableItems[idx],
-                        destinationRoot = destinationRoot,
-                        receivedChunkCount = contiguousVerifiedCount,
-                        onUpdateItem = { updated ->
-                            mutableItems[idx] = updated
-                            publish(updated.state, updated.errorMessage, updated.isRecoverable, null)
-                        }
+                val frameRes = channel.receiveEncryptedFrame()
+                if (frameRes is AppResult.Failure) {
+                    closeAllStagingHandles()
+                    // Network dropped mid-transfer: preserve verified .part staging files & Room checkpoints
+                    return interruptSession(
+                        currentSession,
+                        mutableItems,
+                        "Network interrupted while receiving transfer",
+                        publishImmediate
                     )
-                    if (verifyOutcome is AppResult.Failure) {
+                }
+                val frame = (frameRes as AppResult.Success).data
+
+                when (frame.frameType) {
+                    EncryptedPeerChannel.FRAME_TRANSFER_CHUNK -> {
+                        val pktRes = TransferWireProtocol.decodeChunkPacket(frame.payload)
+                        if (pktRes is AppResult.Failure) {
+                            closeAllStagingHandles()
+                            return failReceiverSession(currentSession, mutableItems, pktRes.error.message, false, publishImmediate)
+                        }
+                        val pkt = (pktRes as AppResult.Success).data
+                        val idx = itemIndexById[pkt.itemId]
+                            ?: run {
+                                closeAllStagingHandles()
+                                return failReceiverSession(currentSession, mutableItems, "Unknown itemId ${pkt.itemId}", false, publishImmediate)
+                            }
+                        val item = mutableItems[idx]
+
+                        val expectedOffset = pkt.chunkIndex.toLong() * offer.chunkSizeBytes.toLong()
+                        if (pkt.byteOffset != expectedOffset ||
+                            pkt.byteOffset + pkt.data.size.toLong() > item.fileSizeBytes
+                        ) {
+                            sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "OFFSET_OUT_OF_BOUNDS", windowCredits)
+                            continue
+                        }
+
+                        val tempFile = File(
+                            item.tempFilePath ?: chunkProcessor.resolveTempPartFile(destinationRoot, offer.sessionId, item.itemId).absolutePath
+                        )
+                        val openRaf = openStagingFiles[item.itemId] ?: runCatching {
+                            tempFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
+                            RandomAccessFile(tempFile, "rw").also { openStagingFiles[item.itemId] = it }
+                        }.getOrNull()
+
+                        val writeRes = if (openRaf != null) {
+                            chunkProcessor.writeVerifiedChunkToOpenFile(
+                                raf = openRaf,
+                                byteOffset = pkt.byteOffset,
+                                data = pkt.data,
+                                expectedChunkSha256 = pkt.chunkSha256
+                            )
+                        } else {
+                            chunkProcessor.writeVerifiedChunkToTempFile(
+                                tempFile = tempFile,
+                                byteOffset = pkt.byteOffset,
+                                data = pkt.data,
+                                expectedChunkSha256 = pkt.chunkSha256
+                            )
+                        }
+
+                        when (writeRes) {
+                            is AppResult.Failure -> {
+                                sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "CORRUPT_CHUNK", windowCredits)
+                            }
+
+                            is AppResult.Success -> {
+                                speedTracker.recordBytes(pkt.data.size.toLong())
+                                val bitSet = verifiedChunksByItem.getOrPut(item.itemId) { BitSet() }
+                                bitSet.set(pkt.chunkIndex)
+                                val contiguousChunks = bitSet.nextClearBit(0).coerceAtMost(item.totalChunks)
+                                val contiguousBytes = if (contiguousChunks >= item.totalChunks) {
+                                    item.fileSizeBytes
+                                } else {
+                                    (contiguousChunks.toLong() * offer.chunkSizeBytes.toLong())
+                                        .coerceAtMost(item.fileSizeBytes)
+                                }
+                                val writtenBytes = maxOf(item.bytesTransferred, contiguousBytes)
+                                    .coerceAtMost(item.fileSizeBytes)
+
+                                mutableItems[idx] = item.copy(
+                                    bytesTransferred = writtenBytes,
+                                    nextChunkIndex = contiguousChunks,
+                                    tempFilePath = tempFile.absolutePath,
+                                    state = TransferState.TRANSFERRING,
+                                    errorMessage = null,
+                                    isRecoverable = true
+                                )
+
+                                val prevCkpt = lastCheckpointedChunk[item.itemId] ?: 0
+                                if (contiguousChunks - prevCkpt >= CHECKPOINT_INTERVAL_CHUNKS) {
+                                    lastCheckpointedChunk[item.itemId] = contiguousChunks
+                                    transferRepository.updateItemProgress(
+                                        itemId = item.itemId,
+                                        bytesTransferred = writtenBytes,
+                                        nextChunkIndex = contiguousChunks,
+                                        state = TransferState.TRANSFERRING,
+                                        tempFilePath = tempFile.absolutePath,
+                                        isRecoverable = true
+                                    )
+                                }
+                                val isFinalChunk = contiguousChunks >= item.totalChunks
+                                publish(
+                                    state = TransferState.TRANSFERRING,
+                                    error = null,
+                                    isResumable = true,
+                                    completedAt = null,
+                                    throttleIfTransferring = !isFinalChunk
+                                )
+                                sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, writtenBytes, true, "", windowCredits)
+                            }
+                        }
+                    }
+
+                    EncryptedPeerChannel.FRAME_TRANSFER_FILE_DONE -> {
+                        val doneRes = TransferWireProtocol.decodeFileDone(frame.payload)
+                        if (doneRes is AppResult.Failure) {
+                            closeAllStagingHandles()
+                            return failReceiverSession(currentSession, mutableItems, doneRes.error.message, false, publishImmediate)
+                        }
+                        val doneMsg = (doneRes as AppResult.Success).data
+                        val idx = itemIndexById[doneMsg.itemId]
+                            ?: run {
+                                closeAllStagingHandles()
+                                return failReceiverSession(currentSession, mutableItems, "Unknown itemId in FILE_DONE", false, publishImmediate)
+                            }
+
+                        closeStagingHandle(doneMsg.itemId)
+
+                        val bitSet = verifiedChunksByItem[doneMsg.itemId]
+                        val contiguousVerifiedCount = bitSet?.nextClearBit(0) ?: 0
+                        val verifyOutcome = finalizeAndVerifyItem(
+                            channel = channel,
+                            session = currentSession,
+                            item = mutableItems[idx],
+                            destinationRoot = destinationRoot,
+                            receivedChunkCount = contiguousVerifiedCount,
+                            onUpdateItem = { updated ->
+                                mutableItems[idx] = updated
+                                publish(updated.state, updated.errorMessage, updated.isRecoverable, null, throttleIfTransferring = false)
+                            }
+                        )
+                        if (verifyOutcome is AppResult.Failure) {
+                            closeAllStagingHandles()
+                            return failReceiverSession(
+                                currentSession,
+                                mutableItems,
+                                verifyOutcome.error.message,
+                                isResumable = false,
+                                publish = publishImmediate
+                            )
+                        }
+                    }
+
+                    EncryptedPeerChannel.FRAME_TRANSFER_CONTROL -> {
+                        val ctrlRes = TransferWireProtocol.decodeControl(frame.payload)
+                        if (ctrlRes is AppResult.Success) {
+                            when (ctrlRes.data.command) {
+                                TransferWireProtocol.ControlCommand.PAUSE -> {
+                                    closeAllStagingHandles()
+                                    speedTracker.reset()
+                                    for (i in mutableItems.indices) {
+                                        if (mutableItems[i].state == TransferState.TRANSFERRING) {
+                                            mutableItems[i] = mutableItems[i].copy(state = TransferState.PAUSED)
+                                            transferRepository.updateItemProgress(
+                                                itemId = mutableItems[i].itemId,
+                                                bytesTransferred = mutableItems[i].bytesTransferred,
+                                                nextChunkIndex = mutableItems[i].nextChunkIndex,
+                                                state = TransferState.PAUSED,
+                                                tempFilePath = mutableItems[i].tempFilePath,
+                                                isRecoverable = true
+                                            )
+                                        }
+                                    }
+                                    publish(TransferState.PAUSED, null, true, null, throttleIfTransferring = false)
+                                    transferRepository.updateSessionState(
+                                        sessionId = currentSession.sessionId,
+                                        state = TransferState.PAUSED,
+                                        isResumable = true,
+                                        updatedAtEpochMillis = clock.nowEpochMillis()
+                                    )
+                                    // Allow long pause wait without timing out socket prematurely
+                                    channel.setReadTimeout(PAUSED_WAIT_TIMEOUT_MS)
+                                }
+
+                                TransferWireProtocol.ControlCommand.RESUME -> {
+                                    channel.setReadTimeout(TRANSFER_IO_TIMEOUT_MS)
+                                    for (i in mutableItems.indices) {
+                                        if (mutableItems[i].state == TransferState.PAUSED) {
+                                            mutableItems[i] = mutableItems[i].copy(state = TransferState.TRANSFERRING)
+                                        }
+                                    }
+                                    publish(TransferState.TRANSFERRING, null, true, null, throttleIfTransferring = false)
+                                    transferRepository.updateSessionState(
+                                        sessionId = currentSession.sessionId,
+                                        state = TransferState.TRANSFERRING,
+                                        isResumable = true,
+                                        updatedAtEpochMillis = clock.nowEpochMillis()
+                                    )
+                                }
+
+                                TransferWireProtocol.ControlCommand.CANCEL -> {
+                                    closeAllStagingHandles()
+                                    val cancelled = cancelReceiverSession(channel, currentSession, mutableItems, publishImmediate, notifyPeer = false)
+                                    chunkProcessor.cleanupSessionStagingDirIfEmpty(destinationRoot, offer.sessionId)
+                                    return cancelled
+                                }
+
+                                TransferWireProtocol.ControlCommand.RESEND_CHUNK -> Unit
+                            }
+                        }
+                    }
+
+                    EncryptedPeerChannel.FRAME_TRANSFER_SESSION_DONE -> {
+                        closeAllStagingHandles()
+                        val allCompleted = mutableItems.all { it.state == TransferState.COMPLETED }
+                        val finalState = if (allCompleted) TransferState.COMPLETED else TransferState.FAILED
+                        val completedAt = if (allCompleted) clock.nowEpochMillis() else null
+                        if (allCompleted) {
+                            chunkProcessor.cleanupSessionStagingDirIfEmpty(destinationRoot, offer.sessionId)
+                        }
+                        publish(
+                            state = finalState,
+                            error = if (allCompleted) null else "Transfer session finished with incomplete files",
+                            isResumable = !allCompleted,
+                            completedAt = completedAt,
+                            throttleIfTransferring = false
+                        )
+                        transferRepository.updateSessionState(
+                            sessionId = currentSession.sessionId,
+                            state = finalState,
+                            errorMessage = currentSession.errorMessage,
+                            isResumable = !allCompleted,
+                            updatedAtEpochMillis = clock.nowEpochMillis(),
+                            completedAtEpochMillis = completedAt
+                        )
+                        return if (allCompleted) {
+                            AppResult.Success(currentSession)
+                        } else {
+                            AppResult.Failure(AppError.IntegrityMismatch("Incomplete transfer session", "", ""))
+                        }
+                    }
+
+                    EncryptedPeerChannel.FRAME_DISCONNECT -> {
+                        closeAllStagingHandles()
+                        return interruptSession(currentSession, mutableItems, "Peer disconnected before completion", publishImmediate)
+                    }
+
+                    else -> {
+                        closeAllStagingHandles()
                         return failReceiverSession(
                             currentSession,
                             mutableItems,
-                            verifyOutcome.error.message,
+                            "Protocol violation: unexpected frame type ${frame.frameType}",
                             isResumable = false,
-                            publish = ::publish
+                            publish = publishImmediate
                         )
                     }
                 }
-
-                EncryptedPeerChannel.FRAME_TRANSFER_CONTROL -> {
-                    val ctrlRes = TransferWireProtocol.decodeControl(frame.payload)
-                    if (ctrlRes is AppResult.Success) {
-                        when (ctrlRes.data.command) {
-                            TransferWireProtocol.ControlCommand.PAUSE -> {
-                                speedTracker.reset()
-                                for (i in mutableItems.indices) {
-                                    if (mutableItems[i].state == TransferState.TRANSFERRING) {
-                                        mutableItems[i] = mutableItems[i].copy(state = TransferState.PAUSED)
-                                        transferRepository.updateItemProgress(
-                                            itemId = mutableItems[i].itemId,
-                                            bytesTransferred = mutableItems[i].bytesTransferred,
-                                            nextChunkIndex = mutableItems[i].nextChunkIndex,
-                                            state = TransferState.PAUSED,
-                                            tempFilePath = mutableItems[i].tempFilePath,
-                                            isRecoverable = true
-                                        )
-                                    }
-                                }
-                                publish(TransferState.PAUSED, null, true, null)
-                                transferRepository.updateSessionState(
-                                    sessionId = currentSession.sessionId,
-                                    state = TransferState.PAUSED,
-                                    isResumable = true,
-                                    updatedAtEpochMillis = clock.nowEpochMillis()
-                                )
-                                // Allow long pause wait without timing out socket prematurely
-                                channel.setReadTimeout(PAUSED_WAIT_TIMEOUT_MS)
-                            }
-
-                            TransferWireProtocol.ControlCommand.RESUME -> {
-                                channel.setReadTimeout(TRANSFER_IO_TIMEOUT_MS)
-                                for (i in mutableItems.indices) {
-                                    if (mutableItems[i].state == TransferState.PAUSED) {
-                                        mutableItems[i] = mutableItems[i].copy(state = TransferState.TRANSFERRING)
-                                    }
-                                }
-                                publish(TransferState.TRANSFERRING, null, true, null)
-                                transferRepository.updateSessionState(
-                                    sessionId = currentSession.sessionId,
-                                    state = TransferState.TRANSFERRING,
-                                    isResumable = true,
-                                    updatedAtEpochMillis = clock.nowEpochMillis()
-                                )
-                            }
-
-                            TransferWireProtocol.ControlCommand.CANCEL -> {
-                                return cancelReceiverSession(channel, currentSession, mutableItems, ::publish, notifyPeer = false)
-                            }
-
-                            TransferWireProtocol.ControlCommand.RESEND_CHUNK -> Unit
-                        }
-                    }
-                }
-
-                EncryptedPeerChannel.FRAME_TRANSFER_SESSION_DONE -> {
-                    val allCompleted = mutableItems.all { it.state == TransferState.COMPLETED }
-                    val finalState = if (allCompleted) TransferState.COMPLETED else TransferState.FAILED
-                    val completedAt = if (allCompleted) clock.nowEpochMillis() else null
-                    publish(
-                        state = finalState,
-                        error = if (allCompleted) null else "Transfer session finished with incomplete files",
-                        isResumable = !allCompleted,
-                        completedAt = completedAt
-                    )
-                    transferRepository.updateSessionState(
-                        sessionId = currentSession.sessionId,
-                        state = finalState,
-                        errorMessage = currentSession.errorMessage,
-                        isResumable = !allCompleted,
-                        updatedAtEpochMillis = clock.nowEpochMillis(),
-                        completedAtEpochMillis = completedAt
-                    )
-                    return if (allCompleted) {
-                        AppResult.Success(currentSession)
-                    } else {
-                        AppResult.Failure(AppError.IntegrityMismatch("Incomplete transfer session", "", ""))
-                    }
-                }
-
-                EncryptedPeerChannel.FRAME_DISCONNECT -> {
-                    return interruptSession(currentSession, mutableItems, "Peer disconnected before completion", ::publish)
-                }
-
-                else -> {
-                    return failReceiverSession(
-                        currentSession,
-                        mutableItems,
-                        "Protocol violation: unexpected frame type ${frame.frameType}",
-                        isResumable = false,
-                        publish = ::publish
-                    )
-                }
             }
+        } finally {
+            closeAllStagingHandles()
         }
     }
 
@@ -792,5 +881,6 @@ class TransferReceiver(
         private const val PAUSED_WAIT_TIMEOUT_MS = 10 * 60 * 1_000
         private const val MAX_IN_FLIGHT_WINDOW_BYTES = 256 * 1024
         private const val CHECKPOINT_INTERVAL_CHUNKS = 8
+        private const val PROGRESS_PUBLISH_INTERVAL_NANOS = 100_000_000L // 100ms UI progress throttle
     }
 }

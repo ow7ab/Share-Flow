@@ -154,9 +154,12 @@ class AndroidFileManagerRepository(
             if (!FileNameValidator.isValid(newName)) {
                 return@withContext AppResult.Failure(AppError.Validation("Invalid file name."))
             }
-            val parent = localFile.parentFile
+            val parent = localFile.parentFile?.canonicalFile
                 ?: return@withContext AppResult.Failure(AppError.Storage("Parent directory unavailable."))
-            val target = File(parent, newName.trim())
+            val target = File(parent, newName.trim()).canonicalFile
+            if (target.parentFile != parent) {
+                return@withContext AppResult.Failure(AppError.Security("Unsafe destination file name blocked."))
+            }
             if (target.exists()) {
                 return@withContext AppResult.Failure(AppError.Validation("A file with that name already exists."))
             }
@@ -296,6 +299,7 @@ class AndroidFileManagerRepository(
         return runCatching {
             receiveRoot.walkTopDown()
                 .maxDepth(3)
+                .onEnter { dir -> !dir.name.equals(".shareflow_staging", ignoreCase = true) }
                 .filter { file ->
                     if (!file.isFile || file.length() <= 0L) return@filter false
                     val path = file.absolutePath

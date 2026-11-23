@@ -23,6 +23,7 @@ import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.resume
@@ -255,21 +256,22 @@ class AndroidSessionServiceDiscovery(
     ) {
         acquireMulticastLock()
         udpResponderJob = scope.launch {
-            val socket = runCatching {
-                DatagramSocket(null).apply {
-                    reuseAddress = true
-                    bind(InetSocketAddress(udpPort))
-                    soTimeout = 1_500
-                }
-            }.getOrNull() ?: return@launch
-
-            udpResponderSocket = socket
-            if (_statusLabel.value == "ADVERTISING_STARTING") {
-                _statusLabel.value = "UDP_ACTIVE"
-            }
-
-            val buffer = ByteArray(1024)
+            var socket: DatagramSocket? = null
             try {
+                socket = runCatching {
+                    DatagramSocket(null).apply {
+                        reuseAddress = true
+                        bind(InetSocketAddress(udpPort))
+                        soTimeout = 1_500
+                    }
+                }.getOrNull() ?: return@launch
+
+                udpResponderSocket = socket
+                if (_statusLabel.value == "ADVERTISING_STARTING") {
+                    _statusLabel.value = "UDP_ACTIVE"
+                }
+
+                val buffer = ByteArray(1024)
                 while (isActive && !socket.isClosed) {
                     val packet = DatagramPacket(buffer, buffer.size)
                     try {
@@ -308,7 +310,11 @@ class AndroidSessionServiceDiscovery(
                     }
                 }
             } finally {
-                runCatching { socket.close() }
+                runCatching { socket?.close() }
+                if (udpResponderSocket === socket) {
+                    udpResponderSocket = null
+                }
+                releaseMulticastLock()
             }
         }
     }
@@ -411,6 +417,14 @@ class AndroidSessionServiceDiscovery(
         return withTimeoutOrNull(timeoutMillis.coerceAtLeast(1_500L)) {
             suspendCancellableCoroutine<DiscoveredReceiverEndpoint?> { cont ->
                 var discoveryListener: NsdManager.DiscoveryListener? = null
+                val discoveryStopped = AtomicBoolean(false)
+
+                fun stopDiscoveryOnce() {
+                    if (discoveryStopped.compareAndSet(false, true)) {
+                        discoveryListener?.let { runCatching { manager.stopServiceDiscovery(it) } }
+                    }
+                }
+
                 val listener = object : NsdManager.DiscoveryListener {
                     override fun onDiscoveryStarted(regType: String) = Unit
 
@@ -433,6 +447,7 @@ class AndroidSessionServiceDiscovery(
                                     val deviceMatches = didAttr == null || didAttr.equals(payload.deviceId, ignoreCase = true)
                                     val hostIp = resolved.host?.hostAddress
                                     if (sessionMatches && deviceMatches && !hostIp.isNullOrBlank() && resolved.port in 1024..65535) {
+                                        stopDiscoveryOnce()
                                         if (cont.isActive) {
                                             cont.resume(
                                                 DiscoveredReceiverEndpoint(
@@ -452,6 +467,7 @@ class AndroidSessionServiceDiscovery(
                     override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
                     override fun onDiscoveryStopped(serviceType: String) = Unit
                     override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                        stopDiscoveryOnce()
                         if (cont.isActive) cont.resume(null)
                     }
 
@@ -465,11 +481,12 @@ class AndroidSessionServiceDiscovery(
                         listener
                     )
                 } catch (_: Throwable) {
+                    discoveryStopped.set(true)
                     if (cont.isActive) cont.resume(null)
                 }
 
                 cont.invokeOnCancellation {
-                    discoveryListener?.let { runCatching { manager.stopServiceDiscovery(it) } }
+                    stopDiscoveryOnce()
                 }
             }
         }

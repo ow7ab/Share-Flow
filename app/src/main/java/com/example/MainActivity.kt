@@ -1,32 +1,47 @@
 package com.example
 
+import android.animation.ObjectAnimator
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
+import android.view.View
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.core.animation.doOnEnd
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.navigation.ShareFlowApp
 
 class MainActivity : FragmentActivity() {
+
+    @Volatile
+    private var isLaunchThemeReady: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install AndroidX SplashScreen BEFORE super.onCreate() so the system splash window
+        // seamlessly transitions into our resolved Deep Ruby Dark or Light theme with zero flash.
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !isLaunchThemeReady }
+
         super.onCreate(savedInstanceState)
+
         val appContainer = (application as ShareFlowApplication).container
         val initialSettings = appContainer.settingsRepository.peekInitialSettings()
         val systemInDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
-        val initialIsDark = when (initialSettings.themeMode) {
-            ThemeMode.LIGHT -> false
-            ThemeMode.DARK -> true
-            ThemeMode.SYSTEM -> systemInDark
-        }
+        val initialIsDark = resolveInitialDarkTheme(
+            themeMode = initialSettings.themeMode,
+            systemInDark = systemInDark
+        )
+        val targetWindowBg = if (initialIsDark) WINDOW_BG_DARK else WINDOW_BG_LIGHT
 
-        // Apply exact system bar appearance and native window background BEFORE the first frame
-        // so the user never sees a Dark Mode flash when Light Mode (or vice versa) is saved.
+        // Apply exact system bar appearance and native window background BEFORE Frame 1 is rendered
+        // so Deep Ruby Dark (#171316) or Light (#FFF9F5) is active immediately with zero flash.
         val barStyle = if (initialIsDark) {
             SystemBarStyle.dark(Color.TRANSPARENT)
         } else {
@@ -36,9 +51,27 @@ class MainActivity : FragmentActivity() {
             statusBarStyle = barStyle,
             navigationBarStyle = barStyle
         )
-        window.decorView.setBackgroundColor(
-            if (initialIsDark) WINDOW_BG_DARK else WINDOW_BG_LIGHT
-        )
+        window.decorView.setBackgroundColor(targetWindowBg)
+
+        // Ensure the SplashScreen exit overlay matches the resolved user theme (even when the saved
+        // app theme overrides the current OS night mode) and cross-fades cleanly without flicker.
+        splashScreen.setOnExitAnimationListener { splashViewProvider ->
+            runCatching {
+                val splashView = splashViewProvider.view
+                splashView.setBackgroundColor(targetWindowBg)
+                ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f).apply {
+                    duration = SPLASH_EXIT_FADE_MS
+                    interpolator = DecelerateInterpolator()
+                    doOnEnd { splashViewProvider.remove() }
+                    start()
+                }
+            }.onFailure {
+                runCatching { splashViewProvider.remove() }
+            }
+        }
+
+        // Release splash condition once theme tokens, window background, and edge-to-edge bars are applied.
+        isLaunchThemeReady = true
 
         setContent {
             CompositionLocalProvider(LocalAppContainer provides appContainer) {
@@ -48,7 +81,17 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
-        private const val WINDOW_BG_LIGHT = 0xFFFFF9F5.toInt()
-        private const val WINDOW_BG_DARK = 0xFF161114.toInt()
+        internal const val WINDOW_BG_LIGHT = 0xFFFFF9F5.toInt()
+        internal const val WINDOW_BG_DARK = 0xFF171316.toInt()
+        private const val SPLASH_EXIT_FADE_MS = 140L
+
+        internal fun resolveInitialDarkTheme(
+            themeMode: ThemeMode,
+            systemInDark: Boolean
+        ): Boolean = when (themeMode) {
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.SYSTEM -> systemInDark
+        }
     }
 }

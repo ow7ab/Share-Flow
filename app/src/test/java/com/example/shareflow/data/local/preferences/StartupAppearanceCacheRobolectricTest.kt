@@ -174,4 +174,41 @@ class StartupAppearanceCacheRobolectricTest {
         assertEquals(ThemeMode.SYSTEM, recovered?.themeMode)
         assertFalse(recovered?.hasCompletedOnboarding ?: true)
     }
+
+    @Test
+    fun `peekInitialSettings skips blocking DataStore read on fresh install when no file exists`() {
+        val dispatcher = StandardTestDispatcher()
+        val dataStoreFile = File(tempFolder.newFolder(), "non_existent.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = TestScope(dispatcher),
+            produceFile = { dataStoreFile }
+        )
+        val cache = StartupAppearanceCache(context)
+        val repo = SettingsRepositoryImpl(
+            dataStore = dataStore,
+            dispatchers = TestDispatcherProvider(dispatcher),
+            appearanceCache = cache,
+            dataStoreFileExists = { false }
+        )
+
+        val initial = repo.peekInitialSettings()
+        assertEquals(ThemeMode.SYSTEM, initial.themeMode)
+        assertFalse(initial.hasCompletedOnboarding)
+        assertFalse(cache.isInitialized())
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "notnight")
+    fun `mainActivity launches directly with exact dark window background matching values-night theme`() {
+        StartupAppearanceCache(context).updateThemeMode(ThemeMode.DARK)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val bgColor = (activity.window.decorView.background as? ColorDrawable)?.color
+            assertEquals(0xFF171316.toInt(), bgColor)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
 }

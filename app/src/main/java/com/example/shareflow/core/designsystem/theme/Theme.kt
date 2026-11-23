@@ -228,13 +228,13 @@ fun ShareFlowTheme(
 
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
-        androidx.compose.runtime.SideEffect {
-            val window = hostActivity?.window ?: return@SideEffect
+        androidx.compose.runtime.LaunchedEffect(isDarkTheme, hostActivity, view) {
+            val window = hostActivity?.window ?: return@LaunchedEffect
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !isDarkTheme
             insetsController.isAppearanceLightNavigationBars = !isDarkTheme
             window.decorView.setBackgroundColor(
-                if (isDarkTheme) 0xFF161114.toInt() else 0xFFFFF9F5.toInt()
+                if (isDarkTheme) 0xFF171316.toInt() else 0xFFFFF9F5.toInt()
             )
         }
     }

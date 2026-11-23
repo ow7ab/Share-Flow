@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -409,12 +410,14 @@ class TransferManager(
                             val deferred = CompletableDeferred<Boolean>()
                             pendingOfferDecisions[offer.sessionId] = deferred
                             _pendingIncomingOffer.value = offer
-                            val decision = deferred.await()
-                            pendingOfferDecisions.remove(offer.sessionId)
-                            if (_pendingIncomingOffer.value?.sessionId == offer.sessionId) {
-                                _pendingIncomingOffer.value = null
+                            try {
+                                deferred.await()
+                            } finally {
+                                pendingOfferDecisions.remove(offer.sessionId)
+                                if (_pendingIncomingOffer.value?.sessionId == offer.sessionId) {
+                                    _pendingIncomingOffer.value = null
+                                }
                             }
-                            decision
                         }
                     }
                 ) { updated ->
@@ -434,14 +437,34 @@ class TransferManager(
     }
 
     private fun publishLiveSession(session: TransferSession) {
-        val map = LinkedHashMap(liveSessionsById.value)
-        map[session.sessionId] = session
-        liveSessionsById.value = map
+        liveSessionsById.update { current ->
+            val map = LinkedHashMap(current)
+            map[session.sessionId] = session
+            // Bound in-memory live overlay so completed/cancelled sessions don't accumulate forever in RAM
+            // (persisted history always remains safely in Room).
+            if (map.size > MAX_IN_MEMORY_LIVE_SESSIONS) {
+                val oldestTerminalKey = map.entries
+                    .filter { (_, s) -> !s.state.isActive && !s.isResumable && s.sessionId != session.sessionId }
+                    .minByOrNull { (_, s) -> s.updatedAtEpochMillis }
+                    ?.key
+                if (oldestTerminalKey != null) {
+                    map.remove(oldestTerminalKey)
+                }
+            }
+            map
+        }
     }
 
     fun shutdown() {
         receiverListenerJob?.cancel()
+        pendingOfferDecisions.values.forEach { it.complete(false) }
+        pendingOfferDecisions.clear()
+        _pendingIncomingOffer.value = null
         transferScheduler.shutdown()
         scope.cancel()
+    }
+
+    companion object {
+        private const val MAX_IN_MEMORY_LIVE_SESSIONS = 24
     }
 }

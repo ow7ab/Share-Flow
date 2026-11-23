@@ -3,4 +3,10 @@
     <style name="Theme.ShareFlow" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">#171316</item>
     </style>
+
+    <style name="Theme.ShareFlow.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#171316</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.ShareFlow</item>
+    </style>
 </resources>

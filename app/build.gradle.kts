@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.shareflow.kxrvnm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 14
-    versionName = "1.0.13"
+    versionCode = 15
+    versionName = "1.0.14"
 
     buildConfigField(
       "String",
@@ -110,6 +110,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.core.splashscreen)
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.documentfile)
   implementation(libs.androidx.lifecycle.runtime.compose)

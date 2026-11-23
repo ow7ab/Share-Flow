@@ -27,6 +27,7 @@ import javax.crypto.Mac
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.CancellationException
 
 /**
  * Authenticated, forward-secret AES-256-GCM encrypted framing channel over a TCP socket.
@@ -586,6 +587,9 @@ class PeerHandshakeProtocol(
             }
 
             AppResult.Success(channel)
+        } catch (ce: CancellationException) {
+            runCatching { socket.close() }
+            throw ce
         } catch (t: Throwable) {
             runCatching { socket.close() }
             AppResult.Failure(AppError.Security("Incoming handshake failed: ${t.message ?: "unexpected error"}", t))

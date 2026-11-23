@@ -371,6 +371,7 @@ private fun ShareFlowActiveSessionBridge(
     // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher
     LaunchedEffect(container) {
         runCatching { container.updateManager.checkForUpdate() }
+            .onFailure { if (it is CancellationException) throw it }
     }
 
     LaunchedEffect(activeTransferSessions) {

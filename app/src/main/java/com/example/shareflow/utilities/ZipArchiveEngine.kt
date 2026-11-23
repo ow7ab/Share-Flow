@@ -21,6 +21,7 @@ import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
@@ -130,6 +131,9 @@ class ZipArchiveEngine(
                     originalsPreserved = true
                 )
             )
+        } catch (ce: CancellationException) {
+            runCatching { tempFile.delete() }
+            throw ce
         } catch (t: Throwable) {
             runCatching { tempFile.delete() }
             AppResult.Failure(AppError.Storage("ZIP compression failed safely: ${t.message ?: t.javaClass.simpleName}", t))
@@ -270,6 +274,8 @@ class ZipArchiveEngine(
                     skippedCount = skippedCount
                 )
             )
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (t: Throwable) {
             AppResult.Failure(AppError.Storage("ZIP extraction failed: ${t.message ?: t.javaClass.simpleName}", t))
         }

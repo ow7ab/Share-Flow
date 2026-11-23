@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Persistent DataStore-backed implementation of [SettingsRepository].
@@ -37,16 +38,23 @@ import kotlinx.coroutines.withContext
 class SettingsRepositoryImpl(
     private val dataStore: DataStore<Preferences>,
     private val dispatchers: DispatcherProvider,
-    private val appearanceCache: StartupAppearanceCache? = null
+    private val appearanceCache: StartupAppearanceCache? = null,
+    private val dataStoreFileExists: () -> Boolean = { true }
 ) : SettingsRepository {
 
     override fun peekInitialSettings(): AppSettings {
         val cache = appearanceCache ?: return AppSettings()
         cache.readOrNull()?.let { return it }
-        // One-time migration seed for existing installs upgrading from DataStore-only persistence
+        // Fresh install: skip synchronous disk I/O on Main Thread completely (0 ms startup path)
+        if (!runCatching { dataStoreFileExists() }.getOrDefault(false)) {
+            return AppSettings()
+        }
+        // One-time bounded migration seed for existing installs upgrading from DataStore-only persistence
         val migrated = runCatching {
-            runBlocking(dispatchers.io) { settings.first() }
-        }.getOrDefault(AppSettings())
+            runBlocking(dispatchers.io) {
+                withTimeoutOrNull(LEGACY_PEEK_TIMEOUT_MS) { settings.first() }
+            }
+        }.getOrNull() ?: return AppSettings()
         cache.write(migrated)
         return migrated
     }
@@ -298,5 +306,9 @@ class SettingsRepositoryImpl(
             onSuccess = { AppResult.Success(Unit) },
             onFailure = { AppResult.Failure(AppError.Storage("Failed to persist settings", it)) }
         )
+    }
+
+    companion object {
+        private const val LEGACY_PEEK_TIMEOUT_MS = 120L
     }
 }

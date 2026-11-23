@@ -26,6 +26,7 @@ import com.example.shareflow.domain.model.StrategyAvailability
 import com.example.shareflow.domain.model.StrategyStatus
 import com.example.shareflow.network.TransferProtocol
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -187,6 +188,8 @@ class WiFiDirectStrategy(
                 statusDetail = "Wi-Fi Direct DNS-SD active"
             )
             AppResult.Success(Unit)
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (se: SecurityException) {
             val missing = permissionHelper.missingPermissionsFor(ConnectionType.WIFI_DIRECT)
             _status.value = _status.value.copy(
@@ -266,6 +269,8 @@ class WiFiDirectStrategy(
                 statusDetail = "Advertising on Wi-Fi Direct :$port"
             )
             AppResult.Success(Unit)
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (se: SecurityException) {
             AppResult.Failure(AppError.PermissionDenied("Wi-Fi Direct advertising permission denied", se))
         } catch (t: Throwable) {
@@ -354,12 +359,14 @@ class WiFiDirectStrategy(
                     connectionType = ConnectionType.WIFI_DIRECT
                 )
             )
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (se: SecurityException) {
-            pendingConnectionInfo = null
             AppResult.Failure(AppError.PermissionDenied("Wi-Fi Direct connect permission denied", se))
         } catch (t: Throwable) {
-            pendingConnectionInfo = null
             AppResult.Failure(AppError.Network("Wi-Fi Direct connection error", t))
+        } finally {
+            pendingConnectionInfo = null
         }
     }
 
