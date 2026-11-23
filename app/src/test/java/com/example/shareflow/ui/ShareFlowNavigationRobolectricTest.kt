@@ -32,9 +32,32 @@ class ShareFlowNavigationRobolectricTest {
         }
     }
 
+    private fun enterHomeDashboard() {
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            val hasOnboarding = composeTestRule
+                .onAllNodesWithTag("onboarding_skip_button", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+            val hasHome = composeTestRule
+                .onAllNodesWithTag("home_send_button", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+            hasOnboarding || hasHome
+        }
+        if (
+            composeTestRule
+                .onAllNodesWithTag("onboarding_skip_button", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        ) {
+            composeTestRule.onNodeWithTag("onboarding_skip_button").performClick()
+        }
+        waitForTag("home_send_button")
+    }
+
     @Test
     fun `home dashboard hides top device card and displays compact header actions and all sections`() {
-        waitForTag("home_send_button")
+        enterHomeDashboard()
 
         // Top device card & header settings shortcut must be completely hidden
         org.junit.Assert.assertTrue(
@@ -82,7 +105,7 @@ class ShareFlowNavigationRobolectricTest {
 
     @Test
     fun `navigates across all five bottom navigation tabs and verifies screens`() {
-        waitForTag("home_send_button")
+        enterHomeDashboard()
 
         // 1. Files tab — all 7 categories + drill-in
         composeTestRule.onNodeWithTag("nav_item_files").performClick()
@@ -175,7 +198,7 @@ class ShareFlowNavigationRobolectricTest {
 
     @Test
     fun `navigates to send receive and settings tab from home`() {
-        waitForTag("home_send_button")
+        enterHomeDashboard()
 
         // Send screen
         composeTestRule.onNodeWithTag("home_send_button").performClick()
@@ -216,7 +239,7 @@ class ShareFlowNavigationRobolectricTest {
 
     @Test
     fun `unified glass bottom navigation bar stays consistently displayed across all five tabs and rapid switches`() {
-        waitForTag("home_send_button")
+        enterHomeDashboard()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
 

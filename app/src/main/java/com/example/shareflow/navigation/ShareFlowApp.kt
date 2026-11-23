@@ -1,6 +1,7 @@
 package com.example.shareflow.navigation
 
 import android.os.Build
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -87,6 +88,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.core.di.LocalAppContainer
+import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.AppSettings
 import com.example.shareflow.domain.model.ShareFlowModuleId
 import com.example.shareflow.domain.model.TransferState
@@ -103,6 +105,7 @@ import com.example.shareflow.ui.media.MusicPlayerScreen
 import com.example.shareflow.ui.media.VideoPlayerScreen
 import com.example.shareflow.ui.migration.PhoneMigrationScreen
 import com.example.shareflow.ui.module.ModuleFoundationScreen
+import com.example.shareflow.ui.onboarding.OnboardingScreen
 import com.example.shareflow.ui.receive.QrPairingScreen
 import com.example.shareflow.ui.receive.ReceiveScreen
 import com.example.shareflow.ui.send.SendConfirmScreen
@@ -118,6 +121,7 @@ import com.example.shareflow.ui.utilities.LargeFilesScreen
 import com.example.shareflow.ui.utilities.QrScannerScreen
 import com.example.shareflow.ui.utilities.RecentFilesScreen
 import com.example.shareflow.ui.vault.VaultScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -139,12 +143,32 @@ fun ShareFlowApp(
     // Defer heavy networking/transfer DI graph initialization off the Main Thread until after Frame 1
     var backgroundServicesReady by remember(container) { mutableStateOf(false) }
     var activeTransferCount by remember(container) { mutableIntStateOf(0) }
+    var onboardingDismissed by remember(container) {
+        mutableStateOf(resolvedInitialSettings.hasCompletedOnboarding)
+    }
+    var pendingLanguageOverride by remember(container) {
+        mutableStateOf<AppLanguage?>(null)
+    }
+    LaunchedEffect(settings.hasCompletedOnboarding) {
+        if (settings.hasCompletedOnboarding) {
+            onboardingDismissed = true
+        }
+    }
+    LaunchedEffect(settings.appLanguage) {
+        if (pendingLanguageOverride == settings.appLanguage) {
+            pendingLanguageOverride = null
+        }
+    }
 
     LaunchedEffect(container) {
-        withContext(container.dispatchers.io) {
-            container.connectionRepository
-            container.transferManager
-            container.unifiedConnectionManager
+        runCatching {
+            withContext(container.dispatchers.io) {
+                container.connectionRepository
+                container.transferManager
+                container.unifiedConnectionManager
+            }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
         }
         backgroundServicesReady = true
     }
@@ -155,17 +179,20 @@ fun ShareFlowApp(
                 Lifecycle.Event.ON_STOP -> {
                     approvalScope.launch(container.dispatchers.io) {
                         if (container.isVaultInitialized) {
-                            container.vaultManager.onAppBackgrounded()
+                            runCatching { container.vaultManager.onAppBackgrounded() }
+                                .onFailure { if (it is CancellationException) throw it }
                         }
                         if (container.isSmartCoordinatorInitialized) {
-                            container.smartConnectionCoordinator.onAppBackgrounded()
+                            runCatching { container.smartConnectionCoordinator.onAppBackgrounded() }
+                                .onFailure { if (it is CancellationException) throw it }
                         }
                     }
                 }
                 Lifecycle.Event.ON_START -> {
                     if (container.isVaultInitialized) {
                         approvalScope.launch(container.dispatchers.io) {
-                            container.vaultManager.checkAutoLock()
+                            runCatching { container.vaultManager.checkAutoLock() }
+                                .onFailure { if (it is CancellationException) throw it }
                         }
                     }
                 }
@@ -178,41 +205,72 @@ fun ShareFlowApp(
         }
     }
 
+    val effectiveLanguage = pendingLanguageOverride ?: settings.appLanguage
+
     ShareFlowTheme(
         themeMode = settings.themeMode,
         useDynamicColor = settings.useDynamicColor,
         accentColor = settings.accentColor,
-        appLanguage = settings.appLanguage
+        appLanguage = effectiveLanguage
     ) {
-        if (backgroundServicesReady) {
-            ShareFlowActiveSessionBridge(
-                onActiveTransferCountChanged = { count -> activeTransferCount = count }
-            )
-        }
+        val showOnboarding = !onboardingDismissed && !settings.hasCompletedOnboarding
 
-        val backStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = backStackEntry?.destination?.route ?: ShareFlowRoutes.HOME
-        val isTopLevel = remember(currentRoute) {
-            TopLevelDestination.entries.any { it.route == currentRoute }
-        }
-
-        val navigateTopLevel = remember(navController) {
-            { route: String ->
-                navController.navigate(route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
-                        saveState = true
+        Crossfade(
+            targetState = showOnboarding,
+            animationSpec = tween(durationMillis = 240),
+            label = "onboarding_to_main_transition"
+        ) { isOnboardingActive ->
+            if (isOnboardingActive) {
+                OnboardingScreen(
+                    selectedLanguage = effectiveLanguage,
+                    onSelectLanguage = { selected ->
+                        pendingLanguageOverride = selected
+                        approvalScope.launch {
+                            runCatching { container.settingsRepository.updateAppLanguage(selected) }
+                                .onFailure { if (it is CancellationException) throw it }
+                        }
+                    },
+                    onComplete = {
+                        onboardingDismissed = true
+                        approvalScope.launch {
+                            runCatching { container.settingsRepository.markOnboardingCompleted() }
+                                .onFailure { if (it is CancellationException) throw it }
+                        }
                     }
-                    launchSingleTop = true
-                    restoreState = true
+                )
+            } else {
+                if (backgroundServicesReady) {
+                    ShareFlowActiveSessionBridge(
+                        onActiveTransferCountChanged = { count -> activeTransferCount = count }
+                    )
                 }
-            }
-        }
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
+                val backStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = backStackEntry?.destination?.route ?: ShareFlowRoutes.HOME
+                val isTopLevel = remember(currentRoute) {
+                    TopLevelDestination.entries.any { it.route == currentRoute }
+                }
+
+                val navigateTopLevel = remember(navController) {
+                    { route: String ->
+                        runCatching {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                        Unit
+                    }
+                }
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
             val useNavigationRail = maxWidth >= 600.dp
 
             Row(modifier = Modifier.fillMaxSize()) {
@@ -284,6 +342,8 @@ fun ShareFlowApp(
                 }
             }
         }
+            }
+        }
     }
 }
 
@@ -317,7 +377,8 @@ private fun ShareFlowActiveSessionBridge(
         onActiveTransferCountChanged(activeTransferSessions.size)
         val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
         if (isTransferring || container.isSmartCoordinatorInitialized) {
-            container.smartConnectionCoordinator.notifyTransferActivity(isTransferring)
+            runCatching { container.smartConnectionCoordinator.notifyTransferActivity(isTransferring) }
+                .onFailure { if (it is CancellationException) throw it }
         }
     }
 
@@ -328,9 +389,11 @@ private fun ShareFlowActiveSessionBridge(
             onDownloadNow = { targetUpdate ->
                 activeUpdateDownloadJob?.cancel()
                 activeUpdateDownloadJob = approvalScope.launch {
-                    container.cloudUpdateManager.downloadAndVerifyUpdate(
-                        targetUpdate.toCloudUpdateManifest()
-                    )
+                    runCatching {
+                        container.cloudUpdateManager.downloadAndVerifyUpdate(
+                            targetUpdate.toCloudUpdateManifest()
+                        )
+                    }.onFailure { if (it is CancellationException) throw it }
                 }
             },
             onCancelDownload = {
@@ -358,15 +421,19 @@ private fun ShareFlowActiveSessionBridge(
             request = request,
             onApprove = { rememberTrusted ->
                 approvalScope.launch {
-                    container.connectionRepository.approveIncomingConnection(
-                        requestId = request.requestId,
-                        rememberAsTrusted = rememberTrusted
-                    )
+                    runCatching {
+                        container.connectionRepository.approveIncomingConnection(
+                            requestId = request.requestId,
+                            rememberAsTrusted = rememberTrusted
+                        )
+                    }.onFailure { if (it is CancellationException) throw it }
                 }
             },
             onReject = {
                 approvalScope.launch {
-                    container.connectionRepository.rejectIncomingConnection(request.requestId)
+                    runCatching {
+                        container.connectionRepository.rejectIncomingConnection(request.requestId)
+                    }.onFailure { if (it is CancellationException) throw it }
                 }
             }
         )
@@ -376,10 +443,14 @@ private fun ShareFlowActiveSessionBridge(
         com.example.shareflow.ui.receive.IncomingTransferOfferDialog(
             offer = offer,
             onAccept = {
-                container.unifiedConnectionManager.approveIncomingTransferOffer(offer.sessionId)
+                runCatching {
+                    container.unifiedConnectionManager.approveIncomingTransferOffer(offer.sessionId)
+                }
             },
             onReject = {
-                container.unifiedConnectionManager.rejectIncomingTransferOffer(offer.sessionId)
+                runCatching {
+                    container.unifiedConnectionManager.rejectIncomingTransferOffer(offer.sessionId)
+                }
             }
         )
     }

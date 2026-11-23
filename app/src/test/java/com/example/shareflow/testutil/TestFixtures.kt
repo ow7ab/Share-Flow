@@ -123,6 +123,11 @@ class FakeSettingsRepository(
         return AppResult.Success(Unit)
     }
 
+    override suspend fun markOnboardingCompleted(): AppResult<Unit> {
+        state.update { it.copy(hasCompletedOnboarding = true) }
+        return AppResult.Success(Unit)
+    }
+
     override suspend fun resetToDefaults(): AppResult<Unit> {
         state.value = AppSettings()
         return AppResult.Success(Unit)

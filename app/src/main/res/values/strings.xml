@@ -1200,6 +1200,58 @@
     <string name="update_dialog_download_now">Download Now</string>
     <string name="update_dialog_later_action">Later</string>
     <string name="update_dialog_default_notes">Performance improvements, bug fixes, and security updates for ShareFlow.</string>
+
+    <!-- First-Install Welcome & Onboarding -->
+    <string name="onboarding_skip_action">Skip</string>
+    <string name="onboarding_next_action">Next</string>
+    <string name="onboarding_get_started_action">Get Started</string>
+    <string name="onboarding_step_counter">%1$d / %2$d</string>
+    <string name="onboarding_app_icon_cd">ShareFlow logo</string>
+    <string name="onboarding_language_label">App Language</string>
+    <string name="onboarding_language_system">System</string>
+    <string name="onboarding_language_english">English</string>
+    <string name="onboarding_language_arabic">العربية</string>
+
+    <string name="onboarding_welcome_badge">Fast Offline Sharing</string>
+    <string name="onboarding_welcome_title">Welcome to ShareFlow</string>
+    <string name="onboarding_welcome_subtitle">Share photos, videos, apps, and folders directly between nearby Android devices at full original quality — with no internet needed.</string>
+    <string name="onboarding_welcome_feat_offline_title">No Internet Required</string>
+    <string name="onboarding_welcome_feat_offline_desc">Transfers run over a direct local Wi-Fi connection at high speed with zero mobile data usage.</string>
+    <string name="onboarding_welcome_feat_verified_title">SHA-256 Verified Integrity</string>
+    <string name="onboarding_welcome_feat_verified_desc">Every file is verified end-to-end so nothing arrives corrupted or compressed.</string>
+    <string name="onboarding_welcome_feat_private_title">Private &amp; Local Only</string>
+    <string name="onboarding_welcome_feat_private_desc">Your files stay strictly between your devices — never uploaded to third-party servers.</string>
+
+    <string name="onboarding_ad_free_badge">100% Ad-Free</string>
+    <string name="onboarding_ad_free_title">Completely Ad-Free Experience</string>
+    <string name="onboarding_ad_free_subtitle">ShareFlow is completely free of ads, pop-ups, banners, and ad trackers — built purely for fast, distraction-free file sharing.</string>
+    <string name="onboarding_ad_free_point_1_title">Zero Ads or Pop-Ups</string>
+    <string name="onboarding_ad_free_point_1_desc">No full-screen video ads, no interrupting banners, and no hidden promotional screens.</string>
+    <string name="onboarding_ad_free_point_2_title">Zero Ad Tracking</string>
+    <string name="onboarding_ad_free_point_2_desc">No advertising SDKs or personal data collection — your privacy always comes first.</string>
+    <string name="onboarding_ad_free_point_3_title">Clean &amp; Ready Instantly</string>
+    <string name="onboarding_ad_free_point_3_desc">Open the app and start sending or receiving files immediately without waiting.</string>
+
+    <string name="onboarding_how_badge">Quick Start Guide</string>
+    <string name="onboarding_how_title">How to Use ShareFlow</string>
+    <string name="onboarding_how_subtitle">Transfer files between two phones in three effortless steps:</string>
+    <string name="onboarding_how_step_1_title">1. Tap Send &amp; Pick Files</string>
+    <string name="onboarding_how_step_1_desc">Open Send on the first phone and choose photos, videos, apps, documents, or entire folders.</string>
+    <string name="onboarding_how_step_2_title">2. Tap Receive on the Other Phone</string>
+    <string name="onboarding_how_step_2_desc">Tap Start Receiving to create a secure local connection and display a pairing QR code.</string>
+    <string name="onboarding_how_step_3_title">3. Scan QR or Tap Nearby</string>
+    <string name="onboarding_how_step_3_desc">Scan the QR code or select the nearby device — files connect and transfer automatically.</string>
+
+    <string name="onboarding_perm_badge">Transparent Privacy</string>
+    <string name="onboarding_perm_title">Required Permissions</string>
+    <string name="onboarding_perm_subtitle">ShareFlow only asks for permissions when you actually use a feature — never ahead of time.</string>
+    <string name="onboarding_perm_wifi_title">Nearby Wi-Fi / Location</string>
+    <string name="onboarding_perm_wifi_desc">Used by Android solely to discover nearby devices and create a direct local Wi-Fi hotspot (Location is only required on Android 12 and below).</string>
+    <string name="onboarding_perm_camera_title">Camera (QR Scanning)</string>
+    <string name="onboarding_perm_camera_desc">Used strictly to scan the receiver\'s QR code for instant one-tap device pairing.</string>
+    <string name="onboarding_perm_optional_title">Notifications &amp; App Install (Optional)</string>
+    <string name="onboarding_perm_optional_desc">Shows live transfer progress notifications and lets you install received APK apps via Android\'s official installer.</string>
+    <string name="onboarding_perm_storage_badge">Zero Broad Storage Permissions — Uses Android Photo &amp; File Picker</string>
 </resources>
 
 

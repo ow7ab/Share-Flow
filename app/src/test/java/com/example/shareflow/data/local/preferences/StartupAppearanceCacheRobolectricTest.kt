@@ -12,6 +12,7 @@ import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.testutil.TestDispatcherProvider
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -121,5 +122,56 @@ class StartupAppearanceCacheRobolectricTest {
         } finally {
             controller.pause().stop().destroy()
         }
+    }
+
+    @Test
+    fun `onboarding completion persists across cold restarts and survives resetToDefaults`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val dataStoreFile = File(tempFolder.newFolder(), "onboarding_persist.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = TestScope(dispatcher),
+            produceFile = { dataStoreFile }
+        )
+        val cache = StartupAppearanceCache(context)
+        val repo = SettingsRepositoryImpl(
+            dataStore = dataStore,
+            dispatchers = TestDispatcherProvider(dispatcher),
+            appearanceCache = cache
+        )
+
+        assertFalse(repo.peekInitialSettings().hasCompletedOnboarding)
+        repo.markOnboardingCompleted()
+
+        // Cold restart with fresh StartupAppearanceCache instance
+        val coldCache = StartupAppearanceCache(context)
+        assertTrue(coldCache.readOrNull()?.hasCompletedOnboarding == true)
+
+        // Resetting app settings must preserve completed onboarding
+        repo.resetToDefaults()
+        assertTrue(StartupAppearanceCache(context).readOrNull()?.hasCompletedOnboarding == true)
+    }
+
+    @Test
+    fun `settings repository recovers gracefully from corrupted preferences file`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val corruptedFile = File(tempFolder.newFolder(), "corrupted_settings.preferences_pb").apply {
+            writeBytes(byteArrayOf(0x00, 0x7F, 0x55, 0x2A, 0x11))
+        }
+        val dataStore = PreferenceDataStoreFactory.create(
+            corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler {
+                androidx.datastore.preferences.core.emptyPreferences()
+            },
+            scope = TestScope(dispatcher),
+            produceFile = { corruptedFile }
+        )
+        val repo = SettingsRepositoryImpl(
+            dataStore = dataStore,
+            dispatchers = TestDispatcherProvider(dispatcher),
+            appearanceCache = null
+        )
+
+        val recovered = repo.settings.firstOrNull()
+        assertEquals(ThemeMode.SYSTEM, recovered?.themeMode)
+        assertFalse(recovered?.hasCompletedOnboarding ?: true)
     }
 }

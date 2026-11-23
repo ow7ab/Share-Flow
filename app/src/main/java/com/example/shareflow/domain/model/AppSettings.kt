@@ -69,7 +69,8 @@ data class AppSettings(
     val discoveryVisibility: DiscoveryVisibility = DiscoveryVisibility.EVERYONE_NEARBY,
     val preferredConnectionMode: PreferredConnectionMode = PreferredConnectionMode.AUTO,
     val biometricUnlockPreferred: Boolean = true,
-    val cloudUpdateManifestUrl: String = ""
+    val cloudUpdateManifestUrl: String = "",
+    val hasCompletedOnboarding: Boolean = false
 ) {
     companion object {
         const val DEFAULT_DEVICE_NAME = "ShareFlow Device"

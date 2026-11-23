@@ -30,32 +30,39 @@ class StartupAppearanceCache(context: Context) {
     @Volatile
     private var memorySnapshot: AppSettings? = null
 
-    fun isInitialized(): Boolean = memorySnapshot != null || prefs.getBoolean(KEY_INITIALIZED, false)
+    fun isInitialized(): Boolean = memorySnapshot != null || runCatching {
+        prefs.getBoolean(KEY_INITIALIZED, false)
+    }.getOrDefault(false)
 
     fun readOrNull(): AppSettings? {
         memorySnapshot?.let { return it }
-        if (!prefs.getBoolean(KEY_INITIALIZED, false)) return null
+        val initialized = runCatching { prefs.getBoolean(KEY_INITIALIZED, false) }.getOrDefault(false)
+        if (!initialized) return null
 
-        val themeMode = prefs.getString(KEY_THEME_MODE, null)
-            ?.let { raw -> runCatching { ThemeMode.valueOf(raw) }.getOrNull() }
-            ?: ThemeMode.SYSTEM
+        return runCatching {
+            val themeMode = prefs.getString(KEY_THEME_MODE, null)
+                ?.let { raw -> runCatching { ThemeMode.valueOf(raw) }.getOrNull() }
+                ?: ThemeMode.SYSTEM
 
-        val accentColor = prefs.getString(KEY_ACCENT_COLOR, null)
-            ?.let { raw -> runCatching { AccentColor.valueOf(raw) }.getOrNull() }
-            ?: AccentColor.COBALT
+            val accentColor = prefs.getString(KEY_ACCENT_COLOR, null)
+                ?.let { raw -> runCatching { AccentColor.valueOf(raw) }.getOrNull() }
+                ?: AccentColor.COBALT
 
-        val appLanguage = prefs.getString(KEY_APP_LANGUAGE, null)
-            ?.let { raw -> runCatching { AppLanguage.valueOf(raw) }.getOrNull() }
-            ?: AppLanguage.SYSTEM
+            val appLanguage = prefs.getString(KEY_APP_LANGUAGE, null)
+                ?.let { raw -> runCatching { AppLanguage.valueOf(raw) }.getOrNull() }
+                ?: AppLanguage.SYSTEM
 
-        val useDynamicColor = prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, false)
+            val useDynamicColor = prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, false)
+            val hasCompletedOnboarding = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
 
-        return AppSettings(
-            themeMode = themeMode,
-            useDynamicColor = useDynamicColor,
-            accentColor = accentColor,
-            appLanguage = appLanguage
-        ).also { memorySnapshot = it }
+            AppSettings(
+                themeMode = themeMode,
+                useDynamicColor = useDynamicColor,
+                accentColor = accentColor,
+                appLanguage = appLanguage,
+                hasCompletedOnboarding = hasCompletedOnboarding
+            ).also { memorySnapshot = it }
+        }.getOrNull()
     }
 
     fun write(settings: AppSettings) {
@@ -63,21 +70,27 @@ class StartupAppearanceCache(context: Context) {
             themeMode = settings.themeMode,
             useDynamicColor = settings.useDynamicColor,
             accentColor = settings.accentColor,
-            appLanguage = settings.appLanguage
+            appLanguage = settings.appLanguage,
+            hasCompletedOnboarding = settings.hasCompletedOnboarding
         )
         val previousTheme = memorySnapshot?.themeMode
-        val alreadyPersisted = memorySnapshot == normalized && prefs.getBoolean(KEY_INITIALIZED, false)
+        val alreadyPersisted = memorySnapshot == normalized && runCatching {
+            prefs.getBoolean(KEY_INITIALIZED, false)
+        }.getOrDefault(false)
         if (alreadyPersisted) {
             return
         }
         memorySnapshot = normalized
-        prefs.edit()
-            .putBoolean(KEY_INITIALIZED, true)
-            .putString(KEY_THEME_MODE, normalized.themeMode.name)
-            .putBoolean(KEY_USE_DYNAMIC_COLOR, normalized.useDynamicColor)
-            .putString(KEY_ACCENT_COLOR, normalized.accentColor.name)
-            .putString(KEY_APP_LANGUAGE, normalized.appLanguage.name)
-            .apply()
+        runCatching {
+            prefs.edit()
+                .putBoolean(KEY_INITIALIZED, true)
+                .putString(KEY_THEME_MODE, normalized.themeMode.name)
+                .putBoolean(KEY_USE_DYNAMIC_COLOR, normalized.useDynamicColor)
+                .putString(KEY_ACCENT_COLOR, normalized.accentColor.name)
+                .putString(KEY_APP_LANGUAGE, normalized.appLanguage.name)
+                .putBoolean(KEY_ONBOARDING_COMPLETED, normalized.hasCompletedOnboarding)
+                .apply()
+        }
 
         if (previousTheme != normalized.themeMode) {
             syncSystemApplicationNightMode(normalized.themeMode)
@@ -104,8 +117,14 @@ class StartupAppearanceCache(context: Context) {
         write(current.copy(appLanguage = language))
     }
 
+    fun markOnboardingCompleted() {
+        val current = readOrNull() ?: AppSettings()
+        write(current.copy(hasCompletedOnboarding = true))
+    }
+
     fun resetToDefaults() {
-        write(AppSettings())
+        val preservedOnboarding = readOrNull()?.hasCompletedOnboarding ?: false
+        write(AppSettings(hasCompletedOnboarding = preservedOnboarding))
     }
 
     private fun syncSystemApplicationNightMode(themeMode: ThemeMode) {
@@ -128,5 +147,6 @@ class StartupAppearanceCache(context: Context) {
         private const val KEY_USE_DYNAMIC_COLOR = "use_dynamic_color"
         private const val KEY_ACCENT_COLOR = "accent_color"
         private const val KEY_APP_LANGUAGE = "app_language"
+        private const val KEY_ONBOARDING_COMPLETED = "has_completed_onboarding"
     }
 }

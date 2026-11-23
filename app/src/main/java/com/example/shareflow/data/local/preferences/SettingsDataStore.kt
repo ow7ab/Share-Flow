@@ -2,14 +2,17 @@ package com.example.shareflow.data.local.preferences
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 
 val Context.shareFlowSettingsDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "shareflow_settings"
+    name = "shareflow_settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
 )
 
 object SettingsPreferenceKeys {
@@ -32,4 +35,5 @@ object SettingsPreferenceKeys {
     val PREFERRED_CONNECTION_MODE = stringPreferencesKey("preferred_connection_mode")
     val BIOMETRIC_UNLOCK_PREFERRED = booleanPreferencesKey("biometric_unlock_preferred")
     val CLOUD_UPDATE_MANIFEST_URL = stringPreferencesKey("cloud_update_manifest_url")
+    val HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
 }

@@ -1,5 +1,6 @@
 package com.example.shareflow.data.repository
 
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -52,7 +53,7 @@ class SettingsRepositoryImpl(
 
     override val settings: Flow<AppSettings> = dataStore.data
         .catch { exception ->
-            if (exception is IOException) {
+            if (exception is IOException || exception is CorruptionException) {
                 emit(emptyPreferences())
             } else {
                 throw exception
@@ -120,7 +121,8 @@ class SettingsRepositoryImpl(
                 biometricUnlockPreferred = prefs[SettingsPreferenceKeys.BIOMETRIC_UNLOCK_PREFERRED] ?: true,
                 cloudUpdateManifestUrl = prefs[SettingsPreferenceKeys.CLOUD_UPDATE_MANIFEST_URL]
                     ?.takeIf { SettingsValidator.isValidOptionalHttpsUpdateUrl(it) }
-                    .orEmpty()
+                    .orEmpty(),
+                hasCompletedOnboarding = prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] ?: false
             )
         }
         .onEach { resolved ->
@@ -269,10 +271,21 @@ class SettingsRepositoryImpl(
         }
     }
 
+    override suspend fun markOnboardingCompleted(): AppResult<Unit> {
+        appearanceCache?.markOnboardingCompleted()
+        return safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] = true
+        }
+    }
+
     override suspend fun resetToDefaults(): AppResult<Unit> {
         appearanceCache?.resetToDefaults()
         return safeEdit { prefs ->
+            val completedOnboarding = prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] ?: false
             prefs.clear()
+            if (completedOnboarding) {
+                prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] = true
+            }
         }
     }
 

@@ -1200,6 +1200,58 @@
     <string name="update_dialog_download_now">تحميل الآن</string>
     <string name="update_dialog_later_action">لاحقاً</string>
     <string name="update_dialog_default_notes">تحسينات في الأداء وإصلاحات وتحديثات أمنية لتطبيق ShareFlow.</string>
+
+    <!-- شاشة الترحيب والإعداد عند التثبيت لأول مرة -->
+    <string name="onboarding_skip_action">تخطي</string>
+    <string name="onboarding_next_action">التالي</string>
+    <string name="onboarding_get_started_action">ابدأ الآن</string>
+    <string name="onboarding_step_counter">%1$d / %2$d</string>
+    <string name="onboarding_app_icon_cd">شعار ShareFlow</string>
+    <string name="onboarding_language_label">لغة التطبيق</string>
+    <string name="onboarding_language_system">تلقائي</string>
+    <string name="onboarding_language_english">English</string>
+    <string name="onboarding_language_arabic">العربية</string>
+
+    <string name="onboarding_welcome_badge">مشاركة سريعة بدون إنترنت</string>
+    <string name="onboarding_welcome_title">أهلاً بك في ShareFlow</string>
+    <string name="onboarding_welcome_subtitle">شارك الصور والفيديوهات والتطبيقات والمجلدات مباشرة بين أجهزة Android القريبة بنفس الجودة الأصلية — بدون إنترنت أو استهلاك للبيانات.</string>
+    <string name="onboarding_welcome_feat_offline_title">بدون إنترنت أو بيانات</string>
+    <string name="onboarding_welcome_feat_offline_desc">يتم النقل عبر شبكة Wi-Fi محلية مباشرة بسرعة فائقة ودون أي استهلاك لرصيد الإنترنت.</string>
+    <string name="onboarding_welcome_feat_verified_title">تحقق فوري SHA-256</string>
+    <string name="onboarding_welcome_feat_verified_desc">يتم فحص سلامة كل ملف بعد النقل لضمان وصوله كاملاً دون تلف أو ضغط للجودة.</string>
+    <string name="onboarding_welcome_feat_private_title">خصوصية تامة ومحلية</string>
+    <string name="onboarding_welcome_feat_private_desc">تبقى ملفاتك بين أجهزتك فقط ولا يتم رفعها أبداً إلى أي خوادم خارجية.</string>
+
+    <string name="onboarding_ad_free_badge">خالي تماماً من الإعلانات</string>
+    <string name="onboarding_ad_free_title">التطبيق خالي تماماً من الإعلانات</string>
+    <string name="onboarding_ad_free_subtitle">تطبيق ShareFlow خالي تماماً من الإعلانات والنوافذ المنبثقة وأدوات التتبع، صُمم ليمنحك تجربة نقل ملفات سريعة ونظيفة دون أي إزعاج.</string>
+    <string name="onboarding_ad_free_point_1_title">بدون إعلانات أو نوافذ منبثقة</string>
+    <string name="onboarding_ad_free_point_1_desc">لا توجد إعلانات فيديو مزعجة أو لافتات تقطع عملك أثناء الإرسال أو الاستقبال.</string>
+    <string name="onboarding_ad_free_point_2_title">بدون تتبع لبياناتك</string>
+    <string name="onboarding_ad_free_point_2_desc">لا يحتوي التطبيق على مكتبات إعلانات أو تتبع — خصوصيتك تأتي أولاً دائماً.</string>
+    <string name="onboarding_ad_free_point_3_title">تجربة سريعة ونظيفة فوراً</string>
+    <string name="onboarding_ad_free_point_3_desc">افتح التطبيق وابدأ مشاركة ملفاتك مباشرة دون انتظار أو تشتيت.</string>
+
+    <string name="onboarding_how_badge">دليل الاستخدام السريع</string>
+    <string name="onboarding_how_title">كيفية استخدام التطبيق</string>
+    <string name="onboarding_how_subtitle">انقل ملفاتك بين أي هاتفين في 3 خطوات سهلة وسريعة:</string>
+    <string name="onboarding_how_step_1_title">1. اضغط «إرسال» واختر ملفاتك</string>
+    <string name="onboarding_how_step_1_desc">اختر الصور أو الفيديوهات أو التطبيقات أو المستندات أو المجلدات التي تريد مشاركتها.</string>
+    <string name="onboarding_how_step_2_title">2. افتح «استقبال» على الهاتف الآخر</string>
+    <string name="onboarding_how_step_2_desc">اضغط «بدء الاستقبال» لإنشاء اتصال محلي آمن وإظهار رمز QR للربط الفوري.</string>
+    <string name="onboarding_how_step_3_title">3. امسح رمز QR أو اختر الجهاز</string>
+    <string name="onboarding_how_step_3_desc">امسح رمز QR بالكاميرا أو اضغط على الجهاز القريب ليبدأ الربط والنقل تلقائياً بدون إنترنت.</string>
+
+    <string name="onboarding_perm_badge">شفافية وخصوصية كاملة</string>
+    <string name="onboarding_perm_title">الأذونات المطلوبة ولماذا نحتاجها</string>
+    <string name="onboarding_perm_subtitle">لا يطلب ShareFlow أي إذن إلا عند استخدام الميزة المرتبطة به، ولا يطلب أبداً صلاحية الوصول الشامل للتخزين.</string>
+    <string name="onboarding_perm_wifi_title">الأجهزة القريبة (Wi-Fi) / الموقع</string>
+    <string name="onboarding_perm_wifi_desc">يطلبه نظام Android فقط لاكتشاف الأجهزة القريبة وإنشاء اتصال Wi-Fi محلي مباشر (الموقع مطلوب فقط في Android 12 والأقدم).</string>
+    <string name="onboarding_perm_camera_title">الكاميرا (لمسح رمز QR)</string>
+    <string name="onboarding_perm_camera_desc">تُستخدم حصرياً لمسح رمز QR على الهاتف المُستقبِل للربط الفوري بضغطة واحدة.</string>
+    <string name="onboarding_perm_optional_title">الإشعارات وتثبيت التطبيقات (اختياري)</string>
+    <string name="onboarding_perm_optional_desc">لعرض تقدّم النقل في الإشعارات، والسماح بتثبيت ملفات APK المستلمة عبر مثبّت Android الرسمي.</string>
+    <string name="onboarding_perm_storage_badge">بدون إذن التخزين الشامل — يستخدم منتقي الصور والملفات الرسمي</string>
 </resources>
 
 
