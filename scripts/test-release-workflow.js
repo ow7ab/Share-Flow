@@ -58,6 +58,12 @@ test("release.yml preserves name, triggers, concurrency, atomic draft->promote, 
   // Final summary step
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
 
+  // Must use REST gh api instead of GraphQL gh repo view, sanitize GH_TOKEN, and handle HTTP 401 cleanly
+  assert.doesNotMatch(yml, /\bgh repo view\b/, "Must use REST gh api repos/... instead of GraphQL gh repo view");
+  assert.match(yml, /gh api "repos\/\$\{PUBLIC_REPO\}"/, "Expected REST gh api repository verification");
+  assert.match(yml, /401\|Bad credentials/, "Expected explicit HTTP 401 Bad credentials diagnostic handling");
+  assert.match(yml, /tr -d '\\r\\n'/, "Expected CR/LF sanitization for secrets/tokens");
+
   // Sibling workflows must remain intact
   for (const wf of ["blank.yml", "sync-website.yml", "generate-release-keystore.yml"]) {
     assert.ok(fs.existsSync(path.join(ROOT_DIR, ".github/workflows", wf)), `Missing sibling workflow: ${wf}`);

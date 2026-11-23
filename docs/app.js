@@ -105,6 +105,7 @@
       galleryHeading: "معرض صور ومكونات Share Flow",
       galleryLead: "اضغط على أي صورة للتكبير والتنقل بينها بوضوح. تُعرض فقط الأصول واللقطات الحقيقية للمشروع.",
       zoomLabel: "تكبير",
+      galleryImageFallback: "تعذّر تحميل الصورة حالياً",
       mod1Title: "الرئيسية (إرسال / استقبال)",
       mod1Desc: "وصول فوري لزرَي الإرسال والاستقبال وآخر التحويلات من أعلى الشاشة.",
       mod2Title: "مدير الملفات والوسائط والتطبيقات",
@@ -233,6 +234,7 @@
       galleryHeading: "Share Flow Visual Showcase",
       galleryLead: "Click any visual to zoom and browse. Only authentic project assets and real screenshots are shown.",
       zoomLabel: "Zoom",
+      galleryImageFallback: "Image preview unavailable",
       mod1Title: "Home (Send / Receive)",
       mod1Desc: "Immediate top-level Send & Receive controls with recent transfers and local connection status.",
       mod2Title: "Files, Media & Apps Hub",
@@ -272,6 +274,8 @@
   };
 
   const THEME_STORAGE_KEY = "shareflow_theme";
+  const loadedGallerySrcs = new Set();
+  let galleryObserver = null;
   let currentLang = "ar";
   let currentTheme = "dark";
   let latestReleaseState = { status: "loading", data: null, history: [] };
@@ -283,6 +287,26 @@
 
   function getNextTheme(theme) {
     return theme === "light" ? "dark" : "light";
+  }
+
+  function isValidGalleryAssetSrc(rawSrc) {
+    if (typeof rawSrc !== "string") return false;
+    const trimmed = rawSrc.trim();
+    if (!trimmed || trimmed.length > 256) return false;
+    if (trimmed.includes("..") || trimmed.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+      return false;
+    }
+    return /\.(png|jpe?g|webp|svg)$/i.test(trimmed);
+  }
+
+  function createGalleryImageState(src, alreadyLoaded) {
+    if (!isValidGalleryAssetSrc(src)) {
+      return { valid: false, shouldDefer: false, initialState: "error" };
+    }
+    if (alreadyLoaded) {
+      return { valid: true, shouldDefer: false, initialState: "loaded" };
+    }
+    return { valid: true, shouldDefer: true, initialState: "idle" };
   }
 
   function isPrivateOrLoopbackHost(hostname) {
@@ -774,17 +798,101 @@
     updateProgress();
   }
 
+  function markGalleryImageLoaded(wrap, img, src) {
+    loadedGallerySrcs.add(src);
+    img.dataset.lazyState = "loaded";
+    img.classList.add("is-loaded");
+    wrap.classList.remove("is-loading");
+    wrap.classList.add("is-loaded");
+    wrap.setAttribute("aria-busy", "false");
+  }
+
+  function markGalleryImageError(wrap, img, fallbackText) {
+    img.dataset.lazyState = "error";
+    wrap.classList.remove("is-loading");
+    wrap.classList.add("is-error");
+    wrap.setAttribute("aria-busy", "false");
+    if (!wrap.querySelector(".gallery-error-badge")) {
+      const badge = document.createElement("span");
+      badge.className = "gallery-error-badge";
+      badge.textContent = fallbackText;
+      wrap.appendChild(badge);
+    }
+  }
+
+  function triggerGalleryImageLoad(wrap, img, src, fallbackText) {
+    if (img.dataset.lazyState === "loading" || img.dataset.lazyState === "loaded") return;
+    img.dataset.lazyState = "loading";
+
+    let settled = false;
+    const handleLoaded = () => {
+      if (settled) return;
+      settled = true;
+      if (typeof img.decode === "function") {
+        img
+          .decode()
+          .catch(() => {})
+          .finally(() => markGalleryImageLoaded(wrap, img, src));
+      } else {
+        markGalleryImageLoaded(wrap, img, src);
+      }
+    };
+
+    const handleError = () => {
+      if (settled) return;
+      settled = true;
+      markGalleryImageError(wrap, img, fallbackText);
+    };
+
+    img.addEventListener("load", handleLoaded, { once: true });
+    img.addEventListener("error", handleError, { once: true });
+
+    img.src = src;
+    if (img.complete && img.naturalWidth > 0) {
+      handleLoaded();
+    }
+  }
+
   function renderGallery() {
     const t = I18N[currentLang];
     const grid = document.getElementById("gallery-grid");
     if (!grid) return;
+
+    if (galleryObserver) {
+      galleryObserver.disconnect();
+      galleryObserver = null;
+    }
+
     while (grid.firstChild) {
       grid.removeChild(grid.firstChild);
+    }
+    grid.setAttribute("aria-busy", "false");
+
+    const supportsObserver = typeof window !== "undefined" && typeof window.IntersectionObserver === "function";
+    if (supportsObserver) {
+      galleryObserver = new window.IntersectionObserver(
+        (entries, observer) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const img = entry.target;
+            const src = img.dataset.src;
+            const wrap = img.closest(".gallery-thumb-wrap");
+            observer.unobserve(img);
+            if (wrap && src) {
+              triggerGalleryImageLoad(wrap, img, src, I18N[currentLang].galleryImageFallback);
+            }
+          });
+        },
+        { rootMargin: "200px 0px", threshold: 0.01 }
+      );
     }
 
     const items = Array.isArray(CONFIG.galleryItems) ? CONFIG.galleryItems : [];
     items.forEach((item, index) => {
-      if (!item || typeof item.src !== "string" || !item.src.trim()) return;
+      if (!item || !isValidGalleryAssetSrc(item.src)) return;
+
+      const src = item.src.trim();
+      const imageState = createGalleryImageState(src, loadedGallerySrcs.has(src));
 
       const card = document.createElement("button");
       card.type = "button";
@@ -792,18 +900,31 @@
       card.addEventListener("click", () => openLightbox(index));
 
       const wrap = document.createElement("div");
-      wrap.className = "gallery-thumb-wrap";
+      wrap.className = imageState.initialState === "loaded" ? "gallery-thumb-wrap is-loaded" : "gallery-thumb-wrap is-loading";
+      wrap.setAttribute("aria-busy", imageState.initialState === "loaded" ? "false" : "true");
+
+      const skeletonOverlay = document.createElement("div");
+      skeletonOverlay.className = "gallery-skeleton-overlay";
+      skeletonOverlay.setAttribute("aria-hidden", "true");
+
+      const shimmer = document.createElement("span");
+      shimmer.className = "gallery-skeleton-shimmer";
+      skeletonOverlay.appendChild(shimmer);
 
       const img = document.createElement("img");
-      img.src = item.src;
       img.alt = currentLang === "ar" ? item.altAr || "" : item.altEn || "";
       img.loading = "lazy";
-      img.className = item.src.includes("icon") ? "gallery-thumb contain-media" : "gallery-thumb";
+      img.decoding = "async";
+      img.dataset.src = src;
+      img.dataset.lazyState = imageState.initialState;
+      const baseImgClass = src.includes("icon") ? "gallery-thumb contain-media" : "gallery-thumb";
+      img.className = imageState.initialState === "loaded" ? `${baseImgClass} is-loaded` : baseImgClass;
 
       const zoomTag = document.createElement("span");
       zoomTag.className = "gallery-zoom-tag";
       zoomTag.textContent = t.zoomLabel;
 
+      wrap.appendChild(skeletonOverlay);
       wrap.appendChild(img);
       wrap.appendChild(zoomTag);
 
@@ -822,6 +943,14 @@
       card.appendChild(wrap);
       card.appendChild(meta);
       grid.appendChild(card);
+
+      if (imageState.initialState === "loaded") {
+        img.src = src;
+      } else if (galleryObserver) {
+        galleryObserver.observe(img);
+      } else {
+        triggerGalleryImageLoad(wrap, img, src, t.galleryImageFallback);
+      }
     });
   }
 
@@ -1229,7 +1358,9 @@
       normalizeCustomManifest,
       calculateScrollProgress,
       resolveInitialTheme,
-      getNextTheme
+      getNextTheme,
+      isValidGalleryAssetSrc,
+      createGalleryImageState
     };
   } else {
     document.addEventListener("DOMContentLoaded", init);

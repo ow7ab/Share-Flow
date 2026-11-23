@@ -91,6 +91,8 @@ if ! printf '%s' "$PUBLIC_RELEASES_REPO" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9
   exit 1
 fi
 
+PUBLIC_RELEASES_TOKEN="$(printf '%s' "${PUBLIC_RELEASES_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+
 if [ -z "${PUBLIC_RELEASES_TOKEN:-}" ]; then
   echo "::error::Missing repository secret PUBLIC_RELEASES_TOKEN required to push static docs/ to ${PUBLIC_RELEASES_REPO}."
   echo "::error::GitHub's default GITHUB_TOKEN cannot push to a separate repository. Create a Fine-grained Personal Access Token scoped ONLY to ${PUBLIC_RELEASES_REPO} with 'Contents: Read and write', then add it in ${GITHUB_REPOSITORY:-ow7ab/Share-Flow} -> Settings -> Secrets and variables -> Actions -> Repository secrets as PUBLIC_RELEASES_TOKEN."

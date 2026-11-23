@@ -89,6 +89,42 @@ test("calculateScrollProgress clamps scroll ratio accurately across all viewport
   assert.equal(portal.calculateScrollProgress(0, 600, 900), 0);
 });
 
+test("gallery implements lazy loading, safe asset validation, and theme-aware skeleton loading state", () => {
+  assert.equal(portal.isValidGalleryAssetSrc("assets/shareflow-icon.png"), true);
+  assert.equal(portal.isValidGalleryAssetSrc("screenshots/home.webp"), true);
+  assert.equal(portal.isValidGalleryAssetSrc("../secrets.png"), false);
+  assert.equal(portal.isValidGalleryAssetSrc("javascript:alert(1).png"), false);
+  assert.equal(portal.isValidGalleryAssetSrc("https://evil.example/x.png"), false);
+  assert.equal(portal.isValidGalleryAssetSrc("assets/script.js"), false);
+
+  assert.deepEqual(portal.createGalleryImageState("assets/shareflow-hero.jpg", false), {
+    valid: true,
+    shouldDefer: true,
+    initialState: "idle"
+  });
+  assert.deepEqual(portal.createGalleryImageState("assets/shareflow-hero.jpg", true), {
+    valid: true,
+    shouldDefer: false,
+    initialState: "loaded"
+  });
+  assert.deepEqual(portal.createGalleryImageState("../bad.png", false), {
+    valid: false,
+    shouldDefer: false,
+    initialState: "error"
+  });
+
+  const html = fs.readFileSync(path.join(__dirname, "..", "docs", "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "docs", "styles.css"), "utf8");
+  const js = fs.readFileSync(path.join(__dirname, "..", "docs", "app.js"), "utf8");
+
+  assert.ok(html.includes("gallery-skeleton-card"), "Expected initial gallery skeleton placeholder cards in docs/index.html");
+  assert.ok(html.includes("gallery-skeleton-shimmer"), "Expected shimmer element inside gallery skeleton placeholder");
+  assert.ok(css.includes("@keyframes gallery-shimmer"), "Expected gallery-shimmer keyframes in docs/styles.css");
+  assert.ok(css.includes("--skeleton-base:") && css.includes("--skeleton-shine:"), "Expected theme-aware skeleton CSS variables");
+  assert.ok(js.includes("IntersectionObserver"), "Expected IntersectionObserver lazy loading in docs/app.js");
+  assert.ok(js.includes('img.loading = "lazy"') && js.includes('img.decoding = "async"'), "Expected native lazy loading and async decoding");
+});
+
 test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or private repo release URLs", () => {
   const docsDir = path.join(__dirname, "..", "docs");
   const files = fs.readdirSync(docsDir).filter((f) => /\.(html|css|js|json)$/i.test(f));

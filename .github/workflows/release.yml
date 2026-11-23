@@ -189,26 +189,71 @@ jobs:
           PREV_MANIFEST="${RUNNER_TEMP}/prev-published-version.json"
           rm -f "$PREV_MANIFEST"
 
-          if [ -n "${GH_TOKEN:-}" ]; then
-            IS_PRIVATE=$(gh repo view "$PUBLIC_REPO" --json isPrivate --jq '.isPrivate')
-            if [ "$IS_PRIVATE" != "false" ]; then
-              echo "::error::Destination repository '${PUBLIC_REPO}' is not public (isPrivate=${IS_PRIVATE}). Public APK distribution requires a public releases repository."
-              exit 1
-            fi
+          # Strip accidental leading/trailing whitespace or CR/LF copied into the secret
+          GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          export GH_TOKEN
 
-            if gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" >/dev/null 2>&1; then
+          TOKEN_VALID="false"
+          if [ -n "${GH_TOKEN:-}" ]; then
+            REPO_API_OUT="${RUNNER_TEMP}/public-repo-api.json"
+            REPO_API_ERR="${RUNNER_TEMP}/public-repo-api.err"
+            rm -f "$REPO_API_OUT" "$REPO_API_ERR"
+
+            if gh api "repos/${PUBLIC_REPO}" >"$REPO_API_OUT" 2>"$REPO_API_ERR"; then
+              TOKEN_VALID="true"
+              IS_PRIVATE=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("private", True)).lower())' "$REPO_API_OUT")
+              if [ "$IS_PRIVATE" != "false" ]; then
+                echo "::error::Destination repository '${PUBLIC_REPO}' is not public (private=${IS_PRIVATE}). Public APK distribution requires a public releases repository."
+                exit 1
+              fi
+
+              if gh api "repos/${PUBLIC_REPO}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "::warning::[DRY-RUN] Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'."
+                else
+                  echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and tag a new release."
+                  exit 1
+                fi
+              fi
+
+              gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1 || true
+            else
+              ERR_MSG=$(tr '\n' ' ' < "$REPO_API_ERR" | sed -E 's/[[:space:]]+/ /g')
               if [ "$DRY_RUN" = "true" ]; then
-                echo "::warning::[DRY-RUN] Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'."
+                echo "::warning::[DRY-RUN] PUBLIC_RELEASES_TOKEN failed authentication against '${PUBLIC_REPO}' (${ERR_MSG}). Falling back to unauthenticated public read-only checks for dry-run; refresh PUBLIC_RELEASES_TOKEN before running a live production release."
               else
-                echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and tag a new release."
+                if printf '%s' "$ERR_MSG" | grep -Eqi '401|Bad credentials'; then
+                  echo "::error::PUBLIC_RELEASES_TOKEN was rejected by GitHub (HTTP 401: Bad credentials)."
+                  echo "::error::Fix: Create a new Fine-grained Personal Access Token in GitHub (Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens) scoped ONLY to '${PUBLIC_REPO}' with Repository permission 'Contents: Read and write', then update secret PUBLIC_RELEASES_TOKEN in '${GITHUB_REPOSITORY}' without extra spaces or line breaks."
+                elif printf '%s' "$ERR_MSG" | grep -Eqi '403|404|Not Found|Resource not accessible'; then
+                  echo "::error::PUBLIC_RELEASES_TOKEN cannot access '${PUBLIC_REPO}' (${ERR_MSG})."
+                  echo "::error::Fix: Verify the token is not expired, grants repository access to '${PUBLIC_REPO}', and includes permission 'Contents: Read and write' (and 'Metadata: Read-only')."
+                else
+                  echo "::error::Failed to verify destination repository '${PUBLIC_REPO}': ${ERR_MSG}"
+                fi
                 exit 1
               fi
             fi
-
-            gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1 || true
+            rm -f "$REPO_API_OUT" "$REPO_API_ERR"
           fi
 
-          # Fallback to public HTTPS version.json if gh token is absent (dry-run) or release asset wasn't found yet
+          # In DRY-RUN mode without a valid token, verify public destination repo via unauthenticated REST API
+          if [ "$DRY_RUN" = "true" ] && [ "$TOKEN_VALID" != "true" ]; then
+            PUB_API_OUT="${RUNNER_TEMP}/public-repo-unauth.json"
+            if curl -fsSL --max-time 10 -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${PUBLIC_REPO}" -o "$PUB_API_OUT" 2>/dev/null; then
+              IS_PRIVATE=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("private", True)).lower())' "$PUB_API_OUT")
+              rm -f "$PUB_API_OUT"
+              if [ "$IS_PRIVATE" != "false" ]; then
+                echo "::error::Destination repository '${PUBLIC_REPO}' is not public (private=${IS_PRIVATE})."
+                exit 1
+              fi
+            else
+              rm -f "$PUB_API_OUT"
+              echo "::warning::[DRY-RUN] Could not query unauthenticated GitHub REST API for '${PUBLIC_REPO}'; continuing local build & verification."
+            fi
+          fi
+
+          # Fallback to public HTTPS version.json if gh token is absent/invalid (dry-run) or release asset wasn't found yet
           if [ ! -s "$PREV_MANIFEST" ]; then
             curl -fsSL --max-time 10 "${PORTAL_URL%/}/version.json" -o "$PREV_MANIFEST" >/dev/null 2>&1 || rm -f "$PREV_MANIFEST"
           fi
@@ -623,8 +668,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Strip accidental leading/trailing whitespace or CR/LF copied into the secret
+          GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          export GH_TOKEN
+
           # Final race-condition duplicate guard before creating draft release
-          if gh release view "$RELEASE_TAG" --repo "$PUBLIC_REPO" >/dev/null 2>&1; then
+          if gh api "repos/${PUBLIC_REPO}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
             echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Aborting to preserve immutable release history."
             exit 1
           fi
