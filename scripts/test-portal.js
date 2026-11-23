@@ -306,3 +306,47 @@ test("formatBytes formats Arabic and English file sizes cleanly", () => {
   assert.equal(portal.formatBytes(1024 * 1024 * 25, "en"), "25.00 MB");
   assert.equal(portal.formatBytes(1024 * 1024 * 25, "ar"), "25.00 م.ب");
 });
+
+test("official Share Flow 4-color branding variables and frameless contain icon rules are enforced with zero legacy palette remnants", () => {
+  const docsDir = path.join(__dirname, "..", "docs");
+  const css = fs.readFileSync(path.join(docsDir, "styles.css"), "utf8");
+  const html = fs.readFileSync(path.join(docsDir, "index.html"), "utf8");
+
+  for (const requiredToken of [
+    "--color-primary: #CA2851;",
+    "--color-secondary: #FF6766;",
+    "--color-accent: #FFB173;",
+    "--color-light: #FFE3B3;"
+  ]) {
+    assert.ok(css.includes(requiredToken), `Missing official brand CSS variable: ${requiredToken}`);
+  }
+
+  assert.ok(html.includes('content="#CA2851"'), "Expected theme-color meta tag to use #CA2851");
+  assert.ok(html.includes('href="assets/favicon.png"'), "Expected favicon link to reference assets/favicon.png");
+  assert.ok(css.includes(".brand-logo") && css.includes("object-fit: contain;"), "Logo must use object-fit: contain");
+
+  // Strictly forbid any legacy palette hex or RGB remnants across all docs/ code files
+  const legacyPalettePatterns = [
+    /#0a1821/i,
+    /#1d59bb/i,
+    /#76b9ff/i,
+    /#fef3b3/i,
+    /#febd19/i,
+    /rgba\(\s*15\s*,\s*34\s*,\s*48/i,
+    /rgba\(\s*118\s*,\s*185\s*,\s*255/i
+  ];
+  for (const file of ["index.html", "styles.css", "app.js", "config.js"]) {
+    const content = fs.readFileSync(path.join(docsDir, file), "utf8");
+    for (const pattern of legacyPalettePatterns) {
+      assert.equal(pattern.test(content), false, `Legacy palette color ${pattern} found in docs/${file}`);
+    }
+  }
+
+  // Verify PNG magic signature on both shareflow-icon.png and favicon.png
+  const pngSig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (const imgRel of ["assets/shareflow-icon.png", "assets/favicon.png"]) {
+    const buf = fs.readFileSync(path.join(docsDir, imgRel));
+    assert.ok(buf.subarray(0, 8).equals(pngSig), `Expected valid PNG signature for docs/${imgRel}`);
+  }
+});
+

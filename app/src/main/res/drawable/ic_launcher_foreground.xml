@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        ic_shareflow_foreground_art is a transparent 512x512 RGBA PNG containing the untouched
+        Share Flow emblem scaled with aspect-ratio-preserving contain (~72% of canvas, 14%
+        transparent safe margin on all sides). At 76dp inside the 108dp adaptive canvas, the
+        emblem spans ~55dp — safely inside Android's 66dp circular safe zone and 72dp mask.
+    -->
     <item
-        android:width="66dp"
-        android:height="66dp"
+        android:width="76dp"
+        android:height="76dp"
         android:drawable="@drawable/ic_shareflow_foreground_art"
         android:gravity="center" />
 </layer-list>

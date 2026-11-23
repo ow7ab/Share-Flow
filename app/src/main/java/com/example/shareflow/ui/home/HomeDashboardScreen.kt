@@ -467,21 +467,14 @@ private fun CompactHomeHeaderRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.weight(1f, fill = false)
         ) {
-            Surface(
-                shape = RoundedCornerShape(11.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shadowElevation = 2.dp,
+            Image(
+                painter = painterResource(id = R.drawable.ic_shareflow_foreground_art),
+                contentDescription = stringResource(R.string.cd_app_logo),
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(40.dp)
                     .testTag("home_brand_logo")
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_shareflow_foreground_art),
-                    contentDescription = stringResource(R.string.cd_app_logo),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            )
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium.copy(

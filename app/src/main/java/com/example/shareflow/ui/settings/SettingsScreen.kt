@@ -1028,10 +1028,8 @@ fun SettingsContent(
                             Image(
                                 painter = painterResource(id = R.drawable.ic_shareflow_foreground_art),
                                 contentDescription = stringResource(R.string.cd_app_logo),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(48.dp)
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(

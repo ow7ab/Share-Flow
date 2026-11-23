@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        Android 12+ Splash Screen icon safe circle is 160dp inside a 288dp drawable.
+        With 14% transparent padding built into ic_shareflow_foreground_art, 160dp renders
+        the emblem cleanly at ~115dp with generous breathing room and zero edge clipping.
+    -->
+    <item
+        android:width="160dp"
+        android:height="160dp"
+        android:drawable="@drawable/ic_shareflow_foreground_art"
+        android:gravity="center" />
+</layer-list>

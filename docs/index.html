@@ -7,21 +7,22 @@
     http-equiv="Content-Security-Policy"
     content="default-src 'self'; connect-src 'self' https://api.github.com https:; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self';"
   />
-  <meta name="theme-color" content="#161114" />
+  <meta name="theme-color" content="#CA2851" />
   <meta
     name="description"
     content="Share Flow — الموقع الرسمي ومركز تحميل وتحديثات تطبيق مشاركة الملفات لأندرويد بدون إعلانات وبسرعة عالية عبر Wi-Fi وQR."
   />
-  <link rel="icon" type="image/png" href="assets/shareflow-icon.png" />
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/shareflow-icon.png" />
   <title>Share Flow — الموقع الرسمي وتحميل أندرويد</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Ambient Liquid Glass Lighting Backdrop -->
+  <!-- Ambient Liquid Glass Lighting Backdrop (Official 4-Color Palette) -->
   <div class="ambient-bg" aria-hidden="true">
-    <span class="ambient-orb orb-royal"></span>
-    <span class="ambient-orb orb-sky"></span>
-    <span class="ambient-orb orb-gold"></span>
+    <span class="ambient-orb orb-primary"></span>
+    <span class="ambient-orb orb-secondary"></span>
+    <span class="ambient-orb orb-accent"></span>
   </div>
 
   <!-- Floating Glass Header -->
@@ -32,8 +33,8 @@
           src="assets/shareflow-icon.png"
           alt="Share Flow"
           class="brand-logo"
-          width="44"
-          height="44"
+          width="46"
+          height="46"
         />
         <div class="brand-text">
           <span class="brand-title">Share Flow</span>
@@ -57,8 +58,8 @@
     <section class="hero-grid" aria-labelledby="hero-title">
       <div class="hero-content glass-panel">
         <div class="hero-badges">
-          <span class="pill-badge badge-gold" id="hero-eyebrow">هل مللت من الإعلانات المزعجة في تطبيقات مشاركة الملفات؟</span>
-          <span class="pill-badge badge-sky" id="official-badge">الموقع الرسمي • خالي تماماً من الإعلانات</span>
+          <span class="pill-badge badge-light" id="hero-eyebrow">هل مللت من الإعلانات المزعجة في تطبيقات مشاركة الملفات؟</span>
+          <span class="pill-badge badge-secondary" id="official-badge">الموقع الرسمي • خالي تماماً من الإعلانات</span>
         </div>
 
         <h1 id="hero-title">جرّب Share Flow. شارك ملفاتك بسهولة، بسرعة، وبتجربة أكثر راحة.</h1>
@@ -70,7 +71,7 @@
         <div class="hero-cta-row">
           <a
             id="download-apk-btn"
-            class="btn-primary-gold"
+            class="btn-primary-brand"
             aria-disabled="true"
             rel="noopener noreferrer"
           >جاري تجهيز تحميل Share Flow…</a>
@@ -141,8 +142,8 @@
               src="assets/shareflow-icon.png"
               alt="Share Flow Logo"
               class="spotlight-icon"
-              width="96"
-              height="96"
+              width="112"
+              height="112"
             />
             <h2 class="spotlight-title">Share Flow</h2>
             <p class="spotlight-tagline" id="spotlight-tagline">
@@ -176,37 +177,37 @@
 
       <div class="features-grid">
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-blue" aria-hidden="true">⇄</div>
+          <div class="feature-icon icon-primary" aria-hidden="true">⇄</div>
           <h3 id="feat-title-1">إرسال واستقبال محلي فائق السرعة</h3>
           <p id="feat-desc-1">شارك ملفاتك مباشرة عبر Wi-Fi المحلي أو Wi-Fi Direct أو نقطة الاتصال دون استهلاك رصيد الإنترنت.</p>
         </article>
 
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-gold" aria-hidden="true">✦</div>
+          <div class="feature-icon icon-secondary" aria-hidden="true">✦</div>
           <h3 id="feat-title-2">تجربة نظيفة خالية تماماً من الإعلانات</h3>
           <p id="feat-desc-2">لا إعلانات منبثقة ولا شاشات مزعجة — افتح التطبيق وابدأ الإرسال أو الاستقبال مباشرة بتركيز كامل.</p>
         </article>
 
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-sky" aria-hidden="true">▣</div>
+          <div class="feature-icon icon-accent" aria-hidden="true">▣</div>
           <h3 id="feat-title-3">ربط فوري عبر رمز QR</h3>
           <p id="feat-desc-3">امسح رمز QR من الجهاز المستقبِل ليتم الاتصال فوراً بوضوح وأمان دون إعدادات معقدة.</p>
         </article>
 
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-blue" aria-hidden="true">▤</div>
+          <div class="feature-icon icon-primary" aria-hidden="true">▤</div>
           <h3 id="feat-title-4">دعم شامل لجميع أنواع ملفاتك</h3>
           <p id="feat-desc-4">يدعم الصور، الفيديوهات، الصوتيات، المستندات، المجلدات، والتطبيقات المثبّتة (بما فيها Split APKs).</p>
         </article>
 
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-gold" aria-hidden="true">◈</div>
+          <div class="feature-icon icon-secondary" aria-hidden="true">◈</div>
           <h3 id="feat-title-5">أمان وتشفير وخصوصية عالية</h3>
           <p id="feat-desc-5">تشفير AES-256-GCM أثناء النقل، تحقق SHA-256 لسلامة كل ملف، وخزنة خاصة محمية بقفل الجهاز.</p>
         </article>
 
         <article class="glass-card feature-card">
-          <div class="feature-icon icon-sky" aria-hidden="true">↻</div>
+          <div class="feature-icon icon-accent" aria-hidden="true">↻</div>
           <h3 id="feat-title-6">تحديثات تلقائية آمنة من داخل التطبيق</h3>
           <p id="feat-desc-6">اضغط «التحقق من التحديثات» داخل الإعدادات ليفحص التطبيق أحدث إصدار ويتحقق من SHA-256 والشهادة تلقائياً.</p>
         </article>
@@ -310,7 +311,7 @@
     <footer class="site-footer">
       <div class="footer-inner glass-panel">
         <div class="footer-brand">
-          <img src="assets/shareflow-icon.png" alt="Share Flow" width="32" height="32" class="footer-icon" />
+          <img src="assets/shareflow-icon.png" alt="Share Flow" width="36" height="36" class="footer-icon" />
           <span id="footer-text">Share Flow — ملفاتك على أجهزتك وتحت تحكمك الكامل.</span>
         </div>
         <span class="footer-meta" id="footer-meta">HTTPS • Direct Signed APK • Zero Ads</span>

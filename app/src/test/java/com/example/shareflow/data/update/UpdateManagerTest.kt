@@ -17,8 +17,13 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class UpdateManagerTest {
 
     private fun buildClientReturning(statusCode: Int, jsonBody: String, onRequestUrl: (String) -> Unit = {}): OkHttpClient =

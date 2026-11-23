@@ -113,10 +113,8 @@ fun UpdateAvailableDialog(
                     Image(
                         painter = painterResource(id = R.drawable.ic_shareflow_foreground_art),
                         contentDescription = stringResource(R.string.cd_app_logo),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(52.dp)
                     )
                     Column(
                         modifier = Modifier.weight(1f),
