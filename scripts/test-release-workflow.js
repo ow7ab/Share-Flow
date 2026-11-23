@@ -332,3 +332,39 @@ test("release_helpers build-manifest generates valid version.json accepted by do
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("generate-release-keystore.yml DN validator accepts 'Share Flow' and rejects malformed/injected inputs", () => {
+  const ksWorkflowPath = path.join(ROOT_DIR, ".github/workflows/generate-release-keystore.yml");
+  const yml = fs.readFileSync(ksWorkflowPath, "utf8");
+
+  assert.doesNotMatch(yml, /grep -Eq '\[,="\\\\`\$;\\r\\n\]'/, "Must not use broken POSIX grep \\r\\n inside [...]");
+  const pyMatch = yml.match(/python3 - <<'PYEOF'\n([\s\S]*?)\n\s*PYEOF/);
+  assert.ok(pyMatch, "Expected Python DN validator block in generate-release-keystore.yml");
+
+  const rawLines = pyMatch[1].split("\n");
+  const indents = rawLines.filter((l) => l.trim().length > 0).map((l) => l.match(/^\s*/)[0].length);
+  const minIndent = Math.min(...indents);
+  const pyCode = rawLines.map((l) => (l.length >= minIndent ? l.slice(minIndent) : "")).join("\n");
+
+  // Default values with letters 'r' and 'n' must succeed
+  execFileSync("python3", ["-c", pyCode], {
+    env: { ...process.env, DNAME_CN: "Share Flow", DNAME_O: "Share Flow Engineering", DNAME_C: "SD" },
+    stdio: "pipe",
+  });
+
+  // Disallowed characters (comma, equals, newline, command substitution) must fail
+  for (const badEnv of [
+    { DNAME_CN: "Share,Flow", DNAME_O: "Share Flow", DNAME_C: "SD" },
+    { DNAME_CN: "Share=Flow", DNAME_O: "Share Flow", DNAME_C: "SD" },
+    { DNAME_CN: "Share\nFlow", DNAME_O: "Share Flow", DNAME_C: "SD" },
+    { DNAME_CN: "$(whoami)", DNAME_O: "Share Flow", DNAME_C: "SD" },
+    { DNAME_CN: "Share Flow", DNAME_O: "Share Flow", DNAME_C: "SUD" },
+  ]) {
+    assert.throws(() =>
+      execFileSync("python3", ["-c", pyCode], {
+        env: { ...process.env, ...badEnv },
+        stdio: "pipe",
+      })
+    );
+  }
+});
