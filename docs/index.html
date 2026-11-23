@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,6 +18,19 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Top Reading / Scroll Progress Bar -->
+  <div
+    id="scroll-progress-bar"
+    class="scroll-progress-track"
+    role="progressbar"
+    aria-label="تقدم التمرير في الصفحة"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    aria-valuenow="0"
+  >
+    <div id="scroll-progress-fill" class="scroll-progress-fill"></div>
+  </div>
+
   <!-- Ambient Liquid Glass Lighting Backdrop (Official 4-Color Palette) -->
   <div class="ambient-bg" aria-hidden="true">
     <span class="ambient-orb orb-primary"></span>
@@ -44,12 +57,25 @@
 
       <div class="nav-links" id="nav-links">
         <a href="#features" id="nav-features">المميزات</a>
+        <a href="#about" id="nav-about">عن التطبيق</a>
         <a href="#screenshots" id="nav-gallery">واجهة التطبيق</a>
         <a href="#releases" id="nav-releases">الإصدارات</a>
         <a href="#faq" id="nav-faq">الأسئلة الشائعة</a>
       </div>
 
-      <button type="button" id="lang-toggle" class="glass-pill-btn" aria-label="Switch Language">English</button>
+      <div class="nav-actions">
+        <button
+          type="button"
+          id="theme-toggle"
+          class="glass-pill-btn theme-toggle-btn"
+          aria-label="التبديل إلى الوضع الفاتح عالي التباين"
+          aria-pressed="false"
+        >
+          <span class="theme-toggle-icon" id="theme-toggle-icon" aria-hidden="true">☀</span>
+          <span class="theme-toggle-label" id="theme-toggle-label">فاتح</span>
+        </button>
+        <button type="button" id="lang-toggle" class="glass-pill-btn" aria-label="Switch Language">English</button>
+      </div>
     </nav>
   </header>
 
@@ -210,6 +236,81 @@
           <div class="feature-icon icon-accent" aria-hidden="true">↻</div>
           <h3 id="feat-title-6">تحديثات تلقائية آمنة من داخل التطبيق</h3>
           <p id="feat-desc-6">اضغط «التحقق من التحديثات» داخل الإعدادات ليفحص التطبيق أحدث إصدار ويتحقق من SHA-256 والشهادة تلقائياً.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 2.5 ABOUT SECTION (AboutSection Component: App Info, Developers & License) -->
+    <section
+      id="about"
+      class="section-block about-section"
+      data-component="AboutSection"
+      aria-labelledby="about-heading"
+    >
+      <div class="section-head">
+        <span class="section-kicker" id="about-kicker">الهوية، التطوير، ورخصة الاستخدام</span>
+        <h2 id="about-heading">حول تطبيق Share Flow</h2>
+        <p id="about-lead">تعرّف على رؤية المشروع، فريق التطوير، وشروط الاستخدام الرسمية لضمان تجربة آمنة وشفافة.</p>
+      </div>
+
+      <div class="about-grid">
+        <article class="glass-panel about-card">
+          <div class="about-card-head">
+            <div class="feature-icon icon-primary" aria-hidden="true">◉</div>
+            <div>
+              <span class="about-card-eyebrow" id="about-app-tag">عن التطبيق</span>
+              <h3 id="about-app-title">تطبيق Share Flow لأندرويد</h3>
+            </div>
+          </div>
+          <p class="about-card-body" id="about-app-desc">
+            تطبيق أندرويد مبني أصلياً بلغة Kotlin وواجهة Jetpack Compose لنقل الملفات محلياً بسرعة عالية عبر Wi-Fi ورمز QR دون إنترنت، مع تشفير AES-256-GCM، تحقق SHA-256، وتجربة نظيفة خالية تماماً من الإعلانات.
+          </p>
+          <ul class="about-facts-list">
+            <li id="about-app-fact-1">يدعم Android 7.0+ (API 24) حتى أحدث إصدارات Android.</li>
+            <li id="about-app-fact-2">تحديثات موثّقة تلقائياً عبر version.json مع تثبيت مباشر فوق النسخة السابقة.</li>
+          </ul>
+        </article>
+
+        <article class="glass-panel about-card">
+          <div class="about-card-head">
+            <div class="feature-icon icon-secondary" aria-hidden="true">⌘</div>
+            <div>
+              <span class="about-card-eyebrow" id="about-dev-tag">المطورون</span>
+              <h3 id="about-dev-title">فريق تطوير Share Flow (ow7ab)</h3>
+            </div>
+          </div>
+          <p class="about-card-body" id="about-dev-desc">
+            يُطوَّر Share Flow ويُصان بواسطة فريق التطوير المستقل (ow7ab) بتركيز كامل على الخصوصية والأمان المحلي وجودة تجربة المستخدم العربية والعالمية دون أي تتبع أو مكتبات إعلانية.
+          </p>
+          <ul class="about-facts-list">
+            <li id="about-dev-fact-1">بناء مؤتمت وموقّع رقمياً مع فحص مستمر للتوقيع والمحاذاة قبل كل إصدار.</li>
+            <li id="about-dev-fact-2">توزيع شفاف لملفات APK وبصمات SHA-256 عبر مستودع الإصدارات العام.</li>
+          </ul>
+          <a
+            id="about-releases-link"
+            class="about-inline-link"
+            href="https://github.com/ow7ab/Share-Flow-Releases/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+          >صفحة الإصدارات الرسمية على GitHub ↗</a>
+        </article>
+
+        <article class="glass-panel about-card">
+          <div class="about-card-head">
+            <div class="feature-icon icon-accent" aria-hidden="true">§</div>
+            <div>
+              <span class="about-card-eyebrow" id="about-license-tag">رخصة الاستخدام</span>
+              <h3 id="about-license-title">ترخيص مجاني للاستخدام الشخصي</h3>
+            </div>
+          </div>
+          <p class="about-card-body" id="about-license-desc">
+            تطبيق Share Flow متاح مجاناً للاستخدام الشخصي وغير التجاري دون أي إعلانات أو رسوم مخفية، بينما تبقى الشيفرة المصدرية والعلامة البصرية محفوظة الحقوق للمطورين.
+          </p>
+          <ul class="about-facts-list">
+            <li id="about-license-fact-1">يُسمح بتنزيل وتثبيت ومشاركة النسخة الرسمية الموقّعة Share-Flow.apk كما هي.</li>
+            <li id="about-license-fact-2">يُمنع تعديل ملف APK أو إعادة توقيعه أو توزيع نسخ غير رسمية باسم Share Flow.</li>
+          </ul>
+          <span class="about-license-badge" id="about-license-badge">جميع الحقوق محفوظة © Share Flow</span>
         </article>
       </div>
     </section>

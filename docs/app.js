@@ -18,9 +18,15 @@
       langBtn: "English",
       brandSub: "مشاركة ملفات سريعة بلا إعلانات • أندرويد",
       navFeatures: "المميزات",
+      navAbout: "عن التطبيق",
       navGallery: "واجهة التطبيق",
       navReleases: "الإصدارات",
       navFaq: "الأسئلة الشائعة",
+      scrollProgressLabel: "تقدم التمرير في الصفحة",
+      themeToLightLabel: "فاتح",
+      themeToDarkLabel: "داكن",
+      themeToLightAria: "التبديل إلى الوضع الفاتح عالي التباين",
+      themeToDarkAria: "التبديل إلى وضع الياقوت الداكن (Deep Ruby)",
       heroEyebrow: "هل مللت من الإعلانات المزعجة في تطبيقات مشاركة الملفات؟",
       officialBadge: "الموقع الرسمي • خالي تماماً من الإعلانات",
       heroTitle: "جرّب Share Flow. شارك ملفاتك بسهولة، بسرعة، وبتجربة أكثر راحة.",
@@ -72,6 +78,29 @@
       f5Desc: "تشفير AES-256-GCM أثناء النقل، تحقق SHA-256 لسلامة كل ملف، وخزنة خاصة محمية بقفل الجهاز.",
       f6Title: "تحديثات تلقائية آمنة من داخل التطبيق",
       f6Desc: "اضغط «التحقق من التحديثات» داخل الإعدادات ليفحص التطبيق أحدث إصدار ويتحقق من SHA-256 والشهادة تلقائياً.",
+      aboutKicker: "الهوية، التطوير، ورخصة الاستخدام",
+      aboutHeading: "حول تطبيق Share Flow",
+      aboutLead: "تعرّف على رؤية المشروع، فريق التطوير، وشروط الاستخدام الرسمية لضمان تجربة آمنة وشفافة.",
+      aboutAppTag: "عن التطبيق",
+      aboutAppTitle: "تطبيق Share Flow لأندرويد",
+      aboutAppDesc:
+        "تطبيق أندرويد مبني أصلياً بلغة Kotlin وواجهة Jetpack Compose لنقل الملفات محلياً بسرعة عالية عبر Wi-Fi ورمز QR دون إنترنت، مع تشفير AES-256-GCM، تحقق SHA-256، وتجربة نظيفة خالية تماماً من الإعلانات.",
+      aboutAppFact1: "يدعم Android 7.0+ (API 24) حتى أحدث إصدارات Android.",
+      aboutAppFact2: "تحديثات موثّقة تلقائياً عبر version.json مع تثبيت مباشر فوق النسخة السابقة.",
+      aboutDevTag: "المطورون",
+      aboutDevTitle: "فريق تطوير Share Flow (ow7ab)",
+      aboutDevDesc:
+        "يُطوَّر Share Flow ويُصان بواسطة فريق التطوير المستقل (ow7ab) بتركيز كامل على الخصوصية والأمان المحلي وجودة تجربة المستخدم العربية والعالمية دون أي تتبع أو مكتبات إعلانية.",
+      aboutDevFact1: "بناء مؤتمت وموقّع رقمياً مع فحص مستمر للتوقيع والمحاذاة قبل كل إصدار.",
+      aboutDevFact2: "توزيع شفاف لملفات APK وبصمات SHA-256 عبر مستودع الإصدارات العام.",
+      aboutReleasesLink: "صفحة الإصدارات الرسمية على GitHub ↗",
+      aboutLicenseTag: "رخصة الاستخدام",
+      aboutLicenseTitle: "ترخيص مجاني للاستخدام الشخصي",
+      aboutLicenseDesc:
+        "تطبيق Share Flow متاح مجاناً للاستخدام الشخصي وغير التجاري دون أي إعلانات أو رسوم مخفية، بينما تبقى الشيفرة المصدرية والعلامة البصرية محفوظة الحقوق للمطورين.",
+      aboutLicenseFact1: "يُسمح بتنزيل وتثبيت ومشاركة النسخة الرسمية الموقّعة Share-Flow.apk كما هي.",
+      aboutLicenseFact2: "يُمنع تعديل ملف APK أو إعادة توقيعه أو توزيع نسخ غير رسمية باسم Share Flow.",
+      aboutLicenseBadge: "جميع الحقوق محفوظة © Share Flow",
       galleryKicker: "الهوية ولقطات المشروع",
       galleryHeading: "معرض صور ومكونات Share Flow",
       galleryLead: "اضغط على أي صورة للتكبير والتنقل بينها بوضوح. تُعرض فقط الأصول واللقطات الحقيقية للمشروع.",
@@ -117,9 +146,15 @@
       langBtn: "العربية",
       brandSub: "Fast Ad-Free Local File Sharing • Android",
       navFeatures: "Features",
+      navAbout: "About",
       navGallery: "Showcase",
       navReleases: "Releases",
       navFaq: "FAQ",
+      scrollProgressLabel: "Page scroll progress",
+      themeToLightLabel: "Light",
+      themeToDarkLabel: "Dark",
+      themeToLightAria: "Switch to high-contrast light theme",
+      themeToDarkAria: "Switch to Deep Ruby dark theme",
       heroEyebrow: "Tired of intrusive ads in file-sharing apps?",
       officialBadge: "Official Website • 100% Ad-Free",
       heroTitle: "Try Share Flow. Share your files easily, fast, and comfortably.",
@@ -171,6 +206,29 @@
       f5Desc: "AES-256-GCM transport encryption, SHA-256 file verification, and a device-locked Private Vault.",
       f6Title: "Automatic Verified In-App Updates",
       f6Desc: "Tap Check for Updates in Settings to fetch version.json, verify SHA-256 and signing cert, and update in-place.",
+      aboutKicker: "Identity, Developers & Usage License",
+      aboutHeading: "About Share Flow",
+      aboutLead: "Learn about the project vision, the developers behind it, and the official usage license.",
+      aboutAppTag: "About the App",
+      aboutAppTitle: "Share Flow for Android",
+      aboutAppDesc:
+        "A native Android application built with Kotlin and Jetpack Compose for high-speed offline local file sharing over Wi-Fi and QR pairing, featuring AES-256-GCM encryption, SHA-256 integrity checks, and a 100% ad-free experience.",
+      aboutAppFact1: "Supports Android 7.0+ (API 24) through modern Android releases.",
+      aboutAppFact2: "Automatic verified in-app updates via version.json with seamless in-place upgrades.",
+      aboutDevTag: "Developers",
+      aboutDevTitle: "Share Flow Engineering Team (ow7ab)",
+      aboutDevDesc:
+        "Designed and maintained independently by the Share Flow team (ow7ab) with a strict focus on local privacy, cryptographic security, and polished bilingual Arabic & English UX with zero tracking or ad SDKs.",
+      aboutDevFact1: "Automated CI/CD signed release builds verified for signature and alignment prior to publishing.",
+      aboutDevFact2: "Transparent public distribution of signed APKs and SHA-256 checksums via GitHub Releases.",
+      aboutReleasesLink: "Official GitHub Releases Page ↗",
+      aboutLicenseTag: "Usage License",
+      aboutLicenseTitle: "Free Personal Use License",
+      aboutLicenseDesc:
+        "Share Flow is free for personal and non-commercial use with zero ads or hidden fees. Source code, signing keys, and brand identity remain proprietary and reserved by the developers.",
+      aboutLicenseFact1: "Downloading, installing, and sharing the unmodified signed Share-Flow.apk is permitted.",
+      aboutLicenseFact2: "Modifying, re-signing, or redistributing unofficial builds under the Share Flow name is prohibited.",
+      aboutLicenseBadge: "All Rights Reserved © Share Flow",
       galleryKicker: "Project Visuals & Modules",
       galleryHeading: "Share Flow Visual Showcase",
       galleryLead: "Click any visual to zoom and browse. Only authentic project assets and real screenshots are shown.",
@@ -213,9 +271,19 @@
     }
   };
 
+  const THEME_STORAGE_KEY = "shareflow_theme";
   let currentLang = "ar";
+  let currentTheme = "dark";
   let latestReleaseState = { status: "loading", data: null, history: [] };
   let activeLightboxIndex = -1;
+
+  function resolveInitialTheme(savedTheme) {
+    return savedTheme === "light" ? "light" : "dark";
+  }
+
+  function getNextTheme(theme) {
+    return theme === "light" ? "dark" : "light";
+  }
 
   function isPrivateOrLoopbackHost(hostname) {
     const clean = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
@@ -521,9 +589,13 @@
     setText("lang-toggle", t.langBtn);
     setText("brand-subtitle", t.brandSub);
     setText("nav-features", t.navFeatures);
+    setText("nav-about", t.navAbout);
     setText("nav-gallery", t.navGallery);
     setText("nav-releases", t.navReleases);
     setText("nav-faq", t.navFaq);
+    const progressBar = document.getElementById("scroll-progress-bar");
+    if (progressBar) progressBar.setAttribute("aria-label", t.scrollProgressLabel);
+    updateThemeToggleUi();
     setText("hero-eyebrow", t.heroEyebrow);
     setText("official-badge", t.officialBadge);
     setText("hero-title", t.heroTitle);
@@ -560,6 +632,8 @@
     setText("feat-desc-5", t.f5Desc);
     setText("feat-title-6", t.f6Title);
     setText("feat-desc-6", t.f6Desc);
+
+    renderAboutSection(t);
 
     setText("gallery-kicker", t.galleryKicker);
     setText("gallery-heading", t.galleryHeading);
@@ -602,6 +676,102 @@
     setText("footer-meta", t.footerMeta);
 
     renderGallery();
+  }
+
+  function renderAboutSection(t) {
+    setText("about-kicker", t.aboutKicker);
+    setText("about-heading", t.aboutHeading);
+    setText("about-lead", t.aboutLead);
+    setText("about-app-tag", t.aboutAppTag);
+    setText("about-app-title", t.aboutAppTitle);
+    setText("about-app-desc", t.aboutAppDesc);
+    setText("about-app-fact-1", t.aboutAppFact1);
+    setText("about-app-fact-2", t.aboutAppFact2);
+    setText("about-dev-tag", t.aboutDevTag);
+    setText("about-dev-title", t.aboutDevTitle);
+    setText("about-dev-desc", t.aboutDevDesc);
+    setText("about-dev-fact-1", t.aboutDevFact1);
+    setText("about-dev-fact-2", t.aboutDevFact2);
+    setText("about-releases-link", t.aboutReleasesLink);
+    setText("about-license-tag", t.aboutLicenseTag);
+    setText("about-license-title", t.aboutLicenseTitle);
+    setText("about-license-desc", t.aboutLicenseDesc);
+    setText("about-license-fact-1", t.aboutLicenseFact1);
+    setText("about-license-fact-2", t.aboutLicenseFact2);
+    setText("about-license-badge", t.aboutLicenseBadge);
+  }
+
+  function calculateScrollProgress(scrollTop, scrollHeight, clientHeight) {
+    const scrollable = Number(scrollHeight) - Number(clientHeight);
+    if (!Number.isFinite(scrollable) || scrollable <= 0) return 0;
+    const raw = Number(scrollTop) / scrollable;
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    if (raw >= 1) return 1;
+    return raw;
+  }
+
+  function updateThemeToggleUi() {
+    const t = I18N[currentLang];
+    const btn = document.getElementById("theme-toggle");
+    const iconEl = document.getElementById("theme-toggle-icon");
+    const labelEl = document.getElementById("theme-toggle-label");
+    const isLight = currentTheme === "light";
+
+    if (iconEl) iconEl.textContent = isLight ? "☾" : "☀";
+    if (labelEl) labelEl.textContent = isLight ? t.themeToDarkLabel : t.themeToLightLabel;
+    if (btn) {
+      btn.setAttribute("aria-pressed", String(isLight));
+      btn.setAttribute("aria-label", isLight ? t.themeToDarkAria : t.themeToLightAria);
+    }
+  }
+
+  function applyTheme(theme, persist) {
+    currentTheme = resolveInitialTheme(theme);
+    document.documentElement.setAttribute("data-theme", currentTheme);
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute("content", currentTheme === "light" ? "#FFF9F2" : "#CA2851");
+    }
+
+    if (persist) {
+      try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
+      } catch {
+        // Storage unavailable (private mode / restricted context)
+      }
+    }
+
+    updateThemeToggleUi();
+  }
+
+  function setupScrollProgressBar() {
+    const bar = document.getElementById("scroll-progress-bar");
+    const fill = document.getElementById("scroll-progress-fill");
+    if (!bar || !fill) return;
+
+    let rafId = 0;
+    const updateProgress = () => {
+      rafId = 0;
+      const docEl = document.documentElement;
+      const scrollTop = window.scrollY || docEl.scrollTop || 0;
+      const ratio = calculateScrollProgress(scrollTop, docEl.scrollHeight, window.innerHeight || docEl.clientHeight);
+      fill.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      bar.setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
+    };
+
+    const scheduleUpdate = () => {
+      if (rafId) return;
+      if (typeof window.requestAnimationFrame === "function") {
+        rafId = window.requestAnimationFrame(updateProgress);
+      } else {
+        updateProgress();
+      }
+    };
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+    updateProgress();
   }
 
   function renderGallery() {
@@ -966,7 +1136,21 @@
   }
 
   function init() {
+    let savedTheme = null;
+    try {
+      savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    } catch {
+      savedTheme = null;
+    }
+    applyTheme(resolveInitialTheme(savedTheme), false);
     applyStaticStrings();
+
+    const themeBtn = document.getElementById("theme-toggle");
+    if (themeBtn) {
+      themeBtn.addEventListener("click", () => {
+        applyTheme(getNextTheme(currentTheme), true);
+      });
+    }
 
     const langBtn = document.getElementById("lang-toggle");
     if (langBtn) {
@@ -1026,6 +1210,7 @@
       if (event.key === "ArrowRight") stepLightbox(currentLang === "ar" ? -1 : 1);
     });
 
+    setupScrollProgressBar();
     fetchLatestRelease();
   }
 
@@ -1041,7 +1226,10 @@
       extractBuildNumber,
       resolveReleasesList,
       resolveLatestAndHistory,
-      normalizeCustomManifest
+      normalizeCustomManifest,
+      calculateScrollProgress,
+      resolveInitialTheme,
+      getNextTheme
     };
   } else {
     document.addEventListener("DOMContentLoaded", init);

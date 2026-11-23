@@ -38,12 +38,17 @@ test("docs/config.js targets public ow7ab/Share-Flow-Releases and GitHub Pages w
   }
 });
 
-test("docs/index.html contains all official landing page sections and Liquid Glass anchors", () => {
+test("docs/index.html contains all official landing page sections, AboutSection placement, theme toggle, and scroll progress bar", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "docs", "index.html"), "utf8");
   for (const requiredId of [
+    'id="scroll-progress-bar"',
+    'id="scroll-progress-fill"',
+    'id="theme-toggle"',
     'id="download-apk-btn"',
     'id="discover-features-btn"',
     'id="features"',
+    'id="about"',
+    'data-component="AboutSection"',
     'id="screenshots"',
     'id="install-title"',
     'id="releases"',
@@ -52,6 +57,36 @@ test("docs/index.html contains all official landing page sections and Liquid Gla
   ]) {
     assert.ok(html.includes(requiredId), `Missing required element ${requiredId} in docs/index.html`);
   }
+
+  // Verify AboutSection is placed strictly between Features (#features) and Visual Gallery (#screenshots)
+  const featuresIdx = html.indexOf('id="features"');
+  const aboutIdx = html.indexOf('id="about"');
+  const galleryIdx = html.indexOf('id="screenshots"');
+  assert.ok(featuresIdx > 0 && aboutIdx > featuresIdx && galleryIdx > aboutIdx, "AboutSection must appear between #features and #screenshots");
+});
+
+test("theme toggle supports Deep Ruby dark default and High-Contrast light CSS variables", () => {
+  assert.equal(portal.resolveInitialTheme(null), "dark");
+  assert.equal(portal.resolveInitialTheme("dark"), "dark");
+  assert.equal(portal.resolveInitialTheme("light"), "light");
+  assert.equal(portal.resolveInitialTheme("invalid"), "dark");
+  assert.equal(portal.getNextTheme("dark"), "light");
+  assert.equal(portal.getNextTheme("light"), "dark");
+
+  const css = fs.readFileSync(path.join(__dirname, "..", "docs", "styles.css"), "utf8");
+  assert.ok(css.includes('html[data-theme="light"]'), "Missing html[data-theme=\"light\"] CSS variable block");
+  assert.ok(css.includes("--surface-canvas: #FFF9F2;"), "Expected high-contrast light surface token");
+  assert.ok(css.includes("--text-primary: #210812;"), "Expected high-contrast dark burgundy text token for light theme");
+});
+
+test("calculateScrollProgress clamps scroll ratio accurately across all viewport states", () => {
+  assert.equal(portal.calculateScrollProgress(0, 2000, 800), 0);
+  assert.equal(portal.calculateScrollProgress(600, 2000, 800), 0.5);
+  assert.equal(portal.calculateScrollProgress(1200, 2000, 800), 1);
+  assert.equal(portal.calculateScrollProgress(-50, 2000, 800), 0);
+  assert.equal(portal.calculateScrollProgress(2500, 2000, 800), 1);
+  assert.equal(portal.calculateScrollProgress(0, 800, 800), 0);
+  assert.equal(portal.calculateScrollProgress(0, 600, 900), 0);
 });
 
 test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or private repo release URLs", () => {
