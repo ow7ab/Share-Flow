@@ -66,6 +66,7 @@ jobs:
           KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
           EXPECTED_CERT: ${{ secrets.EXPECTED_CERT_SHA256 }}
+          SETUP_TOKEN: ${{ secrets.KEYSTORE_SETUP_TOKEN }}
           PUB_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           PUB_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
           PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
@@ -83,10 +84,19 @@ jobs:
             echo "Running in SAFE DRY-RUN mode: no public GitHub Release or website changes will be published."
           fi
 
+          # Safe first-time keystore bootstrap is allowed ONLY when ALL signing secrets & cert pin are absent AND KEYSTORE_SETUP_TOKEN is provided.
+          BOOTSTRAP_KEYSTORE="false"
+          if [ -z "$KEYSTORE_B64" ] && [ -z "$STORE_PW" ] && [ -z "$KEY_PW" ] && [ -z "$EXPECTED_CERT" ] && [ -n "$SETUP_TOKEN" ]; then
+            BOOTSTRAP_KEYSTORE="true"
+            echo "First-time setup detected: permanent release signing secrets are absent and KEYSTORE_SETUP_TOKEN is configured. Will perform guarded one-time keystore bootstrap and save permanently to Repository Secrets."
+          fi
+
           MISSING=()
-          [ -z "$KEYSTORE_B64" ] && MISSING+=("Secret: ANDROID_KEYSTORE_BASE64")
-          [ -z "$STORE_PW" ] && MISSING+=("Secret: ANDROID_STORE_PASSWORD")
-          [ -z "$KEY_PW" ] && MISSING+=("Secret: ANDROID_KEY_PASSWORD")
+          if [ "$BOOTSTRAP_KEYSTORE" != "true" ]; then
+            [ -z "$KEYSTORE_B64" ] && MISSING+=("Secret: ANDROID_KEYSTORE_BASE64")
+            [ -z "$STORE_PW" ] && MISSING+=("Secret: ANDROID_STORE_PASSWORD")
+            [ -z "$KEY_PW" ] && MISSING+=("Secret: ANDROID_KEY_PASSWORD")
+          fi
           if [ "$DRY_RUN" != "true" ]; then
             [ -z "$PUB_TOKEN" ] && MISSING+=("Secret: PUBLIC_RELEASES_TOKEN")
           fi
@@ -96,7 +106,7 @@ jobs:
             for item in "${MISSING[@]}"; do
               echo "::error::  - $item"
             done
-            echo "::error::A replacement release signing keystore is NEVER generated automatically to preserve in-place Android upgrades. Configure your permanent keystore once and add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD, and PUBLIC_RELEASES_TOKEN."
+            echo "::error::A replacement release signing keystore is NEVER generated automatically to preserve in-place Android upgrades. For first-time setup, add a temporary Fine-grained PAT (Secrets: Read and write on ${SOURCE_REPO}) as KEYSTORE_SETUP_TOKEN, or add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD manually."
             exit 1
           fi
 
@@ -135,6 +145,7 @@ jobs:
           echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
           echo "key_alias=${RESOLVED_ALIAS}" >> "$GITHUB_OUTPUT"
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "bootstrap_keystore=${BOOTSTRAP_KEYSTORE}" >> "$GITHUB_OUTPUT"
 
       - name: Locate Android Gradle project root and verify wrapper
         id: locate_project
@@ -210,6 +221,12 @@ jobs:
           if [ -s "$PREV_MANIFEST" ]; then
             PREBUILD_ARGS+=(--prev-manifest "$PREV_MANIFEST")
             echo "prev_manifest_path=${PREV_MANIFEST}" >> "$GITHUB_OUTPUT"
+            if [ "${{ steps.validate_config.outputs.bootstrap_keystore }}" = "true" ]; then
+              if grep -Eq '"signingCertSha256"[[:space:]]*:[[:space:]]*"[0-9a-fA-F]{64}"' "$PREV_MANIFEST"; then
+                echo "::error::A prior signed production release already exists in '${PUBLIC_REPO}'. Refusing to bootstrap a replacement keystore because changing the signing certificate breaks in-place Android upgrades."
+                exit 1
+              fi
+            fi
           else
             echo "prev_manifest_path=" >> "$GITHUB_OUTPUT"
           fi
@@ -231,29 +248,120 @@ jobs:
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: chmod +x ./gradlew
 
-      - name: Decode and validate permanent release keystore outside tracked workspace
+      - name: Decode and validate permanent release keystore outside tracked workspace (with guarded first-time bootstrap)
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PW: ${{ secrets.ANDROID_STORE_PASSWORD }}
           KEY_ALIAS_SECRET: ${{ steps.validate_config.outputs.key_alias }}
+          BOOTSTRAP_KEYSTORE: ${{ steps.validate_config.outputs.bootstrap_keystore }}
+          GH_TOKEN: ${{ secrets.KEYSTORE_SETUP_TOKEN }}
+          SOURCE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          umask 077
           KEYSTORE_FILE="${RUNNER_TEMP}/shareflow-release-key.jks"
-          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > "$KEYSTORE_FILE"
-          chmod 600 "$KEYSTORE_FILE"
 
-          KEYSTORE_INFO=$(keytool -list -keystore "$KEYSTORE_FILE" -storepass:env STORE_PW -alias "$KEY_ALIAS_SECRET")
-          if ! printf '%s\n' "$KEYSTORE_INFO" | grep -qi "PrivateKeyEntry"; then
-            echo "::error::Keystore alias '${KEY_ALIAS_SECRET}' is not a valid PrivateKeyEntry."
-            exit 1
-          fi
-          echo "Verified permanent release signing keystore and PrivateKeyEntry alias (${KEY_ALIAS_SECRET})."
-          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          if [ "$BOOTSTRAP_KEYSTORE" = "true" ]; then
+            echo "Running guarded one-time permanent release keystore bootstrap for '${SOURCE_REPO}'..."
+            if ! EXISTING_SECRETS=$(gh secret list --app actions --repo "$SOURCE_REPO" --json name --jq '.[].name' 2>&1); then
+              echo "::error::KEYSTORE_SETUP_TOKEN failed to access Actions Secrets on '${SOURCE_REPO}': ${EXISTING_SECRETS}"
+              echo "::error::Ensure KEYSTORE_SETUP_TOKEN is a non-expired Fine-grained PAT scoped to '${SOURCE_REPO}' with permission 'Secrets: Read and write' (and 'Metadata: Read-only')."
+              exit 1
+            fi
 
-          if [ "$KEY_ALIAS_SECRET" != "upload" ]; then
-            INIT_SCRIPT="${RUNNER_TEMP}/release-alias.init.gradle"
-            cat > "$INIT_SCRIPT" << 'EOF'
+            for sec_name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_PASSWORD EXPECTED_CERT_SHA256; do
+              if printf '%s\n' "$EXISTING_SECRETS" | grep -Fxq "$sec_name"; then
+                echo "::error::Secret '${sec_name}' already exists in '${SOURCE_REPO}'. Refusing to overwrite existing release signing configuration."
+                exit 1
+              fi
+            done
+
+            BOOT_DIR="${RUNNER_TEMP}/shareflow-keystore-bootstrap"
+            rm -rf "$BOOT_DIR"
+            mkdir -p "$BOOT_DIR"
+            chmod 700 "$BOOT_DIR"
+
+            BOOT_JKS="${BOOT_DIR}/shareflow-release.jks"
+            BOOT_B64="${BOOT_DIR}/shareflow-release.jks.b64"
+            BOOT_VERIFY_JKS="${BOOT_DIR}/roundtrip-verify.jks"
+            KEY_ALIAS="upload"
+
+            BOOT_STORE_PW=$(python3 -c 'import secrets, string; a = string.ascii_letters + string.digits; print("".join(secrets.choice(a) for _ in range(32)), end="")')
+            BOOT_KEY_PW=$(python3 -c 'import secrets, string; a = string.ascii_letters + string.digits; print("".join(secrets.choice(a) for _ in range(32)), end="")')
+            echo "::add-mask::${BOOT_STORE_PW}"
+            echo "::add-mask::${BOOT_KEY_PW}"
+            export BOOT_STORE_PW BOOT_KEY_PW
+
+            keytool -genkeypair -noprompt \
+              -keystore "$BOOT_JKS" \
+              -storetype JKS \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Share Flow, O=Share Flow, C=SD" \
+              -storepass:env BOOT_STORE_PW \
+              -keypass:env BOOT_KEY_PW >/dev/null 2>&1
+            chmod 600 "$BOOT_JKS"
+
+            base64 -w 0 "$BOOT_JKS" > "$BOOT_B64"
+            chmod 600 "$BOOT_B64"
+            tr -d '\r\n' < "$BOOT_B64" | base64 --decode > "$BOOT_VERIFY_JKS"
+            chmod 600 "$BOOT_VERIFY_JKS"
+
+            KEYTOOL_OUT=$(keytool -list -v -keystore "$BOOT_VERIFY_JKS" -storepass:env BOOT_STORE_PW -alias "$KEY_ALIAS")
+            if ! printf '%s\n' "$KEYTOOL_OUT" | grep -qi "Entry type: PrivateKeyEntry" || ! printf '%s\n' "$KEYTOOL_OUT" | grep -Eqi "2048-bit RSA"; then
+              echo "::error::Bootstrapped keystore failed keytool PrivateKeyEntry / 2048-bit RSA verification."
+              exit 1
+            fi
+
+            BOOT_CERT_SHA256=$(printf '%s\n' "$KEYTOOL_OUT" \
+              | awk -F'SHA256: ' '/SHA256:/ {gsub(/[:[:space:]]/, "", $2); print tolower($2); exit}')
+            if [ -z "$BOOT_CERT_SHA256" ] || [ "${#BOOT_CERT_SHA256}" -ne 64 ]; then
+              echo "::error::Failed to extract 64-char SHA-256 fingerprint from bootstrapped keystore."
+              exit 1
+            fi
+
+            gh secret set ANDROID_KEYSTORE_BASE64 --app actions --repo "$SOURCE_REPO" < "$BOOT_B64"
+            printf '%s' "$BOOT_STORE_PW" | gh secret set ANDROID_STORE_PASSWORD --app actions --repo "$SOURCE_REPO"
+            printf '%s' "$BOOT_KEY_PW" | gh secret set ANDROID_KEY_PASSWORD --app actions --repo "$SOURCE_REPO"
+            printf '%s' "$KEY_ALIAS" | gh secret set ANDROID_KEY_ALIAS --app actions --repo "$SOURCE_REPO"
+            printf '%s' "$BOOT_CERT_SHA256" | gh secret set EXPECTED_CERT_SHA256 --app actions --repo "$SOURCE_REPO"
+
+            VERIFIED_SECRETS=$(gh secret list --app actions --repo "$SOURCE_REPO" --json name --jq '.[].name')
+            for sec_name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS EXPECTED_CERT_SHA256; do
+              if ! printf '%s\n' "$VERIFIED_SECRETS" | grep -Fxq "$sec_name"; then
+                echo "::error::Failed to verify saved Repository Secret '${sec_name}' in '${SOURCE_REPO}'."
+                exit 1
+              fi
+            done
+
+            gh secret delete KEYSTORE_SETUP_TOKEN --app actions --repo "$SOURCE_REPO" >/dev/null 2>&1 || true
+
+            cp -f "$BOOT_VERIFY_JKS" "$KEYSTORE_FILE"
+            chmod 600 "$KEYSTORE_FILE"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+            echo "BOOTSTRAPPED_STORE_PASSWORD=$BOOT_STORE_PW" >> "$GITHUB_ENV"
+            echo "BOOTSTRAPPED_KEY_PASSWORD=$BOOT_KEY_PW" >> "$GITHUB_ENV"
+            echo "BOOTSTRAPPED_EXPECTED_CERT=$BOOT_CERT_SHA256" >> "$GITHUB_ENV"
+            echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
+            echo "One-time permanent keystore generated, verified, and saved to Repository Secrets in '${SOURCE_REPO}' (cert SHA-256: ${BOOT_CERT_SHA256})."
+          else
+            printf '%s' "$KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > "$KEYSTORE_FILE"
+            chmod 600 "$KEYSTORE_FILE"
+
+            KEYSTORE_INFO=$(keytool -list -keystore "$KEYSTORE_FILE" -storepass:env STORE_PW -alias "$KEY_ALIAS_SECRET")
+            if ! printf '%s\n' "$KEYSTORE_INFO" | grep -qi "PrivateKeyEntry"; then
+              echo "::error::Keystore alias '${KEY_ALIAS_SECRET}' is not a valid PrivateKeyEntry."
+              exit 1
+            fi
+            echo "Verified permanent release signing keystore and PrivateKeyEntry alias (${KEY_ALIAS_SECRET})."
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+            if [ "$KEY_ALIAS_SECRET" != "upload" ]; then
+              INIT_SCRIPT="${RUNNER_TEMP}/release-alias.init.gradle"
+              cat > "$INIT_SCRIPT" << 'EOF'
           gradle.beforeProject { proj ->
               proj.plugins.withId("com.android.application") {
                   def components = proj.extensions.findByName("androidComponents")
@@ -269,9 +377,10 @@ jobs:
               }
           }
           EOF
-            echo "GRADLE_ALIAS_INIT_SCRIPT=$INIT_SCRIPT" >> "$GITHUB_ENV"
-          else
-            echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
+              echo "GRADLE_ALIAS_INIT_SCRIPT=$INIT_SCRIPT" >> "$GITHUB_ENV"
+            else
+              echo "GRADLE_ALIAS_INIT_SCRIPT=" >> "$GITHUB_ENV"
+            fi
           fi
 
       - name: Run download portal, release pipeline, and public sync safety tests
@@ -317,8 +426,8 @@ jobs:
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD || env.BOOTSTRAPPED_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || env.BOOTSTRAPPED_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ steps.validate_config.outputs.key_alias }}
         run: |
           set -euo pipefail
@@ -333,7 +442,7 @@ jobs:
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
-          EXPECTED_CERT_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
+          EXPECTED_CERT_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 || env.BOOTSTRAPPED_EXPECTED_CERT }}
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
           PORTAL_URL: ${{ steps.validate_config.outputs.portal_url }}
@@ -759,6 +868,12 @@ jobs:
               fi
             fi
           done
+          if [ -d "${RUNNER_TEMP}/shareflow-keystore-bootstrap" ]; then
+            if command -v shred >/dev/null 2>&1; then
+              find "${RUNNER_TEMP}/shareflow-keystore-bootstrap" -type f -exec shred -u {} + 2>/dev/null || true
+            fi
+            rm -rf "${RUNNER_TEMP}/shareflow-keystore-bootstrap"
+          fi
           rm -rf "${RUNNER_TEMP}/shareflow-release-stage"
           rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"
           if [ -n "${{ steps.locate_project.outputs.project_dir }}" ]; then
