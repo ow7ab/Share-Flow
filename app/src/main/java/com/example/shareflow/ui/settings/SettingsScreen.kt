@@ -190,6 +190,7 @@ fun SettingsScreen(
                 }
             )
         },
+        onAutoCheckUpdatesOnLaunchChanged = viewModel::onAutoCheckUpdatesOnLaunchChanged,
         bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
@@ -233,6 +234,7 @@ fun SettingsContent(
     onDownloadCloudUpdate: (CloudUpdateManifest) -> Unit = {},
     onCancelCloudUpdateDownload: () -> Unit = {},
     onInstallVerifiedCloudUpdate: (String) -> Unit = {},
+    onAutoCheckUpdatesOnLaunchChanged: (Boolean) -> Unit = {},
     bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
@@ -1014,7 +1016,9 @@ fun SettingsContent(
                         onCheckForUpdates = onCheckForCloudUpdates,
                         onDownloadUpdate = onDownloadCloudUpdate,
                         onCancelDownload = onCancelCloudUpdateDownload,
-                        onInstallVerifiedUpdate = onInstallVerifiedCloudUpdate
+                        onInstallVerifiedUpdate = onInstallVerifiedCloudUpdate,
+                        autoCheckUpdatesOnLaunch = uiState.settings.autoCheckUpdatesOnLaunch,
+                        onAutoCheckUpdatesOnLaunchChanged = onAutoCheckUpdatesOnLaunchChanged
                     )
                 }
 

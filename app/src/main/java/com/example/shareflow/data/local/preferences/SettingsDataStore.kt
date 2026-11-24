@@ -36,4 +36,5 @@ object SettingsPreferenceKeys {
     val BIOMETRIC_UNLOCK_PREFERRED = booleanPreferencesKey("biometric_unlock_preferred")
     val CLOUD_UPDATE_MANIFEST_URL = stringPreferencesKey("cloud_update_manifest_url")
     val HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
+    val AUTO_CHECK_UPDATES_ON_LAUNCH = booleanPreferencesKey("auto_check_updates_on_launch")
 }

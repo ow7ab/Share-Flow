@@ -24,7 +24,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +62,8 @@ fun CloudUpdateSettingsCard(
     onDownloadUpdate: (CloudUpdateManifest) -> Unit,
     onCancelDownload: () -> Unit,
     onInstallVerifiedUpdate: (String) -> Unit,
+    autoCheckUpdatesOnLaunch: Boolean = true,
+    onAutoCheckUpdatesOnLaunchChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -187,6 +191,40 @@ fun CloudUpdateSettingsCard(
                         )
                     }
                 }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Auto-check for updates on launch toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_auto_check_updates_row"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_auto_check_updates_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_auto_check_updates_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoCheckUpdatesOnLaunch,
+                    onCheckedChange = onAutoCheckUpdatesOnLaunchChanged,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("settings_auto_check_updates_switch")
+                )
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

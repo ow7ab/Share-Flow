@@ -122,8 +122,10 @@ import com.example.shareflow.ui.utilities.QrScannerScreen
 import com.example.shareflow.ui.utilities.RecentFilesScreen
 import com.example.shareflow.ui.vault.VaultScreen
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.zIndex
 
 @Composable
 fun ShareFlowApp(
@@ -239,8 +241,18 @@ fun ShareFlowApp(
                     }
                 )
             } else {
+                var bannerUpdate by remember(container) {
+                    mutableStateOf<com.example.shareflow.data.update.UpdateDetails?>(null)
+                }
+                var expandedUpdateVersionCode by remember(container) {
+                    mutableStateOf<Int?>(null)
+                }
+
                 if (backgroundServicesReady) {
                     ShareFlowActiveSessionBridge(
+                        expandedUpdateVersionCode = expandedUpdateVersionCode,
+                        onExpandedUpdateVersionCodeChange = { expandedUpdateVersionCode = it },
+                        onOptionalBannerUpdateChanged = { bannerUpdate = it },
                         onActiveTransferCountChanged = { count -> activeTransferCount = count }
                     )
                 }
@@ -341,6 +353,22 @@ fun ShareFlowApp(
                     )
                 }
             }
+
+            // Non-intrusive floating update banner for optional updates detected on launch
+            com.example.shareflow.ui.update.UpdateAvailableBanner(
+                update = bannerUpdate,
+                onOpenDetails = {
+                    bannerUpdate?.let { expandedUpdateVersionCode = it.versionCode }
+                },
+                onDismiss = {
+                    expandedUpdateVersionCode = null
+                    bannerUpdate = null
+                    container.updateManager.dismissOptionalUpdate()
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(10f)
+            )
         }
             }
         }
@@ -349,6 +377,9 @@ fun ShareFlowApp(
 
 @Composable
 private fun ShareFlowActiveSessionBridge(
+    expandedUpdateVersionCode: Int?,
+    onExpandedUpdateVersionCodeChange: (Int?) -> Unit,
+    onOptionalBannerUpdateChanged: (com.example.shareflow.data.update.UpdateDetails?) -> Unit,
     onActiveTransferCountChanged: (Int) -> Unit
 ) {
     val container = LocalAppContainer.current
@@ -368,10 +399,27 @@ private fun ShareFlowActiveSessionBridge(
         mutableStateOf<kotlinx.coroutines.Job?>(null)
     }
 
-    // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher
+    // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher,
+    // respecting the persisted "Auto-check for updates on launch" user preference.
     LaunchedEffect(container) {
-        runCatching { container.updateManager.checkForUpdate() }
-            .onFailure { if (it is CancellationException) throw it }
+        val autoCheckEnabled = runCatching {
+            container.settingsRepository.settings.first().autoCheckUpdatesOnLaunch
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            true
+        }
+        if (autoCheckEnabled) {
+            runCatching { container.updateManager.checkForUpdate() }
+                .onFailure { if (it is CancellationException) throw it }
+        }
+    }
+
+    LaunchedEffect(detectedUpdate, expandedUpdateVersionCode) {
+        val current = detectedUpdate
+        val showBanner = current != null &&
+            !current.mandatory &&
+            expandedUpdateVersionCode != current.versionCode
+        onOptionalBannerUpdateChanged(if (showBanner) current else null)
     }
 
     LaunchedEffect(activeTransferSessions) {
@@ -384,37 +432,41 @@ private fun ShareFlowActiveSessionBridge(
     }
 
     detectedUpdate?.let { update ->
-        com.example.shareflow.ui.update.UpdateAvailableDialog(
-            update = update,
-            downloadState = cloudUpdateState,
-            onDownloadNow = { targetUpdate ->
-                activeUpdateDownloadJob?.cancel()
-                activeUpdateDownloadJob = approvalScope.launch {
-                    runCatching {
-                        container.cloudUpdateManager.downloadAndVerifyUpdate(
-                            targetUpdate.toCloudUpdateManifest()
-                        )
-                    }.onFailure { if (it is CancellationException) throw it }
-                }
-            },
-            onCancelDownload = {
-                activeUpdateDownloadJob?.cancel()
-                activeUpdateDownloadJob = null
-                container.cloudUpdateManager.resetState()
-            },
-            onInstallVerifiedApk = { apkPath ->
-                when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
-                    com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
-                        val intent = container.permissionManager.createManageUnknownSourcesIntent()
-                        runCatching { context.startActivity(intent) }
+        val shouldShowDialog = update.mandatory || expandedUpdateVersionCode == update.versionCode
+        if (shouldShowDialog) {
+            com.example.shareflow.ui.update.UpdateAvailableDialog(
+                update = update,
+                downloadState = cloudUpdateState,
+                onDownloadNow = { targetUpdate ->
+                    activeUpdateDownloadJob?.cancel()
+                    activeUpdateDownloadJob = approvalScope.launch {
+                        runCatching {
+                            container.cloudUpdateManager.downloadAndVerifyUpdate(
+                                targetUpdate.toCloudUpdateManifest()
+                            )
+                        }.onFailure { if (it is CancellationException) throw it }
                     }
-                    else -> Unit
+                },
+                onCancelDownload = {
+                    activeUpdateDownloadJob?.cancel()
+                    activeUpdateDownloadJob = null
+                    container.cloudUpdateManager.resetState()
+                },
+                onInstallVerifiedApk = { apkPath ->
+                    when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
+                        com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
+                            val intent = container.permissionManager.createManageUnknownSourcesIntent()
+                            runCatching { context.startActivity(intent) }
+                        }
+                        else -> Unit
+                    }
+                },
+                onDismiss = {
+                    onExpandedUpdateVersionCodeChange(null)
+                    container.updateManager.dismissOptionalUpdate()
                 }
-            },
-            onDismiss = {
-                container.updateManager.dismissOptionalUpdate()
-            }
-        )
+            )
+        }
     }
 
     pendingIncoming?.let { request ->

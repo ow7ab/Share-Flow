@@ -81,4 +81,21 @@ class SettingsViewModelTest {
             BuildConfig.CLOUD_UPDATE_PORTAL_URL
         )
     }
+
+    @Test
+    fun `toggles auto-check for updates on launch setting cleanly`() = runTest(mainDispatcherRule.dispatcher) {
+        val fakeRepo = FakeSettingsRepository()
+        val viewModel = SettingsViewModel(fakeRepo, FakeKeystoreCipher(available = true))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.settings.autoCheckUpdatesOnLaunch)
+
+        viewModel.onAutoCheckUpdatesOnLaunchChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.settings.autoCheckUpdatesOnLaunch)
+
+        viewModel.onAutoCheckUpdatesOnLaunchChanged(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.settings.autoCheckUpdatesOnLaunch)
+    }
 }

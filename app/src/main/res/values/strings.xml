@@ -1194,7 +1194,13 @@
     <string name="receive_app_quick_open_failed">Unable to launch this app right now.</string>
     <string name="transfer_app_progress_cd">%1$s transfer progress %2$d%%</string>
 
-    <!-- Automatic Update Available Dialog -->
+    <!-- Automatic Update Available Dialog & Non-Intrusive Launch Banner -->
+    <string name="settings_auto_check_updates_title">Auto-check for updates on launch</string>
+    <string name="settings_auto_check_updates_desc">Automatically check the official ShareFlow website when the app starts and show a subtle alert if a newer verified release is available.</string>
+    <string name="update_banner_title">New update available</string>
+    <string name="update_banner_subtitle_format">ShareFlow v%1$s is ready — tap to view details</string>
+    <string name="update_banner_view_action">View</string>
+    <string name="update_banner_dismiss_cd">Dismiss update alert</string>
     <string name="update_dialog_title">Update Available</string>
     <string name="update_dialog_mandatory_badge">Mandatory Update Required</string>
     <string name="update_dialog_download_now">Download Now</string>

@@ -445,4 +445,36 @@ test("ContactSection includes all four official personal contact links with safe
   assert.ok(js.includes("renderContactSection") && js.includes('contactHeading: "Contact Me"'), "Missing bilingual ContactSection support in docs/app.js");
 });
 
+test("gallery enforces per-image low-priority lazy loading and smooth GPU-composited Lightbox open/close transitions", () => {
+  const lazyCfg = portal.getGalleryLazyConfig();
+  assert.equal(lazyCfg.loading, "lazy");
+  assert.equal(lazyCfg.decoding, "async");
+  assert.equal(lazyCfg.fetchPriority, "low");
+  assert.equal(lazyCfg.threshold, 0.01);
+
+  const docsDir = path.join(__dirname, "..", "docs");
+  const html = fs.readFileSync(path.join(docsDir, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(docsDir, "styles.css"), "utf8");
+  const js = fs.readFileSync(path.join(docsDir, "app.js"), "utf8");
+
+  assert.ok(html.includes('id="lightbox-stage"'), "Expected lightbox-stage container in docs/index.html");
+  assert.ok(html.includes('aria-hidden="true"'), "Expected aria-hidden initial state on lightbox in docs/index.html");
+  assert.ok(html.includes('loading="lazy"'), "Expected lazy loading attribute on below-the-fold static assets in docs/index.html");
+
+  for (const selector of [
+    "body.lightbox-open",
+    ".lightbox.is-open",
+    ".lightbox.is-open .lightbox-dialog",
+    ".lightbox-img.is-ready",
+    ".lightbox-img.is-switching",
+    "@media (prefers-reduced-motion: reduce)"
+  ]) {
+    assert.ok(css.includes(selector), `Missing smooth Lightbox CSS rule: ${selector}`);
+  }
+
+  assert.ok(js.includes('setAttribute("fetchpriority"'), "Expected per-image fetchpriority attribute in docs/app.js");
+  assert.ok(js.includes("revealLightboxImage") && js.includes('modal.classList.add("is-open")'), "Expected smooth animated Lightbox open orchestration in docs/app.js");
+});
+
+
 

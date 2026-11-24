@@ -42,6 +42,7 @@ class SettingsRepositoryImplTest {
         val initial = repository.settings.first()
         assertEquals(AppSettings.DEFAULT_DEVICE_NAME, initial.deviceName)
         assertEquals(AppSettings.DEFAULT_TRANSFER_PORT, initial.transferPort)
+        assertTrue(initial.autoCheckUpdatesOnLaunch)
 
         // Valid updates
         assertTrue(repository.updateDeviceName("  Galaxy Studio  ") is AppResult.Success)
@@ -49,6 +50,7 @@ class SettingsRepositoryImplTest {
         assertTrue(repository.updateAccentColor(AccentColor.EMERALD) is AppResult.Success)
         assertTrue(repository.updateAppLanguage(AppLanguage.ARABIC) is AppResult.Success)
         assertTrue(repository.updateTransferPort(50001) is AppResult.Success)
+        assertTrue(repository.updateAutoCheckUpdatesOnLaunch(false) is AppResult.Success)
 
         val updated = repository.settings.first()
         assertEquals("Galaxy Studio", updated.deviceName)
@@ -56,6 +58,7 @@ class SettingsRepositoryImplTest {
         assertEquals(AccentColor.EMERALD, updated.accentColor)
         assertEquals(AppLanguage.ARABIC, updated.appLanguage)
         assertEquals(50001, updated.transferPort)
+        assertEquals(false, updated.autoCheckUpdatesOnLaunch)
 
         // Invalid updates rejected
         val invalidPort = repository.updateTransferPort(80)
@@ -71,5 +74,6 @@ class SettingsRepositoryImplTest {
         assertEquals(AccentColor.COBALT, reset.accentColor)
         assertEquals(AppLanguage.SYSTEM, reset.appLanguage)
         assertEquals(AppSettings.DEFAULT_TRANSFER_PORT, reset.transferPort)
+        assertTrue(reset.autoCheckUpdatesOnLaunch)
     }
 }

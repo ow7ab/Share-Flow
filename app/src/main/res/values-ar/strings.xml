@@ -1194,7 +1194,13 @@
     <string name="receive_app_quick_open_failed">تعذّر فتح التطبيق حالياً.</string>
     <string name="transfer_app_progress_cd">تقدّم نقل %1$s: %2$d%%</string>
 
-    <!-- نافذة التحديث التلقائي -->
+    <!-- نافذة وإشعار التحديث التلقائي غير المزعج -->
+    <string name="settings_auto_check_updates_title">التحقق التلقائي من التحديثات عند التشغيل</string>
+    <string name="settings_auto_check_updates_desc">فحص الموقع الرسمي لـ ShareFlow تلقائياً عند فتح التطبيق وإظهار تنبيه غير مزعج عند توفر إصدار جديد موثّق.</string>
+    <string name="update_banner_title">يتوفر تحديث جديد</string>
+    <string name="update_banner_subtitle_format">الإصدار v%1$s جاهز — اضغط لعرض التفاصيل</string>
+    <string name="update_banner_view_action">عرض</string>
+    <string name="update_banner_dismiss_cd">إغلاق تنبيه التحديث</string>
     <string name="update_dialog_title">يتوفر تحديث جديد</string>
     <string name="update_dialog_mandatory_badge">تحديث إلزامي مطلوب للمتابعة</string>
     <string name="update_dialog_download_now">تحميل الآن</string>

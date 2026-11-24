@@ -220,7 +220,7 @@ fun StatusPill(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) {},
         shape = ShareFlowDesign.shapes.badge,
         color = containerColor,
         contentColor = contentColor

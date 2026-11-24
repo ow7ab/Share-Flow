@@ -411,6 +411,10 @@ class SettingsViewModel(
         }
     }
 
+    fun onAutoCheckUpdatesOnLaunchChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.updateAutoCheckUpdatesOnLaunch(enabled) }
+    }
+
     fun checkForCloudUpdates() {
         val updater = cloudUpdateManager ?: return
         activeUpdateJob?.cancel()

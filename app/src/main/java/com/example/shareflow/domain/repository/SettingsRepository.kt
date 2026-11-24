@@ -42,6 +42,7 @@ interface SettingsRepository {
     suspend fun updatePreferredConnectionMode(mode: PreferredConnectionMode): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun updateBiometricUnlockPreferred(enabled: Boolean): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun updateCloudUpdateManifestUrl(url: String): AppResult<Unit> = AppResult.Success(Unit)
+    suspend fun updateAutoCheckUpdatesOnLaunch(enabled: Boolean): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun markOnboardingCompleted(): AppResult<Unit> = AppResult.Success(Unit)
     suspend fun resetToDefaults(): AppResult<Unit>
 }

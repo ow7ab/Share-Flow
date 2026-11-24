@@ -163,6 +163,8 @@
             alt="Share Flow Local Transfer Engine"
             class="visual-backdrop"
             loading="eager"
+            decoding="async"
+            fetchpriority="high"
           />
           <div class="visual-overlay">
             <img
@@ -523,7 +525,15 @@
     <footer class="site-footer">
       <div class="footer-inner glass-panel">
         <div class="footer-brand">
-          <img src="assets/shareflow-icon.png" alt="Share Flow" width="36" height="36" class="footer-icon" />
+          <img
+            src="assets/shareflow-icon.png"
+            alt="Share Flow"
+            width="36"
+            height="36"
+            loading="lazy"
+            decoding="async"
+            class="footer-icon"
+          />
           <span id="footer-text">Share Flow — ملفاتك على أجهزتك وتحت تحكمك الكامل.</span>
         </div>
         <span class="footer-meta" id="footer-meta">HTTPS • Direct Signed APK • Zero Ads</span>
@@ -532,13 +542,23 @@
   </main>
 
   <!-- Interactive Lightbox Modal for Gallery -->
-  <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
+  <div
+    id="lightbox"
+    class="lightbox hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-hidden="true"
+    aria-labelledby="lightbox-title"
+  >
     <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
     <div class="lightbox-dialog glass-panel">
       <button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">✕</button>
       <div class="lightbox-media-wrap">
         <button type="button" id="lightbox-prev" class="lightbox-nav" aria-label="Previous">‹</button>
-        <img id="lightbox-img" src="" alt="" class="lightbox-img" />
+        <div id="lightbox-stage" class="lightbox-stage">
+          <span class="lightbox-spinner" aria-hidden="true"></span>
+          <img id="lightbox-img" src="" alt="" decoding="async" class="lightbox-img" />
+        </div>
         <button type="button" id="lightbox-next" class="lightbox-nav" aria-label="Next">›</button>
       </div>
       <div class="lightbox-caption">

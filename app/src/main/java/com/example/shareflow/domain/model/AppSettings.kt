@@ -70,7 +70,8 @@ data class AppSettings(
     val preferredConnectionMode: PreferredConnectionMode = PreferredConnectionMode.AUTO,
     val biometricUnlockPreferred: Boolean = true,
     val cloudUpdateManifestUrl: String = "",
-    val hasCompletedOnboarding: Boolean = false
+    val hasCompletedOnboarding: Boolean = false,
+    val autoCheckUpdatesOnLaunch: Boolean = true
 ) {
     companion object {
         const val DEFAULT_DEVICE_NAME = "ShareFlow Device"

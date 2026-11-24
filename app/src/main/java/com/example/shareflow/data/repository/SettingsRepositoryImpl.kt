@@ -130,7 +130,8 @@ class SettingsRepositoryImpl(
                 cloudUpdateManifestUrl = prefs[SettingsPreferenceKeys.CLOUD_UPDATE_MANIFEST_URL]
                     ?.takeIf { SettingsValidator.isValidOptionalHttpsUpdateUrl(it) }
                     .orEmpty(),
-                hasCompletedOnboarding = prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] ?: false
+                hasCompletedOnboarding = prefs[SettingsPreferenceKeys.HAS_COMPLETED_ONBOARDING] ?: false,
+                autoCheckUpdatesOnLaunch = prefs[SettingsPreferenceKeys.AUTO_CHECK_UPDATES_ON_LAUNCH] ?: true
             )
         }
         .onEach { resolved ->
@@ -278,6 +279,11 @@ class SettingsRepositoryImpl(
             }
         }
     }
+
+    override suspend fun updateAutoCheckUpdatesOnLaunch(enabled: Boolean): AppResult<Unit> =
+        safeEdit { prefs ->
+            prefs[SettingsPreferenceKeys.AUTO_CHECK_UPDATES_ON_LAUNCH] = enabled
+        }
 
     override suspend fun markOnboardingCompleted(): AppResult<Unit> {
         appearanceCache?.markOnboardingCompleted()
