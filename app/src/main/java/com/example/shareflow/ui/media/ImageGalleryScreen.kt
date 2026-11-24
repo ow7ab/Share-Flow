@@ -365,7 +365,11 @@ private fun GalleryGridTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    val thumbnailRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+        uriString = image.uriString,
+        targetSizePx = 256,
+        isVideo = false
+    )
     Surface(
         modifier = modifier
             .aspectRatio(1f)
@@ -376,10 +380,7 @@ private fun GalleryGridTile(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(Uri.parse(image.uriString))
-                    .crossfade(true)
-                    .build(),
+                model = thumbnailRequest,
                 contentDescription = image.displayName,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

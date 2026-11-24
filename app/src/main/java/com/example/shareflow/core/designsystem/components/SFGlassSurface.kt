@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -39,11 +40,14 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
  * Combines Apple Liquid Glass translucency + specular top-to-bottom rim highlight with
  * Samsung One UI generous rounded geometry and Premium Minimal restraint.
  *
- * Performance & Compatibility:
+ * Performance & 120Hz Scroll Optimization:
  * - Selective backdrop blur (`enableBackdropBlur = true`) uses GPU-accelerated `Modifier.blur`
  *   ONLY on Android 12+ (API 31+) and ONLY on the background layer so text & icons stay razor-sharp.
- * - On API 24–30 (or when blur is disabled for long scrolling lists), renders a layered frosted
- *   translucent surface with specular top glaze and luminous rim border — zero jank, never flat opaque.
+ * - For scrolling list cards (`enableBackdropBlur = false`), renders base glass + specular top
+ *   glaze in a single `drawBehind` pass directly on the `Column` (zero extra `matchParentSize`
+ *   child Boxes and zero offscreen shadow layer unless `elevated = true` or explicit `shadowElevation`).
+ * - Skips `MutableInteractionSource` / `animateFloatAsState` / `graphicsLayer` allocations
+ *   entirely when `onClick == null`.
  */
 @Composable
 fun SFGlassCard(
@@ -65,19 +69,12 @@ fun SFGlassCard(
     val reducedMotion = ShareFlowDesign.reducedMotion
     val supportsBlur = enableBackdropBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed && onClick != null && enabled && !reducedMotion) motion.pressScale else 1f,
-        animationSpec = motion.buttonSpring(),
-        label = "sf_glass_card_press"
-    )
-
     val resolvedBg = containerColor ?: when {
         elevated -> glass.cardElevatedBackground
         else -> glass.cardBackground
     }
-    val resolvedShadow = shadowElevation ?: if (elevated) elevation.glassCard else elevation.card
+    // Avoid expensive per-item offscreen shadow layers on standard scrolling list cards
+    val resolvedShadow = shadowElevation ?: if (elevated) elevation.glassCard else 0.dp
 
     val borderStroke = remember(selected, glass) {
         if (selected) {
@@ -105,64 +102,93 @@ fun SFGlassCard(
         )
     }
 
-    val clickModifier = if (onClick != null) {
-        Modifier.clickable(
-            interactionSource = interactionSource,
-            indication = ripple(color = glass.activeBorder),
-            enabled = enabled,
-            role = Role.Button,
-            onClick = onClick
+    val interactiveModifier = if (onClick != null) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val pressScale by animateFloatAsState(
+            targetValue = if (isPressed && enabled && !reducedMotion) motion.pressScale else 1f,
+            animationSpec = motion.buttonSpring(),
+            label = "sf_glass_card_press"
         )
-    } else {
         Modifier
-    }
-
-    Box(
-        modifier = modifier
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .shadow(
-                elevation = resolvedShadow,
-                shape = shape,
-                clip = false,
-                ambientColor = glass.ambientShadow,
-                spotColor = if (selected) glass.spotShadow else glass.ambientShadow
+            .then(
+                if (resolvedShadow > 0.dp) {
+                    Modifier.shadow(
+                        elevation = resolvedShadow,
+                        shape = shape,
+                        clip = false,
+                        ambientColor = glass.ambientShadow,
+                        spotColor = if (selected) glass.spotShadow else glass.ambientShadow
+                    )
+                } else {
+                    Modifier
+                }
             )
             .clip(shape)
             .border(border = borderStroke, shape = shape)
-            .then(clickModifier)
-    ) {
-        // Layer 1: Translucent base with optional selective RenderEffect blur (API 31+ only)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .then(
-                    if (supportsBlur) {
-                        Modifier.blur(
-                            radiusX = elevation.blurRadiusLight,
-                            radiusY = elevation.blurRadiusLight,
-                            edgeTreatment = BlurredEdgeTreatment.Rectangle
-                        )
-                    } else {
-                        Modifier
-                    }
-                )
-                .background(resolvedBg)
-        )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = glass.activeBorder),
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
+    } else {
+        Modifier
+            .then(
+                if (resolvedShadow > 0.dp) {
+                    Modifier.shadow(
+                        elevation = resolvedShadow,
+                        shape = shape,
+                        clip = false,
+                        ambientColor = glass.ambientShadow,
+                        spotColor = if (selected) glass.spotShadow else glass.ambientShadow
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clip(shape)
+            .border(border = borderStroke, shape = shape)
+    }
 
-        // Layer 2: Crisp unblurred specular top glaze
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(brush = glazeBrush)
-        )
-
-        // Layer 3: Foreground content
+    if (supportsBlur) {
+        Box(modifier = modifier.then(interactiveModifier)) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(
+                        radiusX = elevation.blurRadiusLight,
+                        radiusY = elevation.blurRadiusLight,
+                        edgeTreatment = BlurredEdgeTreatment.Rectangle
+                    )
+                    .background(resolvedBg)
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(brush = glazeBrush)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(contentPadding),
+                content = content
+            )
+        }
+    } else {
+        // Fast single-node path for scrolling lists & API 24-30: zero matchParentSize overhead
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = modifier
+                .then(interactiveModifier)
+                .drawBehind {
+                    drawRect(color = resolvedBg)
+                    drawRect(brush = glazeBrush)
+                }
                 .padding(contentPadding),
             content = content
         )

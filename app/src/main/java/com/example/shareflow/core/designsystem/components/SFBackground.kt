@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -19,7 +19,8 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
  * - Light Mode: Clean bright warm-neutral base with restrained cream (#FFE3B3) & peach (#FFB173)
  *   ambient light halos so translucent Liquid Glass cards and floating navigation refract naturally.
  * - Dark Mode: Deep Navy (#0D1220) canvas with subtle midnight-sapphire depth and controlled Ruby
- *   & Peach ambient luminance — zero pure black, zero harsh gradients, zero scroll allocations.
+ *   & Peach ambient luminance — zero pure black, zero harsh gradients, zero per-frame allocations
+ *   via `drawWithCache`.
  */
 @Composable
 fun SFBackground(
@@ -33,37 +34,36 @@ fun SFBackground(
         modifier = modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .drawBehind {
-                // Top-start warm ambient halo
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(glass.ambientGlowPrimary, Color.Transparent),
-                        center = Offset(size.width * 0.18f, size.height * 0.08f),
-                        radius = size.maxDimension * 0.56f
-                    ),
-                    center = Offset(size.width * 0.18f, size.height * 0.08f),
-                    radius = size.maxDimension * 0.56f
+            .drawWithCache {
+                val primaryCenter = Offset(size.width * 0.18f, size.height * 0.08f)
+                val primaryRadius = (size.maxDimension * 0.56f).coerceAtLeast(1f)
+                val primaryBrush = Brush.radialGradient(
+                    colors = listOf(glass.ambientGlowPrimary, Color.Transparent),
+                    center = primaryCenter,
+                    radius = primaryRadius
                 )
-                // Mid-end subtle depth wash
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(glass.ambientGlowSecondary, Color.Transparent),
-                        center = Offset(size.width * 0.88f, size.height * 0.34f),
-                        radius = size.maxDimension * 0.48f
-                    ),
-                    center = Offset(size.width * 0.88f, size.height * 0.34f),
-                    radius = size.maxDimension * 0.48f
+
+                val secondaryCenter = Offset(size.width * 0.88f, size.height * 0.34f)
+                val secondaryRadius = (size.maxDimension * 0.48f).coerceAtLeast(1f)
+                val secondaryBrush = Brush.radialGradient(
+                    colors = listOf(glass.ambientGlowSecondary, Color.Transparent),
+                    center = secondaryCenter,
+                    radius = secondaryRadius
                 )
-                // Bottom ambient glow behind floating Liquid Glass bottom bar
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(glass.ambientGlowTertiary, Color.Transparent),
-                        center = Offset(size.width * 0.50f, size.height * 0.94f),
-                        radius = size.maxDimension * 0.52f
-                    ),
-                    center = Offset(size.width * 0.50f, size.height * 0.94f),
-                    radius = size.maxDimension * 0.52f
+
+                val tertiaryCenter = Offset(size.width * 0.50f, size.height * 0.94f)
+                val tertiaryRadius = (size.maxDimension * 0.52f).coerceAtLeast(1f)
+                val tertiaryBrush = Brush.radialGradient(
+                    colors = listOf(glass.ambientGlowTertiary, Color.Transparent),
+                    center = tertiaryCenter,
+                    radius = tertiaryRadius
                 )
+
+                onDrawBehind {
+                    drawCircle(brush = primaryBrush, center = primaryCenter, radius = primaryRadius)
+                    drawCircle(brush = secondaryBrush, center = secondaryCenter, radius = secondaryRadius)
+                    drawCircle(brush = tertiaryBrush, center = tertiaryCenter, radius = tertiaryRadius)
+                }
             },
         content = content
     )

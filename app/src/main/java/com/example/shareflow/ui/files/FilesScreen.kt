@@ -534,6 +534,7 @@ internal fun FileManagerHost(
             },
             onScanMedia = viewModel::scanAccessibleMedia,
             onOpenCategory = onOpenCategoryRoute,
+            onSelectOverviewCategory = viewModel::setOverviewCategoryFilter,
             onOpenGrantedDirectory = viewModel::openGrantedDirectory,
             onNavigateBreadcrumb = viewModel::navigateToBreadcrumb,
             onNavigateToStorageAnalyzer = onNavigateToStorageAnalyzer,
@@ -579,6 +580,7 @@ private fun FileManagerBody(
     onPickMedia: () -> Unit,
     onScanMedia: () -> Unit,
     onOpenCategory: (FilesHubCategory) -> Unit,
+    onSelectOverviewCategory: (FileCategory?) -> Unit,
     onOpenGrantedDirectory: (GrantedDirectory) -> Unit,
     onNavigateBreadcrumb: (Int) -> Unit,
     onNavigateToStorageAnalyzer: () -> Unit,
@@ -694,6 +696,7 @@ private fun FileManagerBody(
                             onPickMedia = onPickMedia,
                             onScanMedia = onScanMedia,
                             onOpenCategory = onOpenCategory,
+                            onSelectOverviewCategory = onSelectOverviewCategory,
                             onOpenGrantedDirectory = onOpenGrantedDirectory,
                             onNavigateToStorageAnalyzer = onNavigateToStorageAnalyzer
                         )
@@ -773,6 +776,7 @@ private fun FileManagerBody(
                             onPickMedia = onPickMedia,
                             onScanMedia = onScanMedia,
                             onOpenCategory = onOpenCategory,
+                            onSelectOverviewCategory = onSelectOverviewCategory,
                             onOpenGrantedDirectory = onOpenGrantedDirectory,
                             onNavigateToStorageAnalyzer = onNavigateToStorageAnalyzer
                         )
@@ -846,6 +850,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.overviewHeaderListIte
     onPickMedia: () -> Unit,
     onScanMedia: () -> Unit,
     onOpenCategory: (FilesHubCategory) -> Unit,
+    onSelectOverviewCategory: (FileCategory?) -> Unit,
     onOpenGrantedDirectory: (GrantedDirectory) -> Unit,
     onNavigateToStorageAnalyzer: () -> Unit
 ) {
@@ -895,7 +900,30 @@ private fun androidx.compose.foundation.lazy.LazyListScope.overviewHeaderListIte
     }
 
     item(key = "overview_accessible_header") {
-        SectionHeader(title = stringResource(R.string.files_section_accessible))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            SectionHeader(
+                title = stringResource(R.string.files_section_accessible),
+                modifier = Modifier.weight(1f)
+            )
+            if (uiState.visibleEntriesCount > 0) {
+                com.example.shareflow.core.designsystem.components.StatusPill(
+                    label = stringResource(R.string.files_auto_indexed_count_format, uiState.visibleEntriesCount),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+
+    item(key = "overview_inline_category_chips") {
+        OverviewInlineCategoryFilterBar(
+            selectedCategory = uiState.overviewCategoryFilter,
+            onSelectCategory = onSelectOverviewCategory
+        )
     }
 }
 
@@ -906,6 +934,7 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.overviewHeaderGr
     onPickMedia: () -> Unit,
     onScanMedia: () -> Unit,
     onOpenCategory: (FilesHubCategory) -> Unit,
+    onSelectOverviewCategory: (FileCategory?) -> Unit,
     onOpenGrantedDirectory: (GrantedDirectory) -> Unit,
     onNavigateToStorageAnalyzer: () -> Unit
 ) {
@@ -955,7 +984,68 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.overviewHeaderGr
     }
 
     item(span = { GridItemSpan(maxLineSpan) }, key = "grid_overview_accessible_header") {
-        SectionHeader(title = stringResource(R.string.files_section_accessible))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            SectionHeader(
+                title = stringResource(R.string.files_section_accessible),
+                modifier = Modifier.weight(1f)
+            )
+            if (uiState.visibleEntriesCount > 0) {
+                com.example.shareflow.core.designsystem.components.StatusPill(
+                    label = stringResource(R.string.files_auto_indexed_count_format, uiState.visibleEntriesCount),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+
+    item(span = { GridItemSpan(maxLineSpan) }, key = "grid_overview_inline_category_chips") {
+        OverviewInlineCategoryFilterBar(
+            selectedCategory = uiState.overviewCategoryFilter,
+            onSelectCategory = onSelectOverviewCategory
+        )
+    }
+}
+
+@Composable
+private fun OverviewInlineCategoryFilterBar(
+    selectedCategory: FileCategory?,
+    onSelectCategory: (FileCategory?) -> Unit
+) {
+    val spacing = ShareFlowDesign.spacing
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("files_inline_category_filters")
+    ) {
+        item(key = "filter_all") {
+            androidx.compose.material3.FilterChip(
+                selected = selectedCategory == null,
+                onClick = { onSelectCategory(null) },
+                label = { Text(stringResource(R.string.files_filter_all)) },
+                shape = ShareFlowDesign.shapes.chip,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("files_filter_chip_all")
+            )
+        }
+        items(FilesHubCategory.entries, key = { "filter_${it.name}" }) { hubCat ->
+            val selected = selectedCategory == hubCat.domainCategory
+            androidx.compose.material3.FilterChip(
+                selected = selected,
+                onClick = { onSelectCategory(hubCat.domainCategory) },
+                label = { Text(stringResource(hubCat.titleRes)) },
+                shape = ShareFlowDesign.shapes.chip,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("files_filter_chip_${hubCat.name.lowercase()}")
+            )
+        }
     }
 }
 

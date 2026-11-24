@@ -84,10 +84,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import com.example.shareflow.core.designsystem.components.SFBackground
 import com.example.shareflow.core.designsystem.components.SFGlassNavigationBar
 import com.example.shareflow.core.designsystem.components.SFNavBarItem
 import com.example.shareflow.core.designsystem.motion.ElasticOverscrollContainer
+import com.example.shareflow.core.designsystem.motion.rememberAutoHideBottomBarState
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
@@ -183,6 +187,7 @@ fun ShareFlowApp(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
+                    container.localSessionController.stopNetworkMonitoring()
                     approvalScope.launch(container.dispatchers.io) {
                         if (container.isVaultInitialized) {
                             runCatching { container.vaultManager.onAppBackgrounded() }
@@ -195,8 +200,10 @@ fun ShareFlowApp(
                     }
                 }
                 Lifecycle.Event.ON_START -> {
-                    if (container.isVaultInitialized) {
-                        approvalScope.launch(container.dispatchers.io) {
+                    approvalScope.launch(container.dispatchers.io) {
+                        runCatching { container.localSessionController.startNetworkMonitoring() }
+                            .onFailure { if (it is CancellationException) throw it }
+                        if (container.isVaultInitialized) {
                             runCatching { container.vaultManager.checkAutoLock() }
                                 .onFailure { if (it is CancellationException) throw it }
                         }
@@ -208,6 +215,7 @@ fun ShareFlowApp(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            container.localSessionController.stopNetworkMonitoring()
         }
     }
 
@@ -325,43 +333,105 @@ fun ShareFlowApp(
                                 }
                             }
 
-                            Scaffold(
-                                modifier = Modifier.weight(1f),
-                                containerColor = Color.Transparent,
-                                contentWindowInsets = WindowInsets.safeDrawing,
-                                bottomBar = {
-                                    if (!useNavigationRail && isTopLevel) {
-                                        ShareFlowFloatingGlassNavBar(
-                                            currentRoute = currentRoute,
-                                            onNavigateTopLevel = navigateTopLevel
+                            val showFloatingBottomBar = !useNavigationRail && isTopLevel
+                            val autoHideNavState = rememberAutoHideBottomBarState(
+                                routeKey = currentRoute,
+                                enabled = showFloatingBottomBar
+                            )
+                            val reducedMotion = ShareFlowDesign.reducedMotion
+                            val density = LocalDensity.current
+                            var measuredNavBarHeightPx by remember { mutableIntStateOf(0) }
+                            val navBarRevealProgress by animateFloatAsState(
+                                targetValue = if (autoHideNavState.isVisible) 1f else 0f,
+                                animationSpec = if (reducedMotion) {
+                                    tween(durationMillis = 0)
+                                } else {
+                                    spring(
+                                        dampingRatio = 0.88f,
+                                        stiffness = 420f
+                                    )
+                                },
+                                label = "sf_auto_hide_nav_progress"
+                            )
+                            val extraHideMarginPx = with(density) { 18.dp.toPx() }
+                            val fallbackNavClearance = 92.dp
+                            val measuredClearanceDp = if (measuredNavBarHeightPx > 0) {
+                                with(density) { measuredNavBarHeightPx.toDp() }
+                            } else {
+                                fallbackNavClearance
+                            }
+
+                            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                                Scaffold(
+                                    modifier = Modifier.fillMaxSize(),
+                                    containerColor = Color.Transparent,
+                                    contentWindowInsets = WindowInsets.safeDrawing
+                                ) { innerPadding ->
+                                    val layoutDirection = LocalLayoutDirection.current
+                                    val bottomInset = innerPadding.calculateBottomPadding()
+                                    val contentBottomClearance = if (showFloatingBottomBar) {
+                                        measuredClearanceDp + bottomInset
+                                    } else {
+                                        0.dp
+                                    }
+                                    ElasticOverscrollContainer(
+                                        resetKey = currentRoute,
+                                        revealBackgroundColor = Color.Transparent,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .then(
+                                                if (showFloatingBottomBar) {
+                                                    Modifier.nestedScroll(autoHideNavState.nestedScrollConnection)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                            .padding(
+                                                top = innerPadding.calculateTopPadding(),
+                                                start = innerPadding.calculateStartPadding(layoutDirection),
+                                                end = innerPadding.calculateEndPadding(layoutDirection),
+                                                bottom = if (showFloatingBottomBar) 0.dp else bottomInset
+                                            )
+                                    ) {
+                                        ShareFlowNavHost(
+                                            navController = navController,
+                                            onNavigateTopLevel = { route ->
+                                                autoHideNavState.showImmediately()
+                                                navigateTopLevel(route)
+                                            },
+                                            topLevelBottomBarClearance = contentBottomClearance,
+                                            activeTransferCount = activeTransferCount,
+                                            modifier = Modifier.fillMaxSize()
                                         )
                                     }
                                 }
-                            ) { innerPadding ->
-                                val layoutDirection = LocalLayoutDirection.current
-                                // Float the unified Liquid Glass bottom bar over ALL 5 top-level tabs so
-                                // SFBackground + scrolled content have 100% identical glass translucency everywhere.
-                                val floatOverTopLevel = isTopLevel && !useNavigationRail
-                                val bottomInset = innerPadding.calculateBottomPadding()
-                                ElasticOverscrollContainer(
-                                    resetKey = currentRoute,
-                                    revealBackgroundColor = Color.Transparent,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(
-                                            top = innerPadding.calculateTopPadding(),
-                                            start = innerPadding.calculateStartPadding(layoutDirection),
-                                            end = innerPadding.calculateEndPadding(layoutDirection),
-                                            bottom = if (floatOverTopLevel) 0.dp else bottomInset
-                                        )
-                                ) {
-                                    ShareFlowNavHost(
-                                        navController = navController,
-                                        onNavigateTopLevel = navigateTopLevel,
-                                        topLevelBottomBarClearance = if (floatOverTopLevel) bottomInset else 0.dp,
-                                        activeTransferCount = activeTransferCount,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
+
+                                // GPU-accelerated floating frosted bottom navigation bar overlay:
+                                // hides cleanly off-screen on scroll down with ZERO viewport relayout jump.
+                                if (showFloatingBottomBar) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .zIndex(5f)
+                                            .onSizeChanged { measuredNavBarHeightPx = it.height }
+                                            .graphicsLayer {
+                                                val slideDistance = (measuredNavBarHeightPx.takeIf { it > 0 }?.toFloat()
+                                                    ?: with(density) { fallbackNavClearance.toPx() }) + extraHideMarginPx
+                                                translationY = (1f - navBarRevealProgress) * slideDistance
+                                                alpha = (0.18f + 0.82f * navBarRevealProgress).coerceIn(0f, 1f)
+                                            }
+                                            .testTag("shareflow_floating_nav_container")
+                                    ) {
+                                        if (navBarRevealProgress > 0.04f) {
+                                            ShareFlowFloatingGlassNavBar(
+                                                currentRoute = currentRoute,
+                                                onNavigateTopLevel = { route ->
+                                                    autoHideNavState.showImmediately()
+                                                    navigateTopLevel(route)
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -410,6 +480,31 @@ private fun ShareFlowActiveSessionBridge(
         .collectAsStateWithLifecycle()
     var activeUpdateDownloadJob by remember(container) {
         mutableStateOf<kotlinx.coroutines.Job?>(null)
+    }
+
+    val networkStatus by container.localSessionController.networkStatus
+        .collectAsStateWithLifecycle()
+    var lastAutoDiscoveryWifiReady by remember(container) { mutableStateOf(false) }
+
+    // Smart Wi-Fi Startup Management:
+    // Automatically starts nearby device discovery when Wi-Fi is active on launch, and
+    // seamlessly auto-retries whenever Wi-Fi transitions from OFF -> ON or reconnects.
+    LaunchedEffect(
+        networkStatus.hasCheckedInitialState,
+        networkStatus.isWifiEnabled,
+        networkStatus.isWifiConnected
+    ) {
+        val wifiReady = networkStatus.hasCheckedInitialState &&
+            (networkStatus.isWifiEnabled || networkStatus.isWifiConnected)
+        if (wifiReady && !lastAutoDiscoveryWifiReady) {
+            lastAutoDiscoveryWifiReady = true
+            withContext(container.dispatchers.io) {
+                runCatching { container.unifiedConnectionManager.startNearbyDiscovery() }
+                    .onFailure { if (it is CancellationException) throw it }
+            }
+        } else if (!wifiReady) {
+            lastAutoDiscoveryWifiReady = false
+        }
     }
 
     // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher,

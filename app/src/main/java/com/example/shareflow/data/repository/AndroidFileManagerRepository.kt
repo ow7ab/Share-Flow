@@ -45,7 +45,19 @@ class AndroidFileManagerRepository(
     private val safEngine = SafStorageEngine(appContext, checksumVerifier)
 
     private val mutationEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
-    private val grantedDirectoriesState = MutableStateFlow(safEngine.listGrantedDirectories())
+    // Populated asynchronously on IO dispatcher — never runs DocumentFile I/O on Main Thread at DI init.
+    private val grantedDirectoriesState = MutableStateFlow<List<GrantedDirectory>>(emptyList())
+
+    @Volatile
+    private var cachedMediaIndex: List<LocalFileEntry>? = null
+
+    @Volatile
+    private var cachedMediaIndexTimestampMs: Long = 0L
+
+    private fun invalidateMediaCache() {
+        cachedMediaIndex = null
+        cachedMediaIndexTimestampMs = 0L
+    }
 
     override fun observeStorageChanges(): Flow<Unit> = merge(
         mediaStoreScanner.observeChanges(),
@@ -53,6 +65,7 @@ class AndroidFileManagerRepository(
     )
 
     override fun notifyStorageChanged() {
+        invalidateMediaCache()
         mutationEvents.tryEmit(Unit)
     }
 
@@ -64,6 +77,7 @@ class AndroidFileManagerRepository(
             val result = safEngine.registerGrantedDirectory(treeUriString)
             refreshGrantedDirectories()
             if (result is AppResult.Success) {
+                invalidateMediaCache()
                 mutationEvents.tryEmit(Unit)
             }
             result
@@ -73,6 +87,7 @@ class AndroidFileManagerRepository(
         withContext(dispatchers.io) {
             val result = safEngine.releaseGrantedDirectory(treeUriString)
             refreshGrantedDirectories()
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
             result
         }
@@ -80,6 +95,12 @@ class AndroidFileManagerRepository(
     override suspend fun scanAccessibleMedia(): AppResult<List<LocalFileEntry>> =
         withContext(dispatchers.io) {
             refreshGrantedDirectories()
+            val now = System.currentTimeMillis()
+            val cached = cachedMediaIndex
+            if (cached != null && (now - cachedMediaIndexTimestampMs) < MEDIA_CACHE_TTL_MS) {
+                return@withContext AppResult.Success(cached)
+            }
+
             val mediaResult = mediaStoreScanner.scanAccessibleMedia()
             val receivedEntries = scanReceivedDirectoryEntries()
             val mediaEntries = (mediaResult as? AppResult.Success)?.data.orEmpty()
@@ -87,6 +108,8 @@ class AndroidFileManagerRepository(
             if (merged.isEmpty() && mediaResult is AppResult.Failure) {
                 mediaResult
             } else {
+                cachedMediaIndex = merged
+                cachedMediaIndexTimestampMs = now
                 AppResult.Success(merged)
             }
         }
@@ -110,15 +133,13 @@ class AndroidFileManagerRepository(
 
     override suspend fun queryByCategory(category: FileCategory): AppResult<List<LocalFileEntry>> =
         withContext(dispatchers.io) {
-            val mediaResult = mediaStoreScanner.scanAccessibleMedia()
-            val mediaEntries = (mediaResult as? AppResult.Success)?.data
+            val mediaResult = scanAccessibleMedia()
+            val baseEntries = (mediaResult as? AppResult.Success)?.data
                 ?.filter { it.matchesCategory(category) }
                 .orEmpty()
-            val receivedEntries = scanReceivedDirectoryEntries()
-                .filter { it.matchesCategory(category) }
 
             val safEntries = mutableListOf<LocalFileEntry>()
-            val granted = safEngine.listGrantedDirectories().filter { it.isAccessible }
+            val granted = grantedDirectoriesState.value.filter { it.isAccessible }
             for (dir in granted) {
                 val listed = safEngine.listDirectory(dir.treeUriString)
                 if (listed is AppResult.Success) {
@@ -128,7 +149,7 @@ class AndroidFileManagerRepository(
                 }
             }
 
-            val merged = mergeDeduplicatedEntries(mediaEntries + safEntries, receivedEntries)
+            val merged = mergeDeduplicatedEntries(baseEntries, safEntries)
             if (merged.isEmpty() && mediaResult is AppResult.Failure && granted.isEmpty()) {
                 return@withContext mediaResult
             }
@@ -429,5 +450,9 @@ class AndroidFileManagerRepository(
 
     private fun refreshGrantedDirectories() {
         grantedDirectoriesState.value = safEngine.listGrantedDirectories()
+    }
+
+    companion object {
+        private const val MEDIA_CACHE_TTL_MS = 3_000L
     }
 }

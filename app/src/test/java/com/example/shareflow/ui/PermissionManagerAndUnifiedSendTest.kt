@@ -82,6 +82,17 @@ class PermissionManagerAndUnifiedSendTest {
 
     @Test
     fun `Unified Send screen displays all 4 SHAREit tabs Photos Videos Apps Files cleanly`() {
+        composeTestRule.waitUntil(timeoutMillis = 10_000L) {
+            composeTestRule.onAllNodesWithTag("home_send_button", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty() ||
+                composeTestRule.onAllNodesWithTag("onboarding_skip_button", useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+        }
+        if (composeTestRule.onAllNodesWithTag("onboarding_skip_button", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        ) {
+            composeTestRule.onNodeWithTag("onboarding_skip_button").performClick()
+        }
         waitForTag("home_send_button")
         composeTestRule.onNodeWithTag("home_send_button").performClick()
 

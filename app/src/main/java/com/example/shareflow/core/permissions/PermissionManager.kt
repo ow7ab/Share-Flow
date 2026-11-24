@@ -190,6 +190,18 @@ class PermissionManager(
             createAppSettingsIntent()
         }
 
+    /**
+     * Returns the official Android Settings Panel for Wi-Fi (`Settings.Panel.ACTION_WIFI`) on
+     * Android 10+ (API 29+) so users can toggle Wi-Fi in an in-app bottom sheet without leaving
+     * ShareFlow, falling back to `Settings.ACTION_WIFI_SETTINGS` on Android 7–9.
+     */
+    fun createWifiPanelIntent(): Intent =
+        if (sdkInt >= Build.VERSION_CODES.Q) {
+            Intent(Settings.Panel.ACTION_WIFI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else {
+            createWifiSettingsIntent()
+        }
+
     fun createWifiSettingsIntent(): Intent =
         Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 

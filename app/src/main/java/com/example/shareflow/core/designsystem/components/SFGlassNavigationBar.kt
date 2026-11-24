@@ -107,14 +107,14 @@ fun SFGlassNavigationBar(
 
     val activeContentColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
     val inactiveIconColor = if (isDark) {
-        ShareFlowMarpleColors.DarkTextSecondary.copy(alpha = 0.86f)
+        ShareFlowMarpleColors.DarkTextPrimary.copy(alpha = 0.72f)
     } else {
-        ShareFlowMarpleColors.LightTextSecondary.copy(alpha = 0.90f)
+        ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.66f)
     }
     val inactiveLabelColor = if (isDark) {
-        ShareFlowMarpleColors.DarkTextSecondary.copy(alpha = 0.80f)
+        ShareFlowMarpleColors.DarkTextSecondary.copy(alpha = 0.92f)
     } else {
-        ShareFlowMarpleColors.LightTextSecondary.copy(alpha = 0.88f)
+        ShareFlowMarpleColors.LightTextSecondary.copy(alpha = 0.94f)
     }
 
     val specularBorderBrush = remember(glass) {
@@ -127,22 +127,46 @@ fun SFGlassNavigationBar(
         )
     }
 
-    val glazeBrush = remember(glass, supportsRealBlur) {
+    // Dense iOS-style frosted tint overlay ensuring underlying scrolled content never bleeds sharply
+    val frostedTintAlpha = when {
+        isDark && supportsRealBlur -> 0.86f
+        isDark -> 0.94f
+        supportsRealBlur -> 0.88f
+        else -> 0.95f
+    }
+
+    val glazeBrush = remember(glass, supportsRealBlur, isDark) {
         Brush.verticalGradient(
-            colors = if (supportsRealBlur) {
+            colors = if (isDark) {
                 listOf(
                     glass.navGlazeTop,
-                    glass.navBase.copy(alpha = if (isDark) 0.36f else 0.32f),
+                    glass.navBase.copy(alpha = if (supportsRealBlur) 0.56f else 0.72f),
                     glass.navGlazeBottom
                 )
             } else {
                 listOf(
                     glass.navGlazeTop,
-                    glass.navBase.copy(alpha = if (isDark) 0.56f else 0.52f),
+                    glass.navBase.copy(alpha = if (supportsRealBlur) 0.62f else 0.76f),
                     glass.navGlazeBottom
                 )
             }
         )
+    }
+
+    val bloomColors = remember(isDark) {
+        if (isDark) {
+            listOf(
+                ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f),
+                ShareFlowMarpleColors.Peach.copy(alpha = 0.08f),
+                Color.Transparent
+            )
+        } else {
+            listOf(
+                ShareFlowMarpleColors.Ruby.copy(alpha = 0.10f),
+                ShareFlowMarpleColors.Cream.copy(alpha = 0.26f),
+                Color.Transparent
+            )
+        }
     }
 
     Box(
@@ -157,7 +181,7 @@ fun SFGlassNavigationBar(
                 .fillMaxWidth()
                 .widthIn(max = 520.dp)
                 .shadow(
-                    elevation = if (isDark) 20.dp else 14.dp,
+                    elevation = if (isDark) 16.dp else 11.dp,
                     shape = shapes.navCapsule,
                     clip = false,
                     ambientColor = glass.ambientShadow,
@@ -165,13 +189,13 @@ fun SFGlassNavigationBar(
                 )
                 .clip(shapes.navCapsule)
                 .border(
-                    width = 1.dp,
+                    width = 0.85.dp,
                     brush = specularBorderBrush,
                     shape = shapes.navCapsule
                 )
                 .testTag("shareflow_navigation_bar")
         ) {
-            // Layer 1: Selective GPU blur backdrop (API 31+) or frosted translucent base (API < 31)
+            // Layer 1: Dense frosted backdrop with real Gaussian RenderEffect blur on API 31+
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -187,49 +211,29 @@ fun SFGlassNavigationBar(
                         }
                     )
                     .drawBehind {
-                        drawRect(
-                            color = glass.navBase.copy(
-                                alpha = when {
-                                    isDark && supportsRealBlur -> 0.54f
-                                    isDark -> 0.72f
-                                    supportsRealBlur -> 0.52f
-                                    else -> 0.70f
-                                }
-                            )
-                        )
+                        drawRect(color = glass.navBase.copy(alpha = frostedTintAlpha))
                         val bloomCenterX = (0.10f + 0.80f * animatedBloomFraction) * size.width
+                        val bloomRadius = (size.height * 1.25f).coerceAtLeast(1f)
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = if (isDark) {
-                                    listOf(
-                                        ShareFlowMarpleColors.Ruby.copy(alpha = 0.34f),
-                                        ShareFlowMarpleColors.Peach.copy(alpha = 0.12f),
-                                        Color.Transparent
-                                    )
-                                } else {
-                                    listOf(
-                                        ShareFlowMarpleColors.Ruby.copy(alpha = 0.15f),
-                                        ShareFlowMarpleColors.Cream.copy(alpha = 0.42f),
-                                        Color.Transparent
-                                    )
-                                },
+                                colors = bloomColors,
                                 center = Offset(bloomCenterX, size.height * 0.50f),
-                                radius = size.height * 1.40f
+                                radius = bloomRadius
                             ),
                             center = Offset(bloomCenterX, size.height * 0.50f),
-                            radius = size.height * 1.40f
+                            radius = bloomRadius
                         )
                     }
             )
 
-            // Layer 2: Unblurred specular surface sheen
+            // Layer 2: Unblurred frosted top sheen & opaque-frosted depth seal
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .background(brush = glazeBrush)
             )
 
-            // Layer 3: Crisp navigation items
+            // Layer 3: Crisp high-contrast navigation items
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

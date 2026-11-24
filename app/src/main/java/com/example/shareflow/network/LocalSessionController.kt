@@ -1,8 +1,16 @@
 package com.example.shareflow.network
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiManager
+import androidx.core.content.ContextCompat
 import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.core.common.DispatcherProvider
@@ -13,6 +21,7 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,12 +38,15 @@ data class PairingSessionInfo(
 
 data class DeviceNetworkStatus(
     val isWifiConnected: Boolean,
-    val localIpv4Address: String?
+    val localIpv4Address: String?,
+    val isWifiEnabled: Boolean = isWifiConnected,
+    val hasCheckedInitialState: Boolean = false
 )
 
 /**
  * UI-independent controller managing real local TCP receive socket readiness,
- * real device Wi-Fi connectivity status, ephemeral pairing codes, and selected SAF files queue.
+ * real live device Wi-Fi radio & connectivity state (via NetworkCallback + WIFI_STATE_CHANGED),
+ * ephemeral pairing codes, and selected SAF files queue.
  * Never fabricates devices or fake transfer progress.
  */
 class LocalSessionController(
@@ -45,6 +57,9 @@ class LocalSessionController(
     private val secureRandom = SecureRandom()
 
     private var activeServerSocket: ServerSocket? = null
+    private val isMonitoring = AtomicBoolean(false)
+    private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
+    private var wifiStateReceiver: BroadcastReceiver? = null
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -62,9 +77,112 @@ class LocalSessionController(
     val recentFiles: StateFlow<List<LocalFileEntry>> = _recentFiles.asStateFlow()
 
     private val _networkStatus = MutableStateFlow(
-        DeviceNetworkStatus(isWifiConnected = false, localIpv4Address = null)
+        DeviceNetworkStatus(
+            isWifiConnected = false,
+            localIpv4Address = null,
+            isWifiEnabled = false,
+            hasCheckedInitialState = false
+        )
     )
     val networkStatus: StateFlow<DeviceNetworkStatus> = _networkStatus.asStateFlow()
+
+    /**
+     * Begins observing live Wi-Fi radio state and Wi-Fi transport connectivity changes
+     * cleanly without polling or leaking receivers. Safe to call repeatedly.
+     */
+    fun startNetworkMonitoring() {
+        if (!isMonitoring.compareAndSet(false, true)) {
+            refreshNetworkStatus()
+            return
+        }
+        refreshNetworkStatus()
+
+        val connectivityManager = runCatching {
+            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        }.getOrNull()
+
+        if (connectivityManager != null) {
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    refreshNetworkStatus()
+                }
+
+                override fun onLost(network: Network) {
+                    refreshNetworkStatus()
+                }
+
+                override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                    refreshNetworkStatus()
+                }
+
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities
+                ) {
+                    refreshNetworkStatus()
+                }
+            }
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
+            runCatching {
+                connectivityManager.registerNetworkCallback(request, callback)
+                wifiNetworkCallback = callback
+            }
+        }
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == WifiManager.WIFI_STATE_CHANGED_ACTION) {
+                    val wifiState = intent.getIntExtra(
+                        WifiManager.EXTRA_WIFI_STATE,
+                        WifiManager.WIFI_STATE_UNKNOWN
+                    )
+                    val enabled = wifiState == WifiManager.WIFI_STATE_ENABLED
+                    _networkStatus.update { current ->
+                        current.copy(
+                            isWifiEnabled = enabled,
+                            isWifiConnected = if (enabled) current.isWifiConnected else false,
+                            hasCheckedInitialState = true
+                        )
+                    }
+                    if (wifiState == WifiManager.WIFI_STATE_ENABLED ||
+                        wifiState == WifiManager.WIFI_STATE_DISABLED
+                    ) {
+                        refreshNetworkStatus()
+                    }
+                }
+            }
+        }
+        runCatching {
+            ContextCompat.registerReceiver(
+                appContext,
+                receiver,
+                IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            wifiStateReceiver = receiver
+        }
+    }
+
+    /**
+     * Unregisters live Wi-Fi observers to prevent memory leaks when lifecycle ends.
+     */
+    fun stopNetworkMonitoring() {
+        if (!isMonitoring.compareAndSet(true, false)) return
+        wifiNetworkCallback?.let { callback ->
+            runCatching {
+                val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                cm?.unregisterNetworkCallback(callback)
+            }
+        }
+        wifiNetworkCallback = null
+
+        wifiStateReceiver?.let { receiver ->
+            runCatching { appContext.unregisterReceiver(receiver) }
+        }
+        wifiStateReceiver = null
+    }
 
     fun refreshNetworkStatus(): DeviceNetworkStatus {
         val status = readNetworkStatus()
@@ -162,12 +280,17 @@ class LocalSessionController(
     }
 
     private fun readNetworkStatus(): DeviceNetworkStatus {
-        val isWifi = runCatching {
+        val isWifiConnected = runCatching {
             val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             val activeNetwork = cm?.activeNetwork
             val capabilities = cm?.getNetworkCapabilities(activeNetwork)
             capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
         }.getOrDefault(false)
+
+        val isWifiEnabled = runCatching {
+            val wifiManager = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            wifiManager?.isWifiEnabled == true
+        }.getOrDefault(isWifiConnected) || isWifiConnected
 
         val ipv4 = runCatching {
             val interfaces = NetworkInterface.getNetworkInterfaces() ?: return@runCatching null
@@ -180,8 +303,10 @@ class LocalSessionController(
         }.getOrNull()
 
         return DeviceNetworkStatus(
-            isWifiConnected = isWifi,
-            localIpv4Address = ipv4
+            isWifiConnected = isWifiConnected,
+            localIpv4Address = ipv4,
+            isWifiEnabled = isWifiEnabled,
+            hasCheckedInitialState = true
         )
     }
 

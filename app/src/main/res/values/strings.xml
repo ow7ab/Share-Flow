@@ -1301,6 +1301,14 @@
     <string name="nfc_err_invalid_tag">This NFC tag is not a valid ShareFlow pairing session. Hold against a phone showing ShareFlow Receive.</string>
     <string name="nfc_err_interrupted">NFC connection was interrupted. Hold both phones steady back-to-back for 1–2 seconds and try again.</string>
     <string name="nfc_icon_cd">NFC contactless tap-to-pair</string>
+
+    <!-- Smart Wi-Fi Startup Management & Auto-Indexed File Filter Chips -->
+    <string name="wifi_prompt_title">Turn On Wi-Fi for Fast Local Sharing</string>
+    <string name="wifi_prompt_body">Wi-Fi is currently off. Enable Wi-Fi to automatically discover nearby ShareFlow devices and start high-speed offline transfers.</string>
+    <string name="wifi_prompt_enable_action">Enable Wi-Fi</string>
+    <string name="wifi_prompt_dismiss_cd">Dismiss Wi-Fi prompt</string>
+    <string name="files_filter_all">All</string>
+    <string name="files_auto_indexed_count_format">%1$d ready</string>
 </resources>
 
 

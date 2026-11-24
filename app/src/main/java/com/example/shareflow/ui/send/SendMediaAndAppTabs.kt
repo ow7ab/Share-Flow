@@ -264,8 +264,13 @@ private fun PhotoGridTile(
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            val photoRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+                uriString = photo.uriString,
+                targetSizePx = 240,
+                isVideo = false
+            )
             AsyncImage(
-                model = Uri.parse(photo.uriString),
+                model = photoRequest,
                 contentDescription = photo.displayName,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -439,8 +444,13 @@ private fun VideoSelectionCard(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center
             ) {
+                val videoRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+                    uriString = video.uriString,
+                    targetSizePx = 180,
+                    isVideo = true
+                )
                 AsyncImage(
-                    model = Uri.parse(video.uriString),
+                    model = videoRequest,
                     contentDescription = video.displayName,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -868,8 +878,12 @@ internal fun PhotoPreviewDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(ShareFlowDesign.spacing.xs)) {
+                val previewRequest = com.example.shareflow.core.common.rememberPreviewImageRequest(
+                    uriString = photo.uriString,
+                    maxSizePx = 1080
+                )
                 AsyncImage(
-                    model = Uri.parse(photo.uriString),
+                    model = previewRequest,
                     contentDescription = photo.displayName,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier

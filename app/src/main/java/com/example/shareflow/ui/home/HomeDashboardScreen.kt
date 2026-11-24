@@ -33,13 +33,20 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,12 +113,21 @@ fun HomeDashboardScreen(
     val viewModel: HomeViewModel = viewModel(factory = factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     HomeDashboardContent(
         uiState = uiState,
         onNavigateToRoute = onNavigateToRoute,
         onSelectRecentFile = { file ->
             viewModel.selectFileForSend(file)
             onNavigateToRoute(ShareFlowRoutes.SEND)
+        },
+        onOpenWifiPanel = {
+            val panelIntent = container.permissionManager.createWifiPanelIntent()
+            runCatching { context.startActivity(panelIntent) }
+                .onFailure {
+                    runCatching { context.startActivity(container.permissionManager.createWifiSettingsIntent()) }
+                }
         },
         activeTransferCount = activeTransferCount,
         bottomBarClearance = bottomBarClearance,
@@ -124,6 +140,7 @@ fun HomeDashboardContent(
     uiState: HomeUiState,
     onNavigateToRoute: (String) -> Unit,
     onSelectRecentFile: (LocalFileEntry) -> Unit = {},
+    onOpenWifiPanel: () -> Unit = {},
     activeTransferCount: Int = 0,
     bottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
@@ -145,6 +162,17 @@ fun HomeDashboardContent(
             }
 
             is HomeUiState.Ready -> {
+                var wifiPromptDismissed by remember { mutableStateOf(false) }
+                val wifiIsAvailable = uiState.networkStatus.isWifiEnabled || uiState.networkStatus.isWifiConnected
+                LaunchedEffect(wifiIsAvailable) {
+                    if (wifiIsAvailable) {
+                        wifiPromptDismissed = false
+                    }
+                }
+                val showWifiOffPrompt = uiState.networkStatus.hasCheckedInitialState &&
+                    !wifiIsAvailable &&
+                    !wifiPromptDismissed
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -164,6 +192,16 @@ fun HomeDashboardContent(
                             connectionState = uiState.connectionState,
                             networkStatus = uiState.networkStatus
                         )
+                    }
+
+                    // 1b. Smart Wi-Fi Off Prompt (Android 10+ official Settings Panel / API < 29 fallback)
+                    if (showWifiOffPrompt) {
+                        item(key = "wifi_off_prompt_banner") {
+                            WifiOffStartupPromptCard(
+                                onEnableWifi = onOpenWifiPanel,
+                                onDismiss = { wifiPromptDismissed = true }
+                            )
+                        }
                     }
 
                     // 2. Signature Liquid Glass Hero Action Tiles: Send (Ruby) & Receive (Coral)
@@ -717,6 +755,80 @@ private fun QuickToolTile(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun WifiOffStartupPromptCard(
+    onEnableWifi: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val spacing = ShareFlowDesign.spacing
+    val semantic = ShareFlowDesign.semanticColors
+    SFGlassCard(
+        elevated = true,
+        contentPadding = PaddingValues(spacing.cardPadding),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("home_wifi_off_banner")
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(ShareFlowDesign.shapes.iconContainer)
+                        .background(semantic.warningContainer)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WifiOff,
+                        contentDescription = null,
+                        tint = semantic.warningAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.wifi_prompt_title),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.wifi_prompt_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("home_wifi_dismiss_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.wifi_prompt_dismiss_cd),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            com.example.shareflow.core.designsystem.components.SFPrimaryButton(
+                text = stringResource(R.string.wifi_prompt_enable_action),
+                onClick = onEnableWifi,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("home_wifi_enable_button")
             )
         }
     }

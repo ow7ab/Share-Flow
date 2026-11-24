@@ -455,18 +455,38 @@ private fun FileThumbnailBadge(
     size: androidx.compose.ui.unit.Dp
 ) {
     val isImage = !file.isDirectory && (file.category == FileCategory.IMAGES || file.mimeType.startsWith("image/"))
+    val isVideo = !file.isDirectory && (file.category == FileCategory.VIDEOS || file.mimeType.startsWith("video/"))
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val targetSizePx = remember(size, density) {
+        with(density) { (size.toPx() * 1.35f).toInt().coerceIn(96, 256) }
+    }
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = Modifier.size(size)
     ) {
-        if (isImage) {
-            AsyncImage(
-                model = Uri.parse(file.uriString),
-                contentDescription = file.displayName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size)
+        if (isImage || isVideo) {
+            val request = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+                uriString = file.uriString,
+                targetSizePx = targetSizePx,
+                isVideo = isVideo
             )
+            Box(contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = request,
+                    contentDescription = file.displayName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(size)
+                )
+                if (isVideo) {
+                    Icon(
+                        imageVector = Icons.Filled.VideoFile,
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(size * 0.42f)
+                    )
+                }
+            }
         } else {
             Box(contentAlignment = Alignment.Center) {
                 Icon(

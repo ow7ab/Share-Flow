@@ -22,12 +22,17 @@ import com.example.shareflow.domain.repository.FileManagerRepository
 import com.example.shareflow.domain.repository.StorageAnalyzerRepository
 import com.example.shareflow.network.LocalSessionController
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -55,6 +60,7 @@ data class CategoryCountSummary(
 data class FileManagerUiState(
     val browseMode: FileBrowseMode = FileBrowseMode.OVERVIEW,
     val activeCategory: FileCategory? = null,
+    val overviewCategoryFilter: FileCategory? = null,
     val breadcrumbs: List<DirectoryBreadcrumb> = emptyList(),
     val currentDirectoryWritable: Boolean = false,
     val searchQuery: String = "",
@@ -90,7 +96,7 @@ data class FileManagerUiState(
     val currentDirectoryUri: String? get() = breadcrumbs.lastOrNull()?.uriString
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class FileManagerViewModel(
     private val fileManagerRepository: FileManagerRepository,
     private val storageAnalyzerRepository: StorageAnalyzerRepository,
@@ -109,6 +115,19 @@ class FileManagerViewModel(
     private val allAccessibleEntries = MutableStateFlow<List<LocalFileEntry>>(emptyList())
     private val directoryEntries = MutableStateFlow<List<LocalFileEntry>>(emptyList())
     private val refreshNonce = MutableStateFlow(0L)
+    private var activeRefreshJob: Job? = null
+
+    /**
+     * Strictly minimal filter parameters that should trigger a new [Pager].
+     * Unrelated UI state changes (selection toggles, dialogs, snackbar messages, storageSummary)
+     * NEVER recreate the Pager or disrupt scroll position.
+     */
+    private data class PagingFilterParams(
+        val browseMode: FileBrowseMode,
+        val effectiveCategory: FileCategory?,
+        val searchQuery: String,
+        val sortSpec: FileSortSpec
+    )
 
     private data class PagingQueryKey(
         val entries: List<LocalFileEntry>,
@@ -118,26 +137,40 @@ class FileManagerViewModel(
         val nonce: Long
     )
 
+    private val pagingFilterFlow: Flow<PagingFilterParams> = _uiState
+        .map { state ->
+            val effectiveCategory = when (state.browseMode) {
+                FileBrowseMode.CATEGORY -> state.activeCategory
+                FileBrowseMode.OVERVIEW -> state.overviewCategoryFilter
+                FileBrowseMode.DIRECTORY -> null
+            }
+            PagingFilterParams(
+                browseMode = state.browseMode,
+                effectiveCategory = effectiveCategory,
+                searchQuery = state.searchQuery,
+                sortSpec = state.sortSpec
+            )
+        }
+        .distinctUntilChanged()
+
     val pagedFiles: Flow<PagingData<LocalFileEntry>> = combine(
-        _uiState,
+        pagingFilterFlow,
         allAccessibleEntries,
         directoryEntries,
         refreshNonce
-    ) { state, accessible, dirEntries, nonce ->
-        val raw = when (state.browseMode) {
+    ) { filter, accessible, dirEntries, nonce ->
+        val raw = when (filter.browseMode) {
             FileBrowseMode.DIRECTORY -> dirEntries
-            FileBrowseMode.CATEGORY -> accessible
-            FileBrowseMode.OVERVIEW -> accessible
+            FileBrowseMode.CATEGORY, FileBrowseMode.OVERVIEW -> accessible
         }
-        val categoryFilter = if (state.browseMode == FileBrowseMode.CATEGORY) state.activeCategory else null
         PagingQueryKey(
             entries = raw,
-            query = state.searchQuery,
-            category = categoryFilter,
-            sortSpec = state.sortSpec,
+            query = filter.searchQuery,
+            category = filter.effectiveCategory,
+            sortSpec = filter.sortSpec,
             nonce = nonce
         )
-    }.flatMapLatest { key ->
+    }.distinctUntilChanged().flatMapLatest { key ->
         Pager(
             config = PagingConfig(
                 pageSize = PAGE_SIZE,
@@ -200,14 +233,26 @@ class FileManagerViewModel(
 
     private fun observeStorageChanges() {
         viewModelScope.launch {
-            fileManagerRepository.observeStorageChanges().collect {
-                refreshCurrentView(silent = true)
-            }
+            // Debounce rapid MediaStore ContentObserver bursts into a single calm background sync
+            fileManagerRepository.observeStorageChanges()
+                .debounce(STORAGE_CHANGE_DEBOUNCE_MS)
+                .collect {
+                    refreshCurrentView(silent = true)
+                }
         }
     }
 
+    fun setOverviewCategoryFilter(category: FileCategory?) {
+        _uiState.update { state ->
+            val next = if (state.overviewCategoryFilter == category) null else category
+            state.copy(overviewCategoryFilter = next)
+        }
+        updateVisibleCountForCurrentMode()
+    }
+
     fun refreshCurrentView(silent: Boolean = false) {
-        viewModelScope.launch {
+        activeRefreshJob?.cancel()
+        activeRefreshJob = viewModelScope.launch {
             val state = _uiState.value
             if (!silent) {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null, isPermissionRevoked = false) }
@@ -234,6 +279,7 @@ class FileManagerViewModel(
     fun scanAccessibleMedia() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null, isPermissionRevoked = false) }
+            fileManagerRepository.notifyStorageChanged()
             val count = scanAccessibleMediaInternal()
             _uiState.update {
                 it.copy(
@@ -770,7 +816,11 @@ class FileManagerViewModel(
 
     private fun currentFilteredEntries(): List<LocalFileEntry> {
         val state = _uiState.value
-        val category = if (state.browseMode == FileBrowseMode.CATEGORY) state.activeCategory else null
+        val category = when (state.browseMode) {
+            FileBrowseMode.CATEGORY -> state.activeCategory
+            FileBrowseMode.OVERVIEW -> state.overviewCategoryFilter
+            FileBrowseMode.DIRECTORY -> null
+        }
         return FileSortAndFilter.apply(
             entries = currentPoolEntries(),
             query = state.searchQuery,
@@ -810,5 +860,6 @@ class FileManagerViewModel(
     companion object {
         const val PAGE_SIZE = 60
         const val PREFETCH_DISTANCE = 20
+        const val STORAGE_CHANGE_DEBOUNCE_MS = 450L
     }
 }

@@ -84,12 +84,14 @@ class FileListPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, LocalFileEntry> {
         return try {
-            val allSorted = cachedSortedEntries ?: FileSortAndFilter.apply(
-                entries = loadAllEntries(),
-                query = query,
-                categoryFilter = categoryFilter,
-                sortSpec = sortSpec
-            ).also { cachedSortedEntries = it }
+            val allSorted = cachedSortedEntries ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                FileSortAndFilter.apply(
+                    entries = loadAllEntries(),
+                    query = query,
+                    categoryFilter = categoryFilter,
+                    sortSpec = sortSpec
+                )
+            }.also { cachedSortedEntries = it }
 
             val offset = (params.key ?: 0).coerceAtLeast(0)
             if (offset >= allSorted.size) {
