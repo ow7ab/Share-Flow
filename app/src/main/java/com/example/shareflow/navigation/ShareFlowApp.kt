@@ -84,6 +84,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.shareflow.core.designsystem.motion.ElasticOverscrollContainer
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
@@ -337,11 +338,9 @@ fun ShareFlowApp(
                     // content visibly shines behind the translucent glass capsule on every tab.
                     val floatOverTopLevel = isTopLevel && !useNavigationRail
                     val bottomInset = innerPadding.calculateBottomPadding()
-                    ShareFlowNavHost(
-                        navController = navController,
-                        onNavigateTopLevel = navigateTopLevel,
-                        topLevelBottomBarClearance = if (floatOverTopLevel) bottomInset else 0.dp,
-                        activeTransferCount = activeTransferCount,
+                    ElasticOverscrollContainer(
+                        resetKey = currentRoute,
+                        revealBackgroundColor = MaterialTheme.colorScheme.background,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
@@ -350,7 +349,15 @@ fun ShareFlowApp(
                                 end = innerPadding.calculateEndPadding(layoutDirection),
                                 bottom = if (floatOverTopLevel) 0.dp else bottomInset
                             )
-                    )
+                    ) {
+                        ShareFlowNavHost(
+                            navController = navController,
+                            onNavigateTopLevel = navigateTopLevel,
+                            topLevelBottomBarClearance = if (floatOverTopLevel) bottomInset else 0.dp,
+                            activeTransferCount = activeTransferCount,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 

@@ -3,7 +3,9 @@ package com.example
 import android.animation.ObjectAnimator
 import android.content.res.Configuration
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.view.Display
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.SystemBarStyle
@@ -52,6 +54,7 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = barStyle
         )
         window.decorView.setBackgroundColor(targetWindowBg)
+        enableHighRefreshRateIfSupported()
 
         // Ensure the SplashScreen exit overlay matches the resolved user theme (even when the saved
         // app theme overrides the current OS night mode) and cross-fades cleanly without flicker.
@@ -76,6 +79,35 @@ class MainActivity : FragmentActivity() {
         setContent {
             CompositionLocalProvider(LocalAppContainer provides appContainer) {
                 ShareFlowApp(initialSettings = initialSettings)
+            }
+        }
+    }
+
+    /**
+     * Opts into the display's highest native refresh rate (e.g., 90Hz / 120Hz) at the current
+     * physical resolution so Compose spring animations render at full smoothness on high-refresh
+     * screens while staying seamlessly compatible with standard 60Hz panels.
+     */
+    private fun enableHighRefreshRateIfSupported() {
+        runCatching {
+            val activeDisplay: Display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display ?: return
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay ?: return
+            }
+            val currentMode = activeDisplay.mode
+            val bestMode = activeDisplay.supportedModes
+                .filter {
+                    it.physicalWidth == currentMode.physicalWidth &&
+                        it.physicalHeight == currentMode.physicalHeight
+                }
+                .maxByOrNull { it.refreshRate }
+                ?: return
+            if (bestMode.refreshRate > currentMode.refreshRate) {
+                window.attributes = window.attributes.apply {
+                    preferredDisplayModeId = bestMode.modeId
+                }
             }
         }
     }
