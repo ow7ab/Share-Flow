@@ -61,8 +61,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -239,6 +241,7 @@ fun SettingsContent(
     val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
     var showClearHistoryDialog by rememberSaveable { mutableStateOf(false) }
@@ -1065,6 +1068,17 @@ fun SettingsContent(
                                 .testTag("settings_reset_button")
                         )
                     }
+                }
+
+                // 10. Personal Contact & Social Media Section
+                item(key = "section_contact_me") {
+                    ContactMeSettingsSection(
+                        onShowFeedback = { message ->
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(message)
+                            }
+                        }
+                    )
                 }
 
                 item(key = "settings_bottom_spacer") {

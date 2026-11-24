@@ -1252,6 +1252,20 @@
     <string name="onboarding_perm_optional_title">Notifications &amp; App Install (Optional)</string>
     <string name="onboarding_perm_optional_desc">Shows live transfer progress notifications and lets you install received APK apps via Android\'s official installer.</string>
     <string name="onboarding_perm_storage_badge">Zero Broad Storage Permissions — Uses Android Photo &amp; File Picker</string>
+
+    <!-- Settings: Personal Contact & Social Media Section -->
+    <string name="settings_section_contact_me">Contact Me</string>
+    <string name="settings_contact_me_subtitle">I\'d be happy to connect with you through the channels below</string>
+    <string name="settings_contact_facebook">Facebook</string>
+    <string name="settings_contact_linkedin">LinkedIn</string>
+    <string name="settings_contact_whatsapp">WhatsApp</string>
+    <string name="settings_contact_email">Email</string>
+    <string name="settings_contact_facebook_cd">Open Facebook account ow7ab</string>
+    <string name="settings_contact_linkedin_cd">Open LinkedIn profile ow7ab</string>
+    <string name="settings_contact_whatsapp_cd">Start WhatsApp chat with +249963003301</string>
+    <string name="settings_contact_email_cd">Compose email to oaw7ab@gmail.com</string>
+    <string name="settings_contact_open_link_error">No supported app or browser was found to open %1$s.</string>
+    <string name="settings_contact_open_email_error">No email app was found on this device. You can write to oaw7ab@gmail.com.</string>
 </resources>
 
 

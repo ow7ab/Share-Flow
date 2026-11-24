@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Official Facebook 'f' emblem silhouette -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M22,12.06C22,6.5 17.52,2 12,2C6.48,2 2,6.5 2,12.06C2,17.08 5.66,21.24 10.44,22V14.97H7.9V12.06H10.44V9.84C10.44,7.32 11.93,5.93 14.22,5.93C15.31,5.93 16.45,6.12 16.45,6.12V8.6H15.19C13.95,8.6 13.56,9.37 13.56,10.17V12.06H16.34L15.9,14.97H13.56V22C18.34,21.24 22,17.08 22,12.06Z" />
+</vector>

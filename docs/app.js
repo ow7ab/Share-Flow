@@ -22,6 +22,7 @@
       navGallery: "واجهة التطبيق",
       navReleases: "الإصدارات",
       navFaq: "الأسئلة الشائعة",
+      navContact: "تواصل معي",
       scrollProgressLabel: "تقدم التمرير في الصفحة",
       themeToLightLabel: "فاتح",
       themeToDarkLabel: "داكن",
@@ -139,6 +140,17 @@
       faqA6: "لا إطلاقاً. رابط التحديث الرسمي مدمج ومضبوط تلقائياً داخل التطبيق، ويكفي الضغط على زر التحقق من التحديثات فقط.",
       faqQ7: "ماذا أفعل إذا فشل تثبيت التحديث؟",
       faqA7: "تأكد أولاً من تفعيل إذن «تثبيت التطبيقات غير المعروفة» لـ Share Flow أو المتصفح وتوفر مساحة تخزين كافية. وإذا كانت النسخة القديمة على جهازك نسخة اختبارية قديمة (Debug) وتنتقل لأول مرة إلى النسخة الرسمية، احذف النسخة التجريبية مرة واحدة ثم ثبّت النسخة الرسمية لتعمل جميع التحديثات التالية تلقائياً فوقها.",
+      contactKicker: "قنوات التواصل الرسمية",
+      contactHeading: "تواصل معي",
+      contactLead: "يسعدني تواصلك معي عبر القنوات التالية",
+      contactFacebookLabel: "فيسبوك",
+      contactLinkedinLabel: "لينكدإن",
+      contactWhatsappLabel: "واتساب",
+      contactEmailLabel: "البريد الإلكتروني",
+      contactFacebookAria: "فتح حساب فيسبوك ow7ab",
+      contactLinkedinAria: "فتح الملف الشخصي على لينكدإن ow7ab",
+      contactWhatsappAria: "بدء محادثة واتساب مع +249963003301",
+      contactEmailAria: "إرسال بريد إلكتروني إلى oaw7ab@gmail.com",
       footer: "Share Flow — ملفاتك على أجهزتك وتحت تحكمك الكامل.",
       footerMeta: "HTTPS • ملف APK رسمي موقّع • بدون إعلانات"
     },
@@ -151,6 +163,7 @@
       navGallery: "Showcase",
       navReleases: "Releases",
       navFaq: "FAQ",
+      navContact: "Contact Me",
       scrollProgressLabel: "Page scroll progress",
       themeToLightLabel: "Light",
       themeToDarkLabel: "Dark",
@@ -268,6 +281,17 @@
       faqA6: "Never. The official HTTPS version.json endpoint is built into Share Flow automatically.",
       faqQ7: "What should I do if installing an update fails?",
       faqA7: "Ensure Install Unknown Apps is allowed for Share Flow or your browser and that free storage is available. If upgrading for the very first time from an older Debug build to an official Release build, uninstall the Debug build once; all subsequent official releases will update in-place.",
+      contactKicker: "Official Social Channels",
+      contactHeading: "Contact Me",
+      contactLead: "I'd be happy to connect with you through the channels below",
+      contactFacebookLabel: "Facebook",
+      contactLinkedinLabel: "LinkedIn",
+      contactWhatsappLabel: "WhatsApp",
+      contactEmailLabel: "Email",
+      contactFacebookAria: "Open Facebook account ow7ab",
+      contactLinkedinAria: "Open LinkedIn profile ow7ab",
+      contactWhatsappAria: "Start WhatsApp chat with +249963003301",
+      contactEmailAria: "Compose email to oaw7ab@gmail.com",
       footer: "Share Flow — Your Files. Your Devices. Your Control.",
       footerMeta: "HTTPS • Direct Signed APK • Zero Ads"
     }
@@ -617,6 +641,7 @@
     setText("nav-gallery", t.navGallery);
     setText("nav-releases", t.navReleases);
     setText("nav-faq", t.navFaq);
+    setText("nav-contact", t.navContact);
     const progressBar = document.getElementById("scroll-progress-bar");
     if (progressBar) progressBar.setAttribute("aria-label", t.scrollProgressLabel);
     updateThemeToggleUi();
@@ -696,10 +721,31 @@
     setText("faq-q7", t.faqQ7);
     setText("faq-a7", t.faqA7);
 
+    renderContactSection(t);
+
     setText("footer-text", t.footer);
     setText("footer-meta", t.footerMeta);
 
     renderGallery();
+  }
+
+  function renderContactSection(t) {
+    setText("contact-kicker", t.contactKicker);
+    setText("contact-heading", t.contactHeading);
+    setText("contact-lead", t.contactLead);
+    setText("contact-facebook-label", t.contactFacebookLabel);
+    setText("contact-linkedin-label", t.contactLinkedinLabel);
+    setText("contact-whatsapp-label", t.contactWhatsappLabel);
+    setText("contact-email-label", t.contactEmailLabel);
+
+    const fb = document.getElementById("contact-link-facebook");
+    const li = document.getElementById("contact-link-linkedin");
+    const wa = document.getElementById("contact-link-whatsapp");
+    const em = document.getElementById("contact-link-email");
+    if (fb) fb.setAttribute("aria-label", t.contactFacebookAria);
+    if (li) li.setAttribute("aria-label", t.contactLinkedinAria);
+    if (wa) wa.setAttribute("aria-label", t.contactWhatsappAria);
+    if (em) em.setAttribute("aria-label", t.contactEmailAria);
   }
 
   function renderAboutSection(t) {

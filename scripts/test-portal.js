@@ -421,3 +421,28 @@ test("official Share Flow 4-color branding variables and frameless contain icon 
   }
 });
 
+test("ContactSection includes all four official personal contact links with safe attributes and bilingual support", () => {
+  const docsDir = path.join(__dirname, "..", "docs");
+  const html = fs.readFileSync(path.join(docsDir, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(docsDir, "styles.css"), "utf8");
+  const js = fs.readFileSync(path.join(docsDir, "app.js"), "utf8");
+
+  for (const expectedSnippet of [
+    'id="contact"',
+    'data-component="ContactSection"',
+    'id="contact-heading">تواصل معي<',
+    'id="contact-lead">يسعدني تواصلك معي عبر القنوات التالية<',
+    'href="https://www.facebook.com/ow7ab"',
+    'href="https://www.linkedin.com/in/ow7ab/"',
+    'href="https://wa.me/249963003301"',
+    'href="mailto:oaw7ab@gmail.com"',
+    'rel="noopener noreferrer"'
+  ]) {
+    assert.ok(html.includes(expectedSnippet), `Missing ContactSection element in docs/index.html: ${expectedSnippet}`);
+  }
+
+  assert.ok(css.includes(".contact-grid") && css.includes(".contact-card"), "Missing ContactSection styles in docs/styles.css");
+  assert.ok(js.includes("renderContactSection") && js.includes('contactHeading: "Contact Me"'), "Missing bilingual ContactSection support in docs/app.js");
+});
+
+

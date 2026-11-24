@@ -1252,6 +1252,20 @@
     <string name="onboarding_perm_optional_title">الإشعارات وتثبيت التطبيقات (اختياري)</string>
     <string name="onboarding_perm_optional_desc">لعرض تقدّم النقل في الإشعارات، والسماح بتثبيت ملفات APK المستلمة عبر مثبّت Android الرسمي.</string>
     <string name="onboarding_perm_storage_badge">بدون إذن التخزين الشامل — يستخدم منتقي الصور والملفات الرسمي</string>
+
+    <!-- الإعدادات: قسم تواصل معي وحسابات التواصل الرسمية -->
+    <string name="settings_section_contact_me">تواصل معي</string>
+    <string name="settings_contact_me_subtitle">يسعدني تواصلك معي عبر القنوات التالية</string>
+    <string name="settings_contact_facebook">فيسبوك</string>
+    <string name="settings_contact_linkedin">لينكدإن</string>
+    <string name="settings_contact_whatsapp">واتساب</string>
+    <string name="settings_contact_email">البريد الإلكتروني</string>
+    <string name="settings_contact_facebook_cd">فتح حساب فيسبوك ow7ab</string>
+    <string name="settings_contact_linkedin_cd">فتح الملف الشخصي على لينكدإن ow7ab</string>
+    <string name="settings_contact_whatsapp_cd">بدء محادثة واتساب مع +249963003301</string>
+    <string name="settings_contact_email_cd">إرسال بريد إلكتروني إلى oaw7ab@gmail.com</string>
+    <string name="settings_contact_open_link_error">لم يتم العثور على تطبيق أو متصفح مناسب لفتح %1$s.</string>
+    <string name="settings_contact_open_email_error">لم يتم العثور على تطبيق بريد إلكتروني على هذا الجهاز. يمكنك المراسلة عبر oaw7ab@gmail.com.</string>
 </resources>
 
 
