@@ -321,23 +321,34 @@ class AppSharingRepositoryTest {
         assertTrue(lockedRes is AppResult.Failure)
         assertTrue((lockedRes as AppResult.Failure).error is AppError.PermissionDenied)
 
-        // Extracting standalone + split succeeds with exact byte sizes & SHA-256 digests
+        // Extracting standalone + split succeeds with exact byte sizes, SHA-256 digests, and verified split bundle manifest
         val extractRes = repo.extractApksForSharing(listOf(calc, splitGame))
         assertTrue(extractRes is AppResult.Success)
         val artifacts = (extractRes as AppResult.Success).data
-        assertEquals(3, artifacts.size)
+        assertEquals(4, artifacts.size)
 
-        val calcArtifact = artifacts.first { it.packageName == "com.test.calc" }
+        val apkArtifacts = artifacts.filterNot { it.isBundleManifest }
+        val manifestArtifacts = artifacts.filter { it.isBundleManifest }
+        assertEquals(3, apkArtifacts.size)
+        assertEquals(1, manifestArtifacts.size)
+
+        val calcArtifact = apkArtifacts.first { it.packageName == "com.test.calc" }
         assertEquals("", calcArtifact.relativePath)
         assertFalse(calcArtifact.isSplitPart)
         val expectedCalcHash = (checksumVerifier.computeSha256(FileInputStream(standaloneApk)) as AppResult.Success).data
         assertEquals(expectedCalcHash, calcArtifact.sha256Checksum)
         assertTrue(File(calcArtifact.localFilePath).exists())
 
-        val splitArtifacts = artifacts.filter { it.packageName == "com.test.splitgame" }
-        assertEquals(2, splitArtifacts.size)
-        assertTrue(splitArtifacts.all { it.isSplitPart && it.relativePath.isNotBlank() })
-        assertTrue(splitArtifacts.any { it.fileName == "base.apk" })
+        val splitApkArtifacts = apkArtifacts.filter { it.packageName == "com.test.splitgame" }
+        assertEquals(2, splitApkArtifacts.size)
+        assertTrue(splitApkArtifacts.all { it.isSplitPart && it.relativePath.isNotBlank() })
+        assertTrue(splitApkArtifacts.any { it.fileName == "base.apk" })
+
+        val bundleManifest = manifestArtifacts.single()
+        assertEquals("com.test.splitgame", bundleManifest.packageName)
+        assertTrue(bundleManifest.isSplitPart && bundleManifest.relativePath.isNotBlank())
+        assertTrue(File(bundleManifest.localFilePath).exists())
+        assertEquals(64, bundleManifest.sha256Checksum.length)
     }
 
     @Test

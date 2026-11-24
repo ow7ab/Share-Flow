@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Wifi
@@ -282,8 +282,8 @@ private fun OnboardingWelcomePage(
         // Official ShareFlow hero badge
         Box(
             modifier = Modifier
-                .size(100.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .size(78.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
@@ -296,7 +296,7 @@ private fun OnboardingWelcomePage(
                 .border(
                     width = 1.5.dp,
                     brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.9f),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(24.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -305,12 +305,12 @@ private fun OnboardingWelcomePage(
                 contentDescription = stringResource(R.string.onboarding_app_icon_cd),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(78.dp)
-                    .padding(4.dp)
+                    .size(60.dp)
+                    .padding(3.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(spacing.sm))
+        Spacer(modifier = Modifier.height(spacing.xs))
 
         OnboardingCategoryPill(
             text = stringResource(R.string.onboarding_welcome_badge),
@@ -318,26 +318,26 @@ private fun OnboardingWelcomePage(
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         )
 
-        Spacer(modifier = Modifier.height(spacing.xs))
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = stringResource(R.string.onboarding_welcome_title),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(spacing.xs))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Text(
             text = stringResource(R.string.onboarding_welcome_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(spacing.md))
+        Spacer(modifier = Modifier.height(spacing.sm))
 
         OnboardingLanguageSelector(
             selectedLanguage = selectedLanguage,
@@ -597,7 +597,7 @@ private fun OnboardingHowToUsePage() {
 
         Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
             OnboardingFeatureCard(
-                icon = Icons.Filled.Send,
+                icon = Icons.AutoMirrored.Filled.Send,
                 iconTint = ShareFlowMarpleColors.Ruby,
                 title = stringResource(R.string.onboarding_how_step_1_title),
                 description = stringResource(R.string.onboarding_how_step_1_desc)

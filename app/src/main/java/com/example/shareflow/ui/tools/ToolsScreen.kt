@@ -237,7 +237,11 @@ fun ToolsScreen(
             }
 
             item(key = "tools_bottom_spacer") {
-                Spacer(modifier = Modifier.height(spacing.md))
+                Spacer(
+                    modifier = Modifier
+                        .height(spacing.md)
+                        .testTag("tools_bottom_spacer")
+                )
             }
         }
     }

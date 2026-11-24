@@ -165,8 +165,9 @@ class ShareFlowNavigationRobolectricTest {
         composeTestRule.onNodeWithTag("top_bar_back_button").performClick()
         waitForTag("tools_screen_list")
 
-        // Open Transfer History from Tools
-        toolsList.performScrollToNode(hasTestTag("tools_card_transfer_history"))
+        // Open Transfer History from Tools (scroll to bottom spacer so card clears floating glass nav bar)
+        toolsList.performScrollToNode(hasTestTag("tools_bottom_spacer"))
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("tools_card_transfer_history").performClick()
         waitForTag("history_empty_state")
         composeTestRule.onNodeWithTag("history_empty_state").assertIsDisplayed()

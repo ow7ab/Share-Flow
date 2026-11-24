@@ -5,6 +5,7 @@ import android.graphics.drawable.ColorDrawable
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import com.example.MainActivity
+import com.example.ShareFlowApplication
 import com.example.shareflow.data.repository.SettingsRepositoryImpl
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
@@ -13,8 +14,10 @@ import com.example.shareflow.testutil.TestDispatcherProvider
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,7 +74,7 @@ class StartupAppearanceCacheRobolectricTest {
 
     @Test
     fun `settings repository peekInitialSettings returns saved light mode immediately and seeds legacy datastore`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataStoreFile = File(tempFolder.newFolder(), "startup_settings.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(
             scope = TestScope(dispatcher),
@@ -112,13 +115,18 @@ class StartupAppearanceCacheRobolectricTest {
     @Test
     @Config(sdk = [36], qualifiers = "night")
     fun `mainActivity launches directly with light window background under system night mode when light theme is saved`() {
-        StartupAppearanceCache(context).updateThemeMode(ThemeMode.LIGHT)
+        val app = ApplicationProvider.getApplicationContext<ShareFlowApplication>()
+        runBlocking { app.container.settingsRepository.updateThemeMode(ThemeMode.LIGHT) }
 
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
         try {
             val activity = controller.get()
-            val bgColor = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFFFFF9F5.toInt(), bgColor)
+            val preFrameBg = (activity.window.decorView.background as? ColorDrawable)?.color
+            assertEquals(0xFFFFF9F5.toInt(), preFrameBg)
+
+            controller.start().resume().visible()
+            val settledBg = (activity.window.decorView.background as? ColorDrawable)?.color
+            assertEquals(0xFFFFF9F5.toInt(), settledBg)
         } finally {
             controller.pause().stop().destroy()
         }
@@ -126,7 +134,7 @@ class StartupAppearanceCacheRobolectricTest {
 
     @Test
     fun `onboarding completion persists across cold restarts and survives resetToDefaults`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataStoreFile = File(tempFolder.newFolder(), "onboarding_persist.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(
             scope = TestScope(dispatcher),
@@ -200,13 +208,18 @@ class StartupAppearanceCacheRobolectricTest {
     @Test
     @Config(sdk = [36], qualifiers = "notnight")
     fun `mainActivity launches directly with exact dark window background matching values-night theme`() {
-        StartupAppearanceCache(context).updateThemeMode(ThemeMode.DARK)
+        val app = ApplicationProvider.getApplicationContext<ShareFlowApplication>()
+        runBlocking { app.container.settingsRepository.updateThemeMode(ThemeMode.DARK) }
 
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
         try {
             val activity = controller.get()
-            val bgColor = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFF171316.toInt(), bgColor)
+            val preFrameBg = (activity.window.decorView.background as? ColorDrawable)?.color
+            assertEquals(0xFF171316.toInt(), preFrameBg)
+
+            controller.start().resume().visible()
+            val settledBg = (activity.window.decorView.background as? ColorDrawable)?.color
+            assertEquals(0xFF171316.toInt(), settledBg)
         } finally {
             controller.pause().stop().destroy()
         }

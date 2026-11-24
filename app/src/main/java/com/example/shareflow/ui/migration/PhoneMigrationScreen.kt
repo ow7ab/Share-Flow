@@ -30,8 +30,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Radar
@@ -874,5 +874,5 @@ private fun MigrationCategory.icon(): ImageVector = when (this) {
     MigrationCategory.DOCUMENTS -> Icons.Filled.Description
     MigrationCategory.USER_FOLDERS -> Icons.Filled.Folder
     MigrationCategory.CONTACTS -> Icons.Filled.Contacts
-    MigrationCategory.OTHER_FILES -> Icons.Filled.InsertDriveFile
+    MigrationCategory.OTHER_FILES -> Icons.AutoMirrored.Filled.InsertDriveFile
 }

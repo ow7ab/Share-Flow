@@ -5,6 +5,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.shareflow.core.designsystem.theme.ShareFlowTheme
 import com.example.shareflow.domain.model.AppLanguage
 import org.junit.Assert.assertFalse
@@ -125,8 +126,8 @@ class OnboardingRobolectricTest {
             }
         }
 
-        composeRule.onNodeWithTag("onboarding_language_selector").assertIsDisplayed()
-        composeRule.onNodeWithTag("onboarding_lang_arabic").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding_language_selector").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding_lang_arabic").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("onboarding_lang_english").assertIsDisplayed()
         composeRule.onNodeWithTag("onboarding_lang_system").assertIsDisplayed()
 

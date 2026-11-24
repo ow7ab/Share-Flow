@@ -825,7 +825,12 @@ class CloudUpdateManager(
         val updatesDir = File(appContext.cacheDir, UPDATES_CACHE_DIR)
         val canonicalBase = runCatching { updatesDir.canonicalPath + File.separator }.getOrNull() ?: return UpdateInstallLaunchResult.FAILED
         val canonicalTarget = runCatching { apkFile.canonicalPath }.getOrNull() ?: return UpdateInstallLaunchResult.FAILED
-        if (!apkFile.exists() || !canonicalTarget.startsWith(canonicalBase)) {
+        if (!apkFile.exists() ||
+            !apkFile.isFile ||
+            apkFile.length() <= 0L ||
+            !apkFile.name.endsWith(".apk", ignoreCase = true) ||
+            !canonicalTarget.startsWith(canonicalBase)
+        ) {
             return UpdateInstallLaunchResult.FAILED
         }
         if (!permissionManager.canRequestPackageInstalls()) {

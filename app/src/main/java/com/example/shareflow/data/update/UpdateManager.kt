@@ -148,69 +148,110 @@ class UpdateManager(
     }
 
     private fun fetchManifestWithOkHttp(url: String): AppResult<String> {
-        val request = Request.Builder()
-            .url(url)
-            .get()
-            .header("Accept", "application/json")
-            .header("Cache-Control", "no-cache")
-            .header("User-Agent", "ShareFlow-Android/${BuildConfig.VERSION_NAME}")
-            .build()
+        var currentUrl = url
+        var redirectCount = 0
 
-        return try {
-            okHttpClient.newCall(request).execute().use { response ->
-                val finalUrl = response.request.url.toString()
-                if (!CloudUpdateValidator.isValidPublicHttpsUrl(finalUrl)) {
-                    return AppResult.Failure(
-                        AppError.Security("Blocked non-HTTPS or private network redirect while fetching version.json.")
-                    )
-                }
-                if (!response.isSuccessful) {
-                    return AppResult.Failure(
-                        AppError.Network("Update server returned HTTP ${response.code}.")
-                    )
-                }
-                val body = response.body ?: return AppResult.Failure(
-                    AppError.Validation("Empty update manifest response body.")
+        while (redirectCount <= MAX_REDIRECTS) {
+            if (!CloudUpdateValidator.isValidPublicHttpsUrl(currentUrl)) {
+                return AppResult.Failure(
+                    AppError.Security("Blocked non-HTTPS or private network update manifest URL.")
                 )
-                val contentLength = body.contentLength()
-                if (contentLength > CloudUpdateValidator.MAX_MANIFEST_BYTES) {
-                    return AppResult.Failure(
-                        AppError.Validation("Update manifest exceeds maximum safe size.")
-                    )
-                }
-                val bytes = body.byteStream().use { input ->
-                    val buffer = ByteArray(4096)
-                    val out = java.io.ByteArrayOutputStream()
-                    var total = 0
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read <= 0) break
-                        total += read
-                        if (total > CloudUpdateValidator.MAX_MANIFEST_BYTES) {
+            }
+
+            val request = Request.Builder()
+                .url(currentUrl)
+                .get()
+                .header("Accept", "application/json")
+                .header("Cache-Control", "no-cache")
+                .header("User-Agent", "ShareFlow-Android/${BuildConfig.VERSION_NAME}")
+                .build()
+
+            val nextRedirectUrl: String? = try {
+                okHttpClient.newCall(request).execute().use { response ->
+                    val finalUrl = response.request.url.toString()
+                    if (!CloudUpdateValidator.isValidPublicHttpsUrl(finalUrl)) {
+                        return AppResult.Failure(
+                            AppError.Security("Blocked non-HTTPS or private network redirect while fetching version.json.")
+                        )
+                    }
+
+                    if (response.code in REDIRECT_STATUS_CODES) {
+                        val location = response.header("Location")?.trim().orEmpty()
+                        if (location.isBlank()) {
+                            return AppResult.Failure(
+                                AppError.Network("Update server returned empty redirect Location header.")
+                            )
+                        }
+                        val resolved = runCatching {
+                            java.net.URI(currentUrl).resolve(location).toString()
+                        }.getOrNull().orEmpty()
+                        if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolved)) {
+                            return AppResult.Failure(
+                                AppError.Security("Blocked non-HTTPS or private network redirect target.")
+                            )
+                        }
+                        resolved
+                    } else if (!response.isSuccessful) {
+                        return AppResult.Failure(
+                            AppError.Network("Update server returned HTTP ${response.code}.")
+                        )
+                    } else {
+                        val body = response.body ?: return AppResult.Failure(
+                            AppError.Validation("Empty update manifest response body.")
+                        )
+                        val contentLength = body.contentLength()
+                        if (contentLength > CloudUpdateValidator.MAX_MANIFEST_BYTES) {
                             return AppResult.Failure(
                                 AppError.Validation("Update manifest exceeds maximum safe size.")
                             )
                         }
-                        out.write(buffer, 0, read)
+                        val bytes = body.byteStream().use { input ->
+                            val buffer = ByteArray(4096)
+                            val out = java.io.ByteArrayOutputStream()
+                            var total = 0
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read <= 0) break
+                                total += read
+                                if (total > CloudUpdateValidator.MAX_MANIFEST_BYTES) {
+                                    return AppResult.Failure(
+                                        AppError.Validation("Update manifest exceeds maximum safe size.")
+                                    )
+                                }
+                                out.write(buffer, 0, read)
+                            }
+                            out.toByteArray()
+                        }
+                        return AppResult.Success(bytes.toString(Charsets.UTF_8))
                     }
-                    out.toByteArray()
                 }
-                AppResult.Success(bytes.toString(Charsets.UTF_8))
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: IOException) {
+                return AppResult.Failure(AppError.Network(e.message ?: "Network error while checking for updates."))
+            } catch (e: Exception) {
+                return AppResult.Failure(AppError.Network(e.message ?: "Unexpected error while checking for updates."))
             }
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: IOException) {
-            AppResult.Failure(AppError.Network(e.message ?: "Network error while checking for updates."))
-        } catch (e: Exception) {
-            AppResult.Failure(AppError.Network(e.message ?: "Unexpected error while checking for updates."))
+
+            if (nextRedirectUrl != null) {
+                currentUrl = nextRedirectUrl
+                redirectCount++
+            }
         }
+
+        return AppResult.Failure(
+            AppError.Network("Too many redirects while fetching version.json.")
+        )
     }
 
     companion object {
+        private const val MAX_REDIRECTS = 3
+        private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
+
         fun createDefaultOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
-            .followRedirects(true)
+            .followRedirects(false)
             .followSslRedirects(false)
             .retryOnConnectionFailure(true)
             .build()

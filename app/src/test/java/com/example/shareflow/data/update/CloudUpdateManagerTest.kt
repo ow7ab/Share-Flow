@@ -60,8 +60,8 @@ class CloudUpdateManagerTest {
 
     @Test
     fun `version metadata and default official website manifest URL are valid and consistent`() {
-        assertTrue("VERSION_CODE must be monotonic >= 13", BuildConfig.VERSION_CODE >= 13)
-        assertEquals("1.0.12", BuildConfig.VERSION_NAME)
+        assertTrue("VERSION_CODE must be monotonic >= 16", BuildConfig.VERSION_CODE >= 16)
+        assertEquals("1.0.15", BuildConfig.VERSION_NAME)
         assertTrue(
             "VERSION_NAME must follow semantic versioning",
             Regex("^\\d+\\.\\d+\\.\\d+([-.][0-9A-Za-z.]+)?$").matches(BuildConfig.VERSION_NAME)

@@ -36,8 +36,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -394,7 +394,7 @@ fun CustomFileViewerDialog(
                                     .testTag("viewer_action_open_external")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.OpenInNew,
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                     contentDescription = stringResource(R.string.files_action_open_external),
                                     tint = if (isMediaDarkStage) Color.White else MaterialTheme.colorScheme.onSurface
                                 )
@@ -1166,7 +1166,7 @@ private fun GenericFilePreviewCard(
                     onClick = onOpenExternal,
                     modifier = Modifier.padding(top = spacing.xs)
                 ) {
-                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.size(8.dp))
                     Text(stringResource(R.string.files_action_open_external))
                 }

@@ -51,8 +51,10 @@ class SettingsRepositoryImpl(
         }
         // One-time bounded migration seed for existing installs upgrading from DataStore-only persistence
         val migrated = runCatching {
-            runBlocking(dispatchers.io) {
-                withTimeoutOrNull(LEGACY_PEEK_TIMEOUT_MS) { settings.first() }
+            runBlocking {
+                withTimeoutOrNull(LEGACY_PEEK_TIMEOUT_MS) {
+                    withContext(dispatchers.io) { settings.first() }
+                }
             }
         }.getOrNull() ?: return AppSettings()
         cache.write(migrated)
