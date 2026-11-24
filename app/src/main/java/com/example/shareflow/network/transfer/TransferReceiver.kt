@@ -193,27 +193,12 @@ class TransferReceiver(
             updatedAtEpochMillis = now
         )
 
-        var lastProgressEmitNanos = 0L
-
         fun publish(
             state: TransferState = currentSession.state,
             error: String? = currentSession.errorMessage,
             isResumable: Boolean = currentSession.isResumable,
-            completedAt: Long? = currentSession.completedAtEpochMillis,
-            throttleIfTransferring: Boolean = false
+            completedAt: Long? = currentSession.completedAtEpochMillis
         ) {
-            val nowNanos = System.nanoTime()
-            if (throttleIfTransferring &&
-                state == TransferState.TRANSFERRING &&
-                currentSession.state == TransferState.TRANSFERRING &&
-                error == null &&
-                completedAt == null &&
-                lastProgressEmitNanos != 0L &&
-                nowNanos - lastProgressEmitNanos < PROGRESS_PUBLISH_INTERVAL_NANOS
-            ) {
-                return
-            }
-            lastProgressEmitNanos = nowNanos
             val speed = if (state == TransferState.TRANSFERRING) {
                 speedTracker.currentSpeedBytesPerSec()
             } else {
@@ -287,7 +272,7 @@ class TransferReceiver(
         }
 
         val publishImmediate: (TransferState, String?, Boolean, Long?) -> Unit = { s, e, r, c ->
-            publish(s, e, r, c, throttleIfTransferring = false)
+            publish(s, e, r, c)
         }
 
         channel.setReadTimeout(TRANSFER_IO_TIMEOUT_MS)
@@ -402,13 +387,11 @@ class TransferReceiver(
                                         isRecoverable = true
                                     )
                                 }
-                                val isFinalChunk = contiguousChunks >= item.totalChunks
                                 publish(
                                     state = TransferState.TRANSFERRING,
                                     error = null,
                                     isResumable = true,
-                                    completedAt = null,
-                                    throttleIfTransferring = !isFinalChunk
+                                    completedAt = null
                                 )
                                 sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, writtenBytes, true, "", windowCredits)
                             }
@@ -440,7 +423,7 @@ class TransferReceiver(
                             receivedChunkCount = contiguousVerifiedCount,
                             onUpdateItem = { updated ->
                                 mutableItems[idx] = updated
-                                publish(updated.state, updated.errorMessage, updated.isRecoverable, null, throttleIfTransferring = false)
+                                publish(updated.state, updated.errorMessage, updated.isRecoverable, null)
                             }
                         )
                         if (verifyOutcome is AppResult.Failure) {
@@ -475,7 +458,7 @@ class TransferReceiver(
                                             )
                                         }
                                     }
-                                    publish(TransferState.PAUSED, null, true, null, throttleIfTransferring = false)
+                                    publish(TransferState.PAUSED, null, true, null)
                                     transferRepository.updateSessionState(
                                         sessionId = currentSession.sessionId,
                                         state = TransferState.PAUSED,
@@ -493,7 +476,7 @@ class TransferReceiver(
                                             mutableItems[i] = mutableItems[i].copy(state = TransferState.TRANSFERRING)
                                         }
                                     }
-                                    publish(TransferState.TRANSFERRING, null, true, null, throttleIfTransferring = false)
+                                    publish(TransferState.TRANSFERRING, null, true, null)
                                     transferRepository.updateSessionState(
                                         sessionId = currentSession.sessionId,
                                         state = TransferState.TRANSFERRING,
@@ -526,8 +509,7 @@ class TransferReceiver(
                             state = finalState,
                             error = if (allCompleted) null else "Transfer session finished with incomplete files",
                             isResumable = !allCompleted,
-                            completedAt = completedAt,
-                            throttleIfTransferring = false
+                            completedAt = completedAt
                         )
                         transferRepository.updateSessionState(
                             sessionId = currentSession.sessionId,
@@ -881,6 +863,5 @@ class TransferReceiver(
         private const val PAUSED_WAIT_TIMEOUT_MS = 10 * 60 * 1_000
         private const val MAX_IN_FLIGHT_WINDOW_BYTES = 256 * 1024
         private const val CHECKPOINT_INTERVAL_CHUNKS = 8
-        private const val PROGRESS_PUBLISH_INTERVAL_NANOS = 100_000_000L // 100ms UI progress throttle
     }
 }

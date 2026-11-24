@@ -189,7 +189,12 @@ fun ImageGalleryScreen(
             modifier = modifier
                 .fillMaxSize()
                 .testTag("image_gallery_screen"),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = Color.Transparent,
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState) { data ->
+                    com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+                }
+            },
             topBar = {
                 ShareFlowTopBar(
                     title = stringResource(R.string.media_gallery_title),

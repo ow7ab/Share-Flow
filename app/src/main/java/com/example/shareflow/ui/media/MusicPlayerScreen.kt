@@ -156,7 +156,12 @@ fun MusicPlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("music_player_screen"),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+            }
+        },
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.media_music_title),

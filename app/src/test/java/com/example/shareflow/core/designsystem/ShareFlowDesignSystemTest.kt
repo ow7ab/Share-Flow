@@ -288,7 +288,7 @@ class ShareFlowDesignSystemTest {
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Rtl, capturedDirection)
         assertEquals(Color(0xFFFFF9F5), capturedBackground)
-        assertEquals(Color(0xFF292126), capturedOnBackground)
+        assertEquals(Color(0xFF1D1A22), capturedOnBackground)
         assertEquals(Color(0xFFCA2851), capturedPrimary)
         assertEquals(Color(0xFFFF6766), capturedSecondary)
         assertEquals(Color(0xFFFFB173), capturedTertiary)
@@ -298,9 +298,9 @@ class ShareFlowDesignSystemTest {
             ShareFlowBrandGradients.SignatureStops
         )
         assertEquals(Color(0xFFCA2851), LightColorScheme.primary)
-        assertEquals(Color(0xFFFF8198), DarkColorScheme.primary)
-        assertEquals(Color(0xFF171316), DarkColorScheme.background)
-        assertEquals(Color(0xFF211A1E), DarkColorScheme.surface)
+        assertEquals(Color(0xFFFF6D8C), DarkColorScheme.primary)
+        assertEquals(Color(0xFF0D1220), DarkColorScheme.background)
+        assertEquals(Color(0xFF141B2D), DarkColorScheme.surface)
         composeTestRule.onNodeWithTag("rtl_settings_title").assertTextEquals("الإعدادات")
 
         val arabicSize = ShareFlowFormatters.formatBytes(2048L, Locale.forLanguageTag("ar"))
@@ -336,14 +336,15 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Ltr, capturedDirection)
-        assertEquals(Color(0xFF171316), capturedDarkBackground)
-        assertEquals(Color(0xFFFF8198), capturedDarkPrimary)
-        assertEquals(Color(0xFFFF8986), capturedDarkSecondary)
-        assertEquals(Color(0xFFFFB77F), capturedDarkTertiary)
-        assertEquals(Color(0xFFFFF5F1), capturedDarkOnBackground)
-        assertEquals(Color(0xD9FFF9F5), ShareFlowBrandColors.GlassNavBackground)
-        assertEquals(Color(0xB3EADDE0), ShareFlowBrandColors.GlassNavBorder)
-        assertEquals(Color(0xFFEADDE0), ShareFlowBrandColors.GlassCardBorder)
+        assertEquals(Color(0xFF0D1220), capturedDarkBackground)
+        assertNotEquals(Color.Black, capturedDarkBackground)
+        assertEquals(Color(0xFFFF6D8C), capturedDarkPrimary)
+        assertEquals(Color(0xFFFF8281), capturedDarkSecondary)
+        assertEquals(Color(0xFFFFB173), capturedDarkTertiary)
+        assertEquals(Color(0xFFF4F6FC), capturedDarkOnBackground)
+        assertEquals(Color(0xD9FFFFFF), ShareFlowBrandColors.GlassNavBackground)
+        assertEquals(Color(0xBFE9DCE0), ShareFlowBrandColors.GlassNavBorder)
+        assertEquals(Color(0xFFE9DCE0), ShareFlowBrandColors.GlassCardBorder)
         composeTestRule.onNodeWithTag("ltr_settings_title").assertTextEquals("Settings")
     }
 
@@ -464,5 +465,137 @@ class ShareFlowDesignSystemTest {
         composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_receive_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("shareflow_navigation_bar").assertIsDisplayed()
+    }
+
+    @Test
+    fun `renders all Share Flow 2_0 SF components in Light and Deep Navy Dark modes and preserves official brand colors`() {
+        val themeMode = mutableStateOf(ThemeMode.LIGHT)
+        var capturedPrimaryLight: Color? = null
+        var capturedPrimaryDark: Color? = null
+        var primaryButtonClicks = 0
+        var secondaryButtonClicks = 0
+        var iconButtonClicks = 0
+        var settingsItemClicks = 0
+        var dialogConfirmed = false
+        val showDialog = mutableStateOf(false)
+
+        composeTestRule.setContent {
+            // Even when useDynamicColor = true, Share Flow 2.0 preserves the official brand palette
+            ShareFlowTheme(
+                themeMode = themeMode.value,
+                useDynamicColor = true,
+                appLanguage = AppLanguage.ENGLISH
+            ) {
+                if (themeMode.value == ThemeMode.LIGHT) {
+                    capturedPrimaryLight = MaterialTheme.colorScheme.primary
+                } else {
+                    capturedPrimaryDark = MaterialTheme.colorScheme.primary
+                }
+                com.example.shareflow.core.designsystem.components.SFBackground(
+                    modifier = Modifier.testTag("sf2_background")
+                ) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        com.example.shareflow.core.designsystem.components.SFTopBar(
+                            title = "ShareFlow 2.0",
+                            onNavigateBack = {},
+                            modifier = Modifier.testTag("sf2_top_bar")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFSectionHeader(
+                            title = "Transfers",
+                            actionLabel = "All",
+                            onActionClick = {},
+                            modifier = Modifier.testTag("sf2_section_header")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFGlassCard(
+                            modifier = Modifier.testTag("sf2_glass_card")
+                        ) {
+                            Text("Liquid Glass Card")
+                        }
+                        com.example.shareflow.core.designsystem.components.SFPrimaryButton(
+                            text = "Open Dialog",
+                            onClick = {
+                                primaryButtonClicks++
+                                showDialog.value = true
+                            },
+                            modifier = Modifier.testTag("sf2_primary_btn")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFSecondaryButton(
+                            text = "Secondary",
+                            onClick = { secondaryButtonClicks++ },
+                            modifier = Modifier.testTag("sf2_secondary_btn")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFIconButton(
+                            icon = Icons.Filled.Folder,
+                            contentDescription = "Folder",
+                            onClick = { iconButtonClicks++ },
+                            modifier = Modifier.testTag("sf2_icon_btn")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFProgressIndicator(
+                            progress = 0.72f,
+                            modifier = Modifier.testTag("sf2_progress")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFLoadingIndicator(
+                            message = "Syncing",
+                            modifier = Modifier.testTag("sf2_loading")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFSettingsItem(
+                            title = "Appearance",
+                            subtitle = "Liquid Glass",
+                            leadingIcon = Icons.Filled.Folder,
+                            onClick = { settingsItemClicks++ },
+                            modifier = Modifier.testTag("sf2_settings_item")
+                        )
+                        com.example.shareflow.core.designsystem.components.SFSnackbarSurface(
+                            message = "Transfer verified",
+                            modifier = Modifier.testTag("sf2_snackbar")
+                        )
+                    }
+                    if (showDialog.value) {
+                        com.example.shareflow.core.designsystem.components.SFDialog(
+                            onDismissRequest = { showDialog.value = false },
+                            title = "Confirm",
+                            body = "Proceed with ShareFlow 2.0 action?",
+                            confirmLabel = "Confirm",
+                            onConfirm = {
+                                dialogConfirmed = true
+                                showDialog.value = false
+                            },
+                            onDismiss = { showDialog.value = false },
+                            confirmTestTag = "sf2_dialog_confirm"
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        assertEquals(Color(0xFFCA2851), capturedPrimaryLight)
+        composeTestRule.onNodeWithTag("sf2_background").assertExists()
+        composeTestRule.onNodeWithTag("sf2_top_bar").assertExists()
+        composeTestRule.onNodeWithTag("sf2_section_header").assertExists()
+        composeTestRule.onNodeWithTag("sf2_glass_card").assertExists()
+        composeTestRule.onNodeWithTag("sf2_progress").assertExists()
+        composeTestRule.onNodeWithTag("sf2_loading").assertExists()
+        composeTestRule.onNodeWithTag("sf2_snackbar").assertExists()
+
+        composeTestRule.onNodeWithTag("sf2_secondary_btn").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("sf2_icon_btn").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("sf2_settings_item").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("sf2_primary_btn").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("sf2_dialog_confirm").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, primaryButtonClicks)
+        assertEquals(1, secondaryButtonClicks)
+        assertEquals(1, iconButtonClicks)
+        assertEquals(1, settingsItemClicks)
+        assertTrue(dialogConfirmed)
+
+        // Switch to Deep Navy Dark Mode
+        themeMode.value = ThemeMode.DARK
+        composeTestRule.waitForIdle()
+        assertEquals(Color(0xFFFF6D8C), capturedPrimaryDark)
+        composeTestRule.onNodeWithTag("sf2_glass_card").assertExists()
     }
 }

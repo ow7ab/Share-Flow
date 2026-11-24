@@ -64,6 +64,7 @@ import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.network.qr.SmartQrPairingProtocol
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
 import com.example.shareflow.ui.discovery.AdvancedQrScannerView
+import com.example.shareflow.ui.discovery.NfcSenderTapCard
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
 import com.example.shareflow.ui.discovery.SmartSenderProgressCard
 import com.example.shareflow.ui.discovery.decodeQrCodeFromGalleryUri
@@ -196,7 +197,12 @@ fun QrScannerScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+            }
+        },
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.qr_scanner_utility_title),
@@ -343,6 +349,18 @@ fun QrScannerScreen(
                             }
                         }
                     }
+                }
+
+                item(key = "qr_nfc_tap_card") {
+                    NfcSenderTapCard(
+                        enabled = connectionState !is ConnectionState.Connected && !isPairing,
+                        isConnecting = isPairing || smartPhase.isInProgress,
+                        compact = true,
+                        onPairingUriReceived = { nfcUri ->
+                            manualUri = nfcUri
+                            submitQrUri(nfcUri)
+                        }
+                    )
                 }
 
                 item(key = "qr_gallery_import") {

@@ -89,6 +89,8 @@ import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.ConfirmationDialog
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.SFGlassCard
+import com.example.shareflow.core.designsystem.components.SFSnackbar
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.StatusPill
@@ -389,11 +391,13 @@ fun SettingsContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         snackbarHost = {
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.padding(bottom = bottomBarClearance)
+                modifier = Modifier.padding(bottom = bottomBarClearance),
+                snackbar = { data -> SFSnackbar(snackbarData = data) }
             )
         }
     ) { innerPadding ->
@@ -1238,19 +1242,14 @@ private fun SettingsGroupCard(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val spacing = ShareFlowDesign.spacing
-    Surface(
+    SFGlassCard(
+        contentPadding = PaddingValues(spacing.cardPadding),
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(testTag),
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = ShareFlowDesign.elevation.card,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .testTag(testTag)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.cardPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             Text(

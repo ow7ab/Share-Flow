@@ -6,7 +6,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Shared 8dp-grid spacing and layout tokens for consistent Material 3 rhythm across modules.
+ * Share Flow 2.0 8dp-grid spacing & layout dimension tokens inspired by Samsung One UI
+ * generous breathing room and Premium Minimal visual rhythm.
  */
 @Immutable
 data class ShareFlowSpacing(
@@ -17,24 +18,19 @@ data class ShareFlowSpacing(
     val lg: Dp = 24.dp,
     val xl: Dp = 32.dp,
     val xxl: Dp = 48.dp,
-    val screenHorizontal: Dp = 16.dp,
-    val sectionGap: Dp = 20.dp,
+    val screenHorizontal: Dp = 18.dp,
+    val sectionGap: Dp = 22.dp,
     val cardPadding: Dp = 16.dp,
+    val featuredCardPadding: Dp = 20.dp,
     val itemGap: Dp = 12.dp,
     val iconSmall: Dp = 18.dp,
     val iconMedium: Dp = 22.dp,
     val iconLarge: Dp = 28.dp,
     val minTouchTarget: Dp = 48.dp,
+    val floatingNavHeight: Dp = 68.dp,
     val maxContentWidth: Dp = 720.dp
 )
 
-@Immutable
-data class ShareFlowElevation(
-    val flat: Dp = 0.dp,
-    val card: Dp = 1.dp,
-    val raised: Dp = 3.dp,
-    val modal: Dp = 6.dp
-)
+typealias SFDimensions = ShareFlowSpacing
 
 val LocalShareFlowSpacing = staticCompositionLocalOf { ShareFlowSpacing() }
-val LocalShareFlowElevation = staticCompositionLocalOf { ShareFlowElevation() }

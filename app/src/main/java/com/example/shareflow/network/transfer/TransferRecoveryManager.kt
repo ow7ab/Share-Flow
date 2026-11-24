@@ -229,7 +229,15 @@ class TransferRecoveryManager(
                 recordedBytesTransferred = existingItem.bytesTransferred
             )
         ) {
-            is PartialVerificationResult.Verified -> check.resumeChunkIndex to check.resumeByteOffset
+            is PartialVerificationResult.Verified -> {
+                // An unfinalized staging .part file must never report all chunks complete;
+                // hold back at least the final chunk so FILE_DONE -> SHA-256 -> atomic finalize runs.
+                val maxUnfinalizedChunk = (itemDescriptor.totalChunks - 1).coerceAtLeast(0)
+                val safeChunkIndex = check.resumeChunkIndex.coerceAtMost(maxUnfinalizedChunk)
+                val safeByteOffset = (safeChunkIndex.toLong() * chunkSizeBytes.toLong())
+                    .coerceAtMost(itemDescriptor.fileSizeBytes)
+                safeChunkIndex to safeByteOffset
+            }
             is PartialVerificationResult.NotResumable -> {
                 chunkProcessor.cleanupTempFile(existingItem.tempFilePath)
                 0 to 0L

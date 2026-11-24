@@ -1272,6 +1272,35 @@
     <string name="settings_contact_email_cd">إرسال بريد إلكتروني إلى oaw7ab@gmail.com</string>
     <string name="settings_contact_open_link_error">لم يتم العثور على تطبيق أو متصفح مناسب لفتح %1$s.</string>
     <string name="settings_contact_open_email_error">لم يتم العثور على تطبيق بريد إلكتروني على هذا الجهاز. يمكنك المراسلة عبر oaw7ab@gmail.com.</string>
+
+    <!-- الاقتران السريع عبر تقنية NFC بجانب رمز QR -->
+    <string name="nfc_hce_service_desc">اقتران ShareFlow السريع عبر NFC</string>
+    <string name="nfc_hce_aid_group_desc">اقتران ShareFlow المباشر</string>
+    <string name="send_connect_nfc_tab">NFC</string>
+    <string name="nfc_badge_ready">NFC جاهز</string>
+    <string name="nfc_badge_active">البث عبر NFC نشط</string>
+    <string name="nfc_badge_disabled">NFC متوقف</string>
+    <string name="nfc_badge_unsupported">بدون NFC</string>
+    <string name="nfc_receiver_ready_title">قرّب الهاتفين للاقتران عبر NFC</string>
+    <string name="nfc_receiver_ready_body">لامِس ظهر الهاتف المُرسِل بظهر هذا الهاتف لمشاركة جلسة الاقتران الموقّعة فوراً — أو امسح رمز QR أعلاه.</string>
+    <string name="nfc_receiver_tap_detected">تم التقاط لمسة NFC — جارٍ الربط مع المُرسِل…</string>
+    <string name="nfc_receiver_disabled_title">فعّل NFC للاقتران بالملامسة</string>
+    <string name="nfc_receiver_disabled_body">فعّل تقنية NFC من إعدادات Android ليتمكن المُرسِل من الاقتران بملامسة الهاتفين مباشرة، أو استخدم رمز QR أعلاه.</string>
+    <string name="nfc_receiver_unsupported_body">لا يدعم هذا الجهاز شريحة NFC. يمكنك استخدام رمز QR أو الرمز اليدوي أعلاه.</string>
+    <string name="nfc_sender_ready_title">لامِس الهاتف المستقبِل عبر NFC</string>
+    <string name="nfc_sender_ready_body">قرّب ظهر هذا الهاتف من ظهر الهاتف المستقبِل (وهو مفتوح على شاشة الاستقبال) ليتم الربط والإرسال تلقائياً.</string>
+    <string name="nfc_sender_compact_hint">أو لامِس ظهر الهاتفين معاً للاقتران الفوري عبر NFC</string>
+    <string name="nfc_sender_reading">جارٍ قراءة بيانات اقتران ShareFlow عبر NFC…</string>
+    <string name="nfc_sender_paired_toast">تم استلام بيانات الاقتران عبر NFC! جارٍ الربط الآمن…</string>
+    <string name="nfc_sender_disabled_title">تقنية NFC متوقفة حالياً</string>
+    <string name="nfc_sender_disabled_body">فعّل NFC للاقتران الفوري بملامسة الهاتفين ظهراً لظهر دون الحاجة لمسح رمز QR.</string>
+    <string name="nfc_sender_unsupported_title">تقنية NFC غير متوفرة في هذا الجهاز</string>
+    <string name="nfc_sender_unsupported_body">لا يحتوي هذا الهاتف على شريحة NFC. استخدم مسح QR أو الرمز اليدوي أو الأجهزة القريبة.</string>
+    <string name="nfc_open_settings_action">تفعيل NFC</string>
+    <string name="nfc_err_receiver_not_ready">الهاتف الآخر لا يبث جلسة استقبال بعد. افتح شاشة «استقبال» واضغط «بدء الاستقبال» أولاً.</string>
+    <string name="nfc_err_invalid_tag">بطاقة NFC هذه ليست جلسة اقتران ShareFlow صالحة. قرّب الهاتف من جهاز مفتوح على شاشة الاستقبال.</string>
+    <string name="nfc_err_interrupted">انقطع اتصال NFC قبل الاكتمال. ثبّت ظهر الهاتفين معاً لمدة ثانية إلى ثانيتين وأعد المحاولة.</string>
+    <string name="nfc_icon_cd">الاقتران اللاتلامسي عبر NFC</string>
 </resources>
 
 

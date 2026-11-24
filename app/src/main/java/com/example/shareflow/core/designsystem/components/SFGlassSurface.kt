@@ -1,0 +1,170 @@
+package com.example.shareflow.core.designsystem.components
+
+import android.os.Build
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
+import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+
+/**
+ * Share Flow 2.0 Liquid Glass Card (`SFGlassCard`).
+ *
+ * Combines Apple Liquid Glass translucency + specular top-to-bottom rim highlight with
+ * Samsung One UI generous rounded geometry and Premium Minimal restraint.
+ *
+ * Performance & Compatibility:
+ * - Selective backdrop blur (`enableBackdropBlur = true`) uses GPU-accelerated `Modifier.blur`
+ *   ONLY on Android 12+ (API 31+) and ONLY on the background layer so text & icons stay razor-sharp.
+ * - On API 24–30 (or when blur is disabled for long scrolling lists), renders a layered frosted
+ *   translucent surface with specular top glaze and luminous rim border — zero jank, never flat opaque.
+ */
+@Composable
+fun SFGlassCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    elevated: Boolean = false,
+    enableBackdropBlur: Boolean = false,
+    shape: Shape = ShareFlowDesign.shapes.card,
+    containerColor: Color? = null,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    shadowElevation: Dp? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val glass = ShareFlowDesign.glass
+    val elevation = ShareFlowDesign.elevation
+    val motion = ShareFlowDesign.motion
+    val reducedMotion = ShareFlowDesign.reducedMotion
+    val supportsBlur = enableBackdropBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed && onClick != null && enabled && !reducedMotion) motion.pressScale else 1f,
+        animationSpec = motion.buttonSpring(),
+        label = "sf_glass_card_press"
+    )
+
+    val resolvedBg = containerColor ?: when {
+        elevated -> glass.cardElevatedBackground
+        else -> glass.cardBackground
+    }
+    val resolvedShadow = shadowElevation ?: if (elevated) elevation.glassCard else elevation.card
+
+    val borderStroke = remember(selected, glass) {
+        if (selected) {
+            BorderStroke(
+                width = elevation.activeBorderWidth,
+                brush = ShareFlowBrandGradients.signatureBorder(alpha = 0.85f)
+            )
+        } else {
+            BorderStroke(
+                width = elevation.glassBorderWidth,
+                brush = Brush.verticalGradient(
+                    colors = listOf(glass.borderTop, glass.borderMiddle, glass.borderBottom)
+                )
+            )
+        }
+    }
+
+    val glazeBrush = remember(glass) {
+        Brush.verticalGradient(
+            colors = listOf(
+                glass.topGlaze,
+                Color.Transparent,
+                glass.bottomGlaze
+            )
+        )
+    }
+
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable(
+            interactionSource = interactionSource,
+            indication = ripple(color = glass.activeBorder),
+            enabled = enabled,
+            role = Role.Button,
+            onClick = onClick
+        )
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .shadow(
+                elevation = resolvedShadow,
+                shape = shape,
+                clip = false,
+                ambientColor = glass.ambientShadow,
+                spotColor = if (selected) glass.spotShadow else glass.ambientShadow
+            )
+            .clip(shape)
+            .border(border = borderStroke, shape = shape)
+            .then(clickModifier)
+    ) {
+        // Layer 1: Translucent base with optional selective RenderEffect blur (API 31+ only)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .then(
+                    if (supportsBlur) {
+                        Modifier.blur(
+                            radiusX = elevation.blurRadiusLight,
+                            radiusY = elevation.blurRadiusLight,
+                            edgeTreatment = BlurredEdgeTreatment.Rectangle
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .background(resolvedBg)
+        )
+
+        // Layer 2: Crisp unblurred specular top glaze
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(brush = glazeBrush)
+        )
+
+        // Layer 3: Foreground content
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(contentPadding),
+            content = content
+        )
+    }
+}

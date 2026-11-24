@@ -52,7 +52,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.PaddingValues
 import com.example.R
+import com.example.shareflow.core.designsystem.components.SFGlassCard
 import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
@@ -235,19 +237,14 @@ fun ContactMeSettingsSection(
         }
     }
 
-    Surface(
+    SFGlassCard(
+        contentPadding = PaddingValues(spacing.cardPadding),
         modifier = modifier
             .fillMaxWidth()
-            .testTag("settings_section_contact_me"),
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = ShareFlowDesign.elevation.card,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .testTag("settings_section_contact_me")
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.cardPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             // Subtle official 4-color ShareFlow Marple accent strip

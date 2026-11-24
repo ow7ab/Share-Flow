@@ -237,6 +237,7 @@ fun SendScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.send_title),

@@ -319,7 +319,12 @@ fun VideoPlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("video_player_screen"),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+            }
+        },
         topBar = {
             if (!uiState.isFullScreen) {
                 ShareFlowTopBar(

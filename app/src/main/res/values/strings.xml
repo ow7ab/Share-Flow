@@ -1272,6 +1272,35 @@
     <string name="settings_contact_email_cd">Compose email to oaw7ab@gmail.com</string>
     <string name="settings_contact_open_link_error">No supported app or browser was found to open %1$s.</string>
     <string name="settings_contact_open_email_error">No email app was found on this device. You can write to oaw7ab@gmail.com.</string>
+
+    <!-- NFC Tap-to-Pair (HCE + Reader Mode alongside QR) -->
+    <string name="nfc_hce_service_desc">ShareFlow NFC Tap-to-Pair</string>
+    <string name="nfc_hce_aid_group_desc">ShareFlow Direct Pairing</string>
+    <string name="send_connect_nfc_tab">NFC</string>
+    <string name="nfc_badge_ready">NFC Ready</string>
+    <string name="nfc_badge_active">NFC Tap-to-Pair Active</string>
+    <string name="nfc_badge_disabled">NFC Off</string>
+    <string name="nfc_badge_unsupported">No NFC</string>
+    <string name="nfc_receiver_ready_title">Tap Phones to Pair via NFC</string>
+    <string name="nfc_receiver_ready_body">Hold the back of the sending phone against this phone to share the signed pairing session instantly — or scan the QR code above.</string>
+    <string name="nfc_receiver_tap_detected">NFC tap detected — linking with sender…</string>
+    <string name="nfc_receiver_disabled_title">Turn On NFC for Tap-to-Pair</string>
+    <string name="nfc_receiver_disabled_body">Enable NFC in Android Settings to let the sender pair by tapping phones together, or use the QR code above.</string>
+    <string name="nfc_receiver_unsupported_body">This device does not include NFC hardware. Use the QR code or manual pairing code above.</string>
+    <string name="nfc_sender_ready_title">Tap Receiver Phone via NFC</string>
+    <string name="nfc_sender_ready_body">Hold the back of this phone near the unlocked receiving phone while Receive mode is open to connect and send automatically.</string>
+    <string name="nfc_sender_compact_hint">Or tap backs of both phones together via NFC</string>
+    <string name="nfc_sender_reading">Reading ShareFlow pairing session via NFC…</string>
+    <string name="nfc_sender_paired_toast">NFC pairing data received! Connecting securely…</string>
+    <string name="nfc_sender_disabled_title">NFC is Turned Off</string>
+    <string name="nfc_sender_disabled_body">Enable NFC to pair instantly by tapping phones back-to-back without scanning QR codes.</string>
+    <string name="nfc_sender_unsupported_title">NFC Not Available on This Device</string>
+    <string name="nfc_sender_unsupported_body">This phone does not have an NFC chip. Use Scan QR, Manual Code, or Nearby instead.</string>
+    <string name="nfc_open_settings_action">Turn On NFC</string>
+    <string name="nfc_err_receiver_not_ready">The other phone is not broadcasting a Receive session yet. Open Receive and tap Start Receiving first.</string>
+    <string name="nfc_err_invalid_tag">This NFC tag is not a valid ShareFlow pairing session. Hold against a phone showing ShareFlow Receive.</string>
+    <string name="nfc_err_interrupted">NFC connection was interrupted. Hold both phones steady back-to-back for 1–2 seconds and try again.</string>
+    <string name="nfc_icon_cd">NFC contactless tap-to-pair</string>
 </resources>
 
 

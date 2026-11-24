@@ -142,6 +142,7 @@ fun RecentFilesScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.recent_files_title),
@@ -338,6 +339,7 @@ fun FavoritesScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.favorites_title),

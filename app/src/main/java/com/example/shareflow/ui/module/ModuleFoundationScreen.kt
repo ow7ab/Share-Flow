@@ -52,6 +52,7 @@ fun ModuleFoundationScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = title,

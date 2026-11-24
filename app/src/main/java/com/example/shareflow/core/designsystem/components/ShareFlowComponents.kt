@@ -1,9 +1,11 @@
 package com.example.shareflow.core.designsystem.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,81 +14,71 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ChipColors
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.R
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 
 /**
- * Centralized Marple Material 3 styling for OutlinedTextFields across all ShareFlow screens.
- * Uses Coral/Ruby interactive focus borders and clean Light/Dark surface containers.
+ * Centralized Share Flow 2.0 styling for OutlinedTextFields across all screens.
  */
 object ShareFlowInputDefaults {
     @Composable
-    fun outlinedTextFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        focusedBorderColor = MaterialTheme.colorScheme.secondary,
-        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-        errorBorderColor = MaterialTheme.colorScheme.error,
-        cursorColor = MaterialTheme.colorScheme.primary,
-        focusedLabelColor = MaterialTheme.colorScheme.primary,
-        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        focusedTrailingIconColor = MaterialTheme.colorScheme.secondary,
-        unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-    )
+    fun outlinedTextFieldColors(): TextFieldColors {
+        val glass = ShareFlowDesign.glass
+        return OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = glass.cardElevatedBackground,
+            unfocusedContainerColor = glass.cardBackground,
+            disabledContainerColor = glass.cardSubtleBackground,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = glass.borderMiddle,
+            disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            errorBorderColor = MaterialTheme.colorScheme.error,
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTrailingIconColor = MaterialTheme.colorScheme.secondary,
+            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+        )
+    }
 }
 
 /**
- * Centralized Marple Material 3 styling for FilterChips and AssistChips across all ShareFlow screens.
- * - Selected FilterChips use Coral interactive highlight containers and borders.
- * - AssistChips use subtle warm surface containers with Coral secondary iconography.
+ * Centralized Share Flow 2.0 styling for FilterChips and AssistChips across all screens.
  */
 object ShareFlowChipDefaults {
     @Composable
     fun filterChipColors(): SelectableChipColors = FilterChipDefaults.filterChipColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = ShareFlowDesign.glass.cardBackground,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
         iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
         selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
         selectedTrailingIconColor = MaterialTheme.colorScheme.primary,
         disabledContainerColor = ShareFlowDesign.semanticColors.disabled.copy(alpha = 0.5f),
@@ -100,8 +92,8 @@ object ShareFlowChipDefaults {
     ): BorderStroke = FilterChipDefaults.filterChipBorder(
         enabled = enabled,
         selected = selected,
-        borderColor = MaterialTheme.colorScheme.outlineVariant,
-        selectedBorderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.78f),
+        borderColor = ShareFlowDesign.glass.borderMiddle,
+        selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
         disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
         borderWidth = 1.dp,
         selectedBorderWidth = 1.25.dp
@@ -110,9 +102,9 @@ object ShareFlowChipDefaults {
     @Composable
     fun assistChipColors(supportingPeach: Boolean = false): ChipColors = AssistChipDefaults.assistChipColors(
         containerColor = if (supportingPeach) {
-            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
+            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.76f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+            ShareFlowDesign.glass.cardBackground
         },
         labelColor = if (supportingPeach) {
             MaterialTheme.colorScheme.onTertiaryContainer
@@ -122,7 +114,7 @@ object ShareFlowChipDefaults {
         leadingIconContentColor = if (supportingPeach) {
             MaterialTheme.colorScheme.onTertiaryContainer
         } else {
-            MaterialTheme.colorScheme.secondary
+            MaterialTheme.colorScheme.primary
         },
         trailingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         disabledContainerColor = ShareFlowDesign.semanticColors.disabled.copy(alpha = 0.5f),
@@ -136,16 +128,15 @@ object ShareFlowChipDefaults {
     ): BorderStroke = AssistChipDefaults.assistChipBorder(
         enabled = enabled,
         borderColor = if (supportingPeach) {
-            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.52f)
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.48f)
         } else {
-            MaterialTheme.colorScheme.outlineVariant
+            ShareFlowDesign.glass.borderMiddle
         },
         disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
         borderWidth = 1.dp
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareFlowTopBar(
     title: String,
@@ -153,38 +144,11 @@ fun ShareFlowTopBar(
     onNavigateBack: (() -> Unit)? = null,
     actions: @Composable () -> Unit = {}
 ) {
-    TopAppBar(
+    SFTopBar(
+        title = title,
         modifier = modifier,
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        navigationIcon = {
-            if (onNavigateBack != null) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .testTag("top_bar_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_navigate_back)
-                    )
-                }
-            }
-        },
-        actions = { actions() },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground,
-            navigationIconContentColor = MaterialTheme.colorScheme.primary,
-            actionIconContentColor = MaterialTheme.colorScheme.primary
-        )
+        onNavigateBack = onNavigateBack,
+        actions = { actions() }
     )
 }
 
@@ -194,22 +158,11 @@ fun SectionHeader(
     subtitle: String? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.semantics { heading() }
-        )
-        if (!subtitle.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    SFSectionHeader(
+        title = title,
+        subtitle = subtitle,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -228,7 +181,7 @@ fun StatusPill(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
         )
     }
 }
@@ -242,30 +195,24 @@ fun MetricStatCard(
     testTag: String? = null
 ) {
     val spacing = ShareFlowDesign.spacing
-    Surface(
+    SFGlassCard(
         modifier = modifier.let { if (testTag != null) it.testTag(testTag) else it },
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = ShareFlowDesign.elevation.card,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        contentPadding = PaddingValues(spacing.sm)
     ) {
-        Column(
-            modifier = Modifier.padding(spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(spacing.xs)
-        ) {
-            Surface(
-                shape = ShareFlowDesign.shapes.badge,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                modifier = Modifier.size(32.dp)
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(ShareFlowDesign.shapes.badge)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f))
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Text(
                 text = value,
@@ -301,45 +248,40 @@ fun ModuleDirectoryCard(
 ) {
     val spacing = ShareFlowDesign.spacing
     val semantic = ShareFlowDesign.semanticColors
-    Card(
+    SFGlassCard(
         onClick = onClick,
+        contentPadding = PaddingValues(spacing.md),
         modifier = modifier
             .fillMaxWidth()
-            .testTag(testTag),
-        shape = ShareFlowDesign.shapes.card,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = ShareFlowDesign.elevation.card),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .testTag(testTag)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.md),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = if (isReady) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                },
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isReady) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(ShareFlowDesign.shapes.iconContainer)
+                    .background(
+                        if (isReady) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(22.dp)
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        }
                     )
-                }
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isReady) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(22.dp)
+                )
             }
             Spacer(modifier = Modifier.width(spacing.sm))
             Column(modifier = Modifier.weight(1f)) {
@@ -380,7 +322,7 @@ fun ModuleDirectoryCard(
             }
             Spacer(modifier = Modifier.width(spacing.xs))
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )

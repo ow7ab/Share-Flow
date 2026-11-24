@@ -91,6 +91,7 @@ import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
 import com.example.shareflow.ui.discovery.AdvancedQrScannerView
 import com.example.shareflow.ui.discovery.KeepScreenOnEffect
+import com.example.shareflow.ui.discovery.NfcSenderTapCard
 import com.example.shareflow.ui.discovery.QuickPairingGuideCard
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
 import com.example.shareflow.ui.discovery.SmartSenderProgressCard
@@ -101,6 +102,7 @@ import kotlinx.coroutines.withContext
 
 private enum class SendConnectMode {
     SCAN_QR,
+    NFC_TAP,
     MANUAL_CODE,
     NEARBY
 }
@@ -192,6 +194,7 @@ fun SendConfirmScreen(
 
     var autoStartedPeerSession by rememberSaveable { mutableStateOf<String?>(null) }
     val autoSendStartingMsg = stringResource(R.string.shareit_auto_send_starting)
+    val nfcPairedMsg = stringResource(R.string.nfc_sender_paired_toast)
 
     // SHAREit-style zero-intermediary workflow: once a fresh QR, manual code, or 1-tap Nearby
     // link succeeds with AES-256-GCM auth, immediately start sending without an extra confirmation tap.
@@ -249,6 +252,7 @@ fun SendConfirmScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.send_confirm_title),
@@ -599,6 +603,7 @@ fun SendConfirmScreen(
                             ) {
                                 val modes = listOf(
                                     SendConnectMode.SCAN_QR to R.string.send_connect_scan_qr_tab,
+                                    SendConnectMode.NFC_TAP to R.string.send_connect_nfc_tab,
                                     SendConnectMode.MANUAL_CODE to R.string.send_connect_manual_code_tab,
                                     SendConnectMode.NEARBY to R.string.send_connect_nearby_tab
                                 )
@@ -617,7 +622,11 @@ fun SendConfirmScreen(
                                         ),
                                         modifier = Modifier.testTag("send_connect_mode_${mode.name.lowercase()}")
                                     ) {
-                                        Text(text = stringResource(labelRes), maxLines = 1)
+                                        Text(
+                                            text = stringResource(labelRes),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
                             }
@@ -717,7 +726,33 @@ fun SendConfirmScreen(
                                             .fillMaxWidth()
                                             .testTag("send_confirm_gallery_qr_button")
                                     )
+
+                                    NfcSenderTapCard(
+                                        enabled = !isSmartJoining && !isDirectConnecting,
+                                        isConnecting = isSmartJoining || isDirectConnecting,
+                                        compact = true,
+                                        onPairingUriReceived = { nfcUri ->
+                                            viewModel.showFeedback(nfcPairedMsg)
+                                            awaitingFreshLinkAutoSend = true
+                                            viewModel.connectViaQrOrCode(nfcUri)
+                                        }
+                                    )
                                 }
+                            }
+                        }
+
+                        SendConnectMode.NFC_TAP -> {
+                            item(key = "inline_nfc_tap") {
+                                NfcSenderTapCard(
+                                    enabled = !isSmartJoining && !isDirectConnecting,
+                                    isConnecting = isSmartJoining || isDirectConnecting,
+                                    compact = false,
+                                    onPairingUriReceived = { nfcUri ->
+                                        viewModel.showFeedback(nfcPairedMsg)
+                                        awaitingFreshLinkAutoSend = true
+                                        viewModel.connectViaQrOrCode(nfcUri)
+                                    }
+                                )
                             }
                         }
 

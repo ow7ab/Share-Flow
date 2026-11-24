@@ -114,7 +114,7 @@ class MainActivity : FragmentActivity() {
 
     companion object {
         internal const val WINDOW_BG_LIGHT = 0xFFFFF9F5.toInt()
-        internal const val WINDOW_BG_DARK = 0xFF171316.toInt()
+        internal const val WINDOW_BG_DARK = 0xFF0D1220.toInt()
         private const val SPLASH_EXIT_FADE_MS = 140L
 
         internal fun resolveInitialDarkTheme(

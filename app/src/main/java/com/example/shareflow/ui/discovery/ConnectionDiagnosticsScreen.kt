@@ -97,6 +97,7 @@ fun ConnectionDiagnosticsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.diag_title),

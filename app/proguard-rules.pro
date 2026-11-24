@@ -20,6 +20,7 @@
 -keep public class com.example.ShareFlowApplication { *; }
 -keep public class com.example.MainActivity { *; }
 -keep public class com.example.shareflow.media.music.ShareFlowMediaSessionService { *; }
+-keep public class com.example.shareflow.network.nfc.ShareFlowNfcHceService { *; }
 -keep public class com.example.shareflow.data.apps.PackageInstallStatusReceiver { *; }
 -keep class androidx.core.splashscreen.** { *; }
 

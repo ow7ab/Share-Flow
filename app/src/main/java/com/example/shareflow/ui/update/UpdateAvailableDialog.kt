@@ -68,6 +68,7 @@ fun UpdateAvailableDialog(
 ) {
     val spacing = ShareFlowDesign.spacing
     val semantic = ShareFlowDesign.semanticColors
+    val glass = ShareFlowDesign.glass
     val locale = ShareFlowDesign.locale
     val isArabicLocale = locale.language.equals("ar", ignoreCase = true)
     val releaseNotesText = update.localizedReleaseNotes(isArabicLocale)
@@ -94,9 +95,10 @@ fun UpdateAvailableDialog(
                 .fillMaxWidth()
                 .testTag("update_available_dialog"),
             shape = ShareFlowDesign.shapes.dialog,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            tonalElevation = 6.dp
+            color = glass.overlayBackground,
+            border = BorderStroke(1.dp, glass.borderTop),
+            shadowElevation = ShareFlowDesign.elevation.modal,
+            tonalElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier

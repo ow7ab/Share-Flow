@@ -409,7 +409,7 @@ class SmartConnectionCoordinator(
         val now = clock.nowEpochMillis()
 
         if (trimmed == lastSubmittedQrInput && (now - lastSubmittedQrTimestamp) < DUPLICATE_SCAN_COOLDOWN_MS &&
-            (_phase.value.isInProgress || _phase.value == SmartConnectionPhase.CONNECTED)
+            _phase.value.isInProgress
         ) {
             return@withContext AppResult.Failure(
                 AppError.Validation("Duplicate QR scan ignored while connection is already active")
@@ -423,10 +423,10 @@ class SmartConnectionCoordinator(
 
         try {
             operationMutex.withLock {
+                val wasConnected = _phase.value == SmartConnectionPhase.CONNECTED
                 lastSubmittedQrInput = trimmed
                 lastSubmittedQrTimestamp = now
                 _lastError.value = null
-                updatePhase(SmartConnectionPhase.QR_SCANNED, null)
 
                 val parsed = qrProtocol.parseAndValidate(
                     rawInput = trimmed,
@@ -435,10 +435,11 @@ class SmartConnectionCoordinator(
                 val payload = when (parsed) {
                     is SmartQrParseResult.Valid -> parsed.payload
                     is SmartQrParseResult.Rejected -> {
-                        val targetPhase = if (parsed.errorCode == SmartConnectionErrorCode.STALE_OR_EXPIRED_QR) {
-                            SmartConnectionPhase.EXPIRED
-                        } else {
-                            SmartConnectionPhase.FAILED
+                        val targetPhase = when {
+                            wasConnected -> SmartConnectionPhase.CONNECTED
+                            parsed.errorCode == SmartConnectionErrorCode.STALE_OR_EXPIRED_QR ->
+                                SmartConnectionPhase.EXPIRED
+                            else -> SmartConnectionPhase.FAILED
                         }
                         return@withLock failLocked(
                             code = parsed.errorCode,
@@ -447,6 +448,7 @@ class SmartConnectionCoordinator(
                         )
                     }
                 }
+                updatePhase(SmartConnectionPhase.QR_SCANNED, null)
 
                 updateDiagnostics {
                     it.copy(

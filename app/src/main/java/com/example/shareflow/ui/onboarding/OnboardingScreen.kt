@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.SFBackground
 import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
@@ -84,15 +85,11 @@ import kotlinx.coroutines.launch
 private const val ONBOARDING_PAGE_COUNT = 4
 
 /**
- * First-install welcome & onboarding experience for ShareFlow:
+ * First-install welcome & onboarding experience for ShareFlow 2.0:
  * 1. Welcome overview (offline, verified, private).
  * 2. Dedicated 100% Ad-Free promise screen.
  * 3. How to use ShareFlow in 3 clear steps.
  * 4. Transparent breakdown of required permissions (with zero broad storage access).
- *
- * Layout honors LTR/RTL automatically via [ShareFlowTheme]:
- * - "Skip" sits at top-end (top-right in English LTR, top-left in Arabic RTL).
- * - "Next" / "Get Started" sits anchored at the bottom above system navigation insets.
  */
 @Composable
 fun OnboardingScreen(
@@ -103,8 +100,8 @@ fun OnboardingScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { ONBOARDING_PAGE_COUNT })
     val coroutineScope = rememberCoroutineScope()
-    val semantic = ShareFlowDesign.semanticColors
     val spacing = ShareFlowDesign.spacing
+    val glass = ShareFlowDesign.glass
     val isLastPage = pagerState.currentPage == ONBOARDING_PAGE_COUNT - 1
 
     BackHandler(enabled = pagerState.currentPage > 0) {
@@ -113,75 +110,45 @@ fun OnboardingScreen(
         }
     }
 
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val topGlowColor = if (semantic.isDark) {
-        ShareFlowMarpleColors.Ruby.copy(alpha = 0.24f)
-    } else {
-        ShareFlowMarpleColors.Cream.copy(alpha = 0.65f)
-    }
-    val secondaryGlowColor = if (semantic.isDark) {
-        ShareFlowMarpleColors.Coral.copy(alpha = 0.14f)
-    } else {
-        ShareFlowMarpleColors.Peach.copy(alpha = 0.25f)
-    }
-
-    Box(
+    SFBackground(
         modifier = modifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(topGlowColor, Color.Transparent),
-                        center = Offset(size.width * 0.5f, size.height * 0.14f),
-                        radius = size.maxDimension * 0.55f
-                    ),
-                    center = Offset(size.width * 0.5f, size.height * 0.14f),
-                    radius = size.maxDimension * 0.55f
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(secondaryGlowColor, Color.Transparent),
-                        center = Offset(size.width * 0.85f, size.height * 0.82f),
-                        radius = size.maxDimension * 0.45f
-                    ),
-                    center = Offset(size.width * 0.85f, size.height * 0.82f),
-                    radius = size.maxDimension * 0.45f
-                )
-            }
-            .testTag("onboarding_screen"),
-        contentAlignment = Alignment.Center
+            .testTag("onboarding_screen")
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 600.dp)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            // Top bar: step pill at start, Skip button at end (top-right in LTR, top-left in RTL)
-            Box(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = spacing.md, vertical = spacing.xs)
+                    .fillMaxSize()
+                    .widthIn(max = 600.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.align(Alignment.CenterStart)
+                // Top bar: Liquid Glass step pill at start, Skip button at end
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = spacing.md, vertical = spacing.xs)
                 ) {
-                    Text(
-                        text = stringResource(
-                            R.string.onboarding_step_counter,
-                            pagerState.currentPage + 1,
-                            ONBOARDING_PAGE_COUNT
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
+                    Surface(
+                        shape = CircleShape,
+                        color = glass.cardBackground,
+                        border = BorderStroke(1.dp, glass.borderMiddle),
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.onboarding_step_counter,
+                                pagerState.currentPage + 1,
+                                ONBOARDING_PAGE_COUNT
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
 
                 TextButton(
                     onClick = onComplete,
@@ -259,6 +226,7 @@ fun OnboardingScreen(
                         .testTag("onboarding_next_button")
                 )
             }
+        }
         }
     }
 }

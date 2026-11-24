@@ -9,31 +9,37 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
 /**
- * Material 3 Shape scale for ShareFlow.
+ * Share Flow 2.0 shape scale — smooth One UI + Apple Liquid Glass continuous rounded geometry.
  */
 val ShareFlowShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(18.dp),
     large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    extraLarge = RoundedCornerShape(30.dp)
 )
 
 /**
- * Semantic component shape tokens aligned with ShareFlow's rounded Material 3 surfaces.
+ * Semantic component shape tokens for Share Flow 2.0 Liquid Glass & One UI surfaces.
  */
 @Immutable
 data class ShareFlowShapeTokens(
-    val button: Shape = RoundedCornerShape(14.dp),
-    val input: Shape = RoundedCornerShape(14.dp),
-    val card: Shape = RoundedCornerShape(18.dp),
-    val featuredCard: Shape = RoundedCornerShape(24.dp),
+    val button: Shape = RoundedCornerShape(16.dp),
+    val input: Shape = RoundedCornerShape(16.dp),
+    val card: Shape = RoundedCornerShape(22.dp),
+    val featuredCard: Shape = RoundedCornerShape(28.dp),
     val dialog: Shape = RoundedCornerShape(28.dp),
-    val bottomSheet: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-    val chip: Shape = RoundedCornerShape(12.dp),
-    val badge: Shape = RoundedCornerShape(8.dp),
+    val bottomSheet: Shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+    val navCapsule: Shape = RoundedCornerShape(32.dp),
+    val navPill: Shape = RoundedCornerShape(22.dp),
+    val chip: Shape = RoundedCornerShape(14.dp),
+    val badge: Shape = RoundedCornerShape(10.dp),
+    val iconContainer: Shape = RoundedCornerShape(14.dp),
+    val snackbar: Shape = RoundedCornerShape(18.dp),
     val progressTrack: Shape = CircleShape,
     val avatar: Shape = CircleShape
 )
+
+typealias SFShapeTokens = ShareFlowShapeTokens
 
 val LocalShareFlowShapeTokens = staticCompositionLocalOf { ShareFlowShapeTokens() }

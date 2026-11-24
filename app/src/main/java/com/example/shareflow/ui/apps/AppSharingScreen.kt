@@ -245,6 +245,7 @@ fun AppSharingContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.apps_screen_title),

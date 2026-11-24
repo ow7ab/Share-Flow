@@ -1,48 +1,30 @@
 package com.example.shareflow.core.designsystem.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -59,8 +41,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.TransferDirection
 
 /**
- * Reusable determinate progress bar filled with the Marple Signature Gradient:
- * Ruby (#CA2851) -> Coral (#FF6766) -> Peach (#FFB173) -> Cream (#FFE3B3).
+ * Determinate brand-gradient progress bar delegating to Share Flow 2.0 [SFProgressIndicator].
  */
 @Composable
 fun ShareFlowSignatureProgressBar(
@@ -68,81 +49,29 @@ fun ShareFlowSignatureProgressBar(
     modifier: Modifier = Modifier,
     height: Dp = 10.dp
 ) {
-    val clamped = progress.coerceIn(0f, 1f)
-    val trackShape = ShareFlowDesign.shapes.progressTrack
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(trackShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .border(
-                width = 0.75.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = trackShape
-            )
-    ) {
-        if (clamped > 0.005f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(clamped)
-                    .fillMaxHeight()
-                    .clip(trackShape)
-                    .background(ShareFlowBrandGradients.signatureHorizontal())
-            )
-        }
-    }
+    SFProgressIndicator(
+        progress = progress,
+        modifier = modifier,
+        height = height
+    )
 }
 
 /**
- * Reusable indeterminate progress bar with a sweeping
- * Marple Signature Gradient segment (Ruby -> Coral -> Peach -> Cream).
+ * Indeterminate brand-gradient progress bar delegating to Share Flow 2.0 [SFProgressIndicator].
  */
 @Composable
 fun ShareFlowSignatureProgressBar(
     modifier: Modifier = Modifier,
     height: Dp = 6.dp
 ) {
-    val trackShape = ShareFlowDesign.shapes.progressTrack
-    val transition = rememberInfiniteTransition(label = "signature_indeterminate_progress")
-    val offsetFraction by transition.animateFloat(
-        initialValue = -0.45f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1350, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "signature_indeterminate_offset"
+    SFProgressIndicator(
+        modifier = modifier,
+        height = height
     )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(trackShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .border(
-                width = 0.75.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = trackShape
-            )
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val segWidth = size.width * 0.42f
-            val startX = offsetFraction * size.width
-            val radius = size.height / 2f
-            drawRoundRect(
-                brush = ShareFlowBrandGradients.signatureHorizontal(),
-                topLeft = Offset(startX, 0f),
-                size = Size(segWidth, size.height),
-                cornerRadius = CornerRadius(radius, radius)
-            )
-        }
-    }
 }
 
 /**
- * Reusable active-state tab indicator painted with the Marple Signature Gradient.
+ * Active-state tab indicator painted with the official brand gradient.
  */
 @Composable
 fun ShareFlowSignatureTabIndicator(
@@ -159,7 +88,7 @@ fun ShareFlowSignatureTabIndicator(
 }
 
 /**
- * Reusable Material 3 storage capacity indicator driven strictly by real used/total byte values.
+ * Share Flow 2.0 Liquid Glass storage capacity card driven strictly by real used/total byte values.
  */
 @Composable
 fun StorageIndicator(
@@ -176,11 +105,6 @@ fun StorageIndicator(
     val safeUsed = usedBytes.coerceIn(0L, safeTotal)
     val availableBytes = (safeTotal - safeUsed).coerceAtLeast(0L)
     val fraction = if (safeTotal <= 0L) 0f else (safeUsed.toFloat() / safeTotal.toFloat()).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 300),
-        label = "storage_progress"
-    )
 
     val barColor = when {
         fraction >= 0.9f -> MaterialTheme.colorScheme.error
@@ -188,21 +112,16 @@ fun StorageIndicator(
         else -> MaterialTheme.colorScheme.primary
     }
 
-    Surface(
+    SFGlassCard(
+        contentPadding = PaddingValues(spacing.cardPadding),
         modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
-            },
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = ShareFlowDesign.elevation.card,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            }
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.cardPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             Row(
@@ -216,7 +135,7 @@ fun StorageIndicator(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Storage,
+                        imageVector = Icons.Outlined.Storage,
                         contentDescription = null,
                         tint = barColor,
                         modifier = Modifier.size(spacing.iconSmall)
@@ -236,23 +155,11 @@ fun StorageIndicator(
                 )
             }
 
-            if (fraction >= 0.9f) {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(ShareFlowDesign.shapes.progressTrack),
-                    color = MaterialTheme.colorScheme.error,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    strokeCap = StrokeCap.Round
-                )
-            } else {
-                ShareFlowSignatureProgressBar(
-                    progress = animatedProgress,
-                    height = 10.dp
-                )
-            }
+            SFProgressIndicator(
+                progress = fraction,
+                height = 10.dp,
+                isError = fraction >= 0.9f
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -282,8 +189,8 @@ fun StorageIndicator(
 }
 
 /**
- * Reusable Material 3 active transfer progress card.
- * Always reflects caller-provided real transferred bytes and real throughput; never fakes progress.
+ * Share Flow 2.0 Liquid Glass active transfer progress card.
+ * Always reflects caller-provided real transferred bytes and real throughput.
  */
 @Composable
 fun TransferProgressCard(
@@ -304,27 +211,18 @@ fun TransferProgressCard(
     val safeTotal = totalBytes.coerceAtLeast(0L)
     val safeTransferred = bytesTransferred.coerceIn(0L, safeTotal)
     val fraction = if (safeTotal <= 0L) 0f else (safeTransferred.toFloat() / safeTotal.toFloat()).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 200),
-        label = "transfer_progress"
-    )
 
-    Surface(
+    SFGlassCard(
+        elevated = true,
+        contentPadding = PaddingValues(spacing.cardPadding),
         modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
-            },
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = ShareFlowDesign.elevation.card,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            }
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.cardPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             Row(
@@ -332,29 +230,31 @@ fun TransferProgressCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm)
             ) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = if (isSent) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isSent) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                            contentDescription = stringResource(
-                                if (isSent) R.string.history_direction_sent else R.string.history_direction_received
-                            ),
-                            tint = if (isSent) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(ShareFlowDesign.shapes.iconContainer)
+                        .background(
+                            if (isSent) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                             } else {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            },
-                            modifier = Modifier.size(20.dp)
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)
+                            }
                         )
-                    }
+                ) {
+                    Icon(
+                        imageVector = if (isSent) Icons.Outlined.ArrowUpward else Icons.Outlined.ArrowDownward,
+                        contentDescription = stringResource(
+                            if (isSent) R.string.history_direction_sent else R.string.history_direction_received
+                        ),
+                        tint = if (isSent) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
 
                 Column(
@@ -384,7 +284,7 @@ fun TransferProgressCard(
                         modifier = Modifier.minimumInteractiveComponentSize()
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Close,
+                            imageVector = Icons.Outlined.Close,
                             contentDescription = stringResource(R.string.ds_cd_cancel_transfer),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -392,8 +292,8 @@ fun TransferProgressCard(
                 }
             }
 
-            ShareFlowSignatureProgressBar(
-                progress = animatedProgress,
+            SFProgressIndicator(
+                progress = fraction,
                 height = 8.dp
             )
 

@@ -15,27 +15,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DataUsage
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.InstallMobile
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SdStorage
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DataUsage
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.InstallMobile
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.SdStorage
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +58,7 @@ import com.example.shareflow.core.designsystem.components.ErrorState
 import com.example.shareflow.core.designsystem.components.MetricStatCard
 import com.example.shareflow.core.designsystem.components.ModuleDirectoryCard
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
+import com.example.shareflow.core.designsystem.components.SFGlassCard
 import com.example.shareflow.core.designsystem.components.SecondaryActionButton
 import com.example.shareflow.core.designsystem.components.SectionHeader
 import com.example.shareflow.core.designsystem.components.ShareFlowSignatureProgressBar
@@ -108,7 +108,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_private_vault_title),
                     description = stringResource(R.string.module_private_vault_desc),
-                    icon = Icons.Filled.Lock,
+                    icon = Icons.Outlined.Lock,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
@@ -120,7 +120,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_storage_analyzer_title),
                     description = stringResource(R.string.module_storage_analyzer_desc),
-                    icon = Icons.Filled.Storage,
+                    icon = Icons.Outlined.Storage,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.STORAGE_ANALYZER) },
@@ -132,7 +132,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_file_compression_title),
                     description = stringResource(R.string.module_file_compression_desc),
-                    icon = Icons.Filled.Archive,
+                    icon = Icons.Outlined.Archive,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.COMPRESSION) },
@@ -144,7 +144,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_duplicate_finder_title),
                     description = stringResource(R.string.module_duplicate_finder_desc),
-                    icon = Icons.Filled.ContentCopy,
+                    icon = Icons.Outlined.ContentCopy,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.DUPLICATE_FINDER) },
@@ -156,7 +156,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_large_files_title),
                     description = stringResource(R.string.module_large_files_desc),
-                    icon = Icons.Filled.SdStorage,
+                    icon = Icons.Outlined.SdStorage,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.LARGE_FILES) },
@@ -168,7 +168,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_phone_migration_title),
                     description = stringResource(R.string.module_phone_migration_desc),
-                    icon = Icons.Filled.SwapHoriz,
+                    icon = Icons.Outlined.SwapHoriz,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.PHONE_MIGRATION) },
@@ -180,7 +180,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_recent_files_title),
                     description = stringResource(R.string.module_recent_files_desc),
-                    icon = Icons.Filled.AccessTime,
+                    icon = Icons.Outlined.AccessTime,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.RECENT_FILES) },
@@ -192,7 +192,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_favorites_title),
                     description = stringResource(R.string.module_favorites_desc),
-                    icon = Icons.Filled.Star,
+                    icon = Icons.Outlined.Star,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.FAVORITES) },
@@ -204,7 +204,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_connection_diagnostics_title),
                     description = stringResource(R.string.module_connection_diagnostics_desc),
-                    icon = Icons.Filled.NetworkCheck,
+                    icon = Icons.Outlined.NetworkCheck,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.CONNECTION_DIAGNOSTICS) },
@@ -216,7 +216,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_app_sharing_title),
                     description = stringResource(R.string.module_app_sharing_desc),
-                    icon = Icons.Filled.InstallMobile,
+                    icon = Icons.Outlined.InstallMobile,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.APPLICATION_SHARING) },
@@ -228,7 +228,7 @@ fun ToolsScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.module_transfer_history_title),
                     description = stringResource(R.string.module_transfer_history_desc),
-                    icon = Icons.Filled.History,
+                    icon = Icons.Outlined.History,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.TRANSFER_HISTORY) },
@@ -288,6 +288,7 @@ fun StorageAnalyzerScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.storage_analyzer_title),
@@ -341,21 +342,21 @@ fun StorageAnalyzerScreen(
                                 MetricStatCard(
                                     label = stringResource(R.string.storage_analyzer_total),
                                     value = ShareFlowFormatters.formatBytes(summary.totalBytes, locale),
-                                    icon = Icons.Filled.Storage,
+                                    icon = Icons.Outlined.Storage,
                                     testTag = "storage_metric_total",
                                     modifier = Modifier.weight(1f)
                                 )
                                 MetricStatCard(
                                     label = stringResource(R.string.storage_analyzer_used),
                                     value = ShareFlowFormatters.formatBytes(summary.usedBytes, locale),
-                                    icon = Icons.Filled.DataUsage,
+                                    icon = Icons.Outlined.DataUsage,
                                     testTag = "storage_metric_used",
                                     modifier = Modifier.weight(1f)
                                 )
                                 MetricStatCard(
                                     label = stringResource(R.string.storage_analyzer_available),
                                     value = ShareFlowFormatters.formatBytes(summary.availableBytes, locale),
-                                    icon = Icons.Filled.SdStorage,
+                                    icon = Icons.Outlined.SdStorage,
                                     testTag = "storage_metric_available",
                                     modifier = Modifier.weight(1f)
                                 )
@@ -367,7 +368,7 @@ fun StorageAnalyzerScreen(
                                 text = stringResource(R.string.storage_analyzer_refresh),
                                 onClick = ::refresh,
                                 isLoading = isRefreshing,
-                                leadingIcon = Icons.Filled.Refresh,
+                                leadingIcon = Icons.Outlined.Refresh,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("storage_analyzer_refresh_button")
@@ -376,16 +377,12 @@ fun StorageAnalyzerScreen(
 
                         // Accessible Media Categories Breakdown
                         item(key = "storage_categories_card") {
-                            Surface(
-                                shape = ShareFlowDesign.shapes.card,
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            SFGlassCard(
+                                contentPadding = PaddingValues(spacing.cardPadding),
                                 modifier = Modifier.testTag("storage_categories_card")
                             ) {
                                 Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(spacing.cardPadding),
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalArrangement = Arrangement.spacedBy(spacing.sm)
                                 ) {
                                     Text(
@@ -436,16 +433,12 @@ fun StorageAnalyzerScreen(
                         // Large Files Summary
                         analysisReport?.let { report ->
                             item(key = "storage_large_files_card") {
-                                Surface(
-                                    shape = ShareFlowDesign.shapes.card,
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                SFGlassCard(
+                                    contentPadding = PaddingValues(spacing.cardPadding),
                                     modifier = Modifier.testTag("storage_large_files_card")
                                 ) {
                                     Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(spacing.cardPadding),
+                                        modifier = Modifier.fillMaxWidth(),
                                         verticalArrangement = Arrangement.spacedBy(spacing.xs)
                                     ) {
                                         Text(
@@ -482,7 +475,7 @@ fun StorageAnalyzerScreen(
                                                 text = stringResource(R.string.storage_analyzer_view_all_large),
                                                 onClick = onOpenLargeFiles,
                                                 outlined = true,
-                                                leadingIcon = Icons.Filled.SdStorage,
+                                                leadingIcon = Icons.Outlined.SdStorage,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .testTag("storage_open_large_files_button")
@@ -494,16 +487,12 @@ fun StorageAnalyzerScreen(
 
                             // Storage Trends Card
                             item(key = "storage_trends_card") {
-                                Surface(
-                                    shape = ShareFlowDesign.shapes.card,
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                SFGlassCard(
+                                    contentPadding = PaddingValues(spacing.cardPadding),
                                     modifier = Modifier.testTag("storage_trends_card")
                                 ) {
                                     Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(spacing.cardPadding),
+                                        modifier = Modifier.fillMaxWidth(),
                                         verticalArrangement = Arrangement.spacedBy(spacing.xs)
                                     ) {
                                         Row(
@@ -511,7 +500,7 @@ fun StorageAnalyzerScreen(
                                             horizontalArrangement = Arrangement.spacedBy(spacing.xs)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Filled.Timeline,
+                                                imageVector = Icons.Outlined.Timeline,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(20.dp)
@@ -574,20 +563,17 @@ fun StorageAnalyzerScreen(
                         }
 
                         item(key = "storage_privacy_note") {
-                            Surface(
-                                shape = ShareFlowDesign.shapes.card,
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            SFGlassCard(
+                                contentPadding = PaddingValues(spacing.md),
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f)
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(spacing.md),
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(spacing.sm)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.VerifiedUser,
+                                        imageVector = Icons.Outlined.VerifiedUser,
                                         contentDescription = null,
                                         tint = semantic.verifiedBadge,
                                         modifier = Modifier.size(20.dp)

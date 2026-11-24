@@ -275,7 +275,12 @@ fun DuplicateFinderContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+            }
+        },
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.duplicates_title),

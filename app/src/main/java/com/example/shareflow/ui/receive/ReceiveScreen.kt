@@ -80,6 +80,7 @@ import com.example.shareflow.domain.model.TransferDirection
 import com.example.shareflow.domain.model.TransferState
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
 import com.example.shareflow.ui.discovery.KeepScreenOnEffect
+import com.example.shareflow.ui.discovery.NfcReceiverBroadcastCard
 import com.example.shareflow.ui.discovery.QuickPairingGuideCard
 import com.example.shareflow.ui.discovery.RealQrCodeView
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
@@ -229,6 +230,7 @@ fun ReceiveScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.receive_title),
@@ -509,6 +511,12 @@ fun ReceiveScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("receive_expired_refresh_button")
+                                    )
+                                } else {
+                                    NfcReceiverBroadcastCard(
+                                        pairingUri = uiState.smartQrUri,
+                                        expiresAtEpochMillis = payload.expiresAtEpochMillis,
+                                        isSessionExpired = isExpired
                                     )
                                 }
 

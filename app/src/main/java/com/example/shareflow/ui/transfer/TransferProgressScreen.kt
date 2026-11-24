@@ -382,6 +382,7 @@ fun TransferProgressContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.transfer_progress_title),

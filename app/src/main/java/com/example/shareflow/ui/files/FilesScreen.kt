@@ -104,6 +104,17 @@ import com.example.shareflow.domain.model.LocalFileEntry
 import com.example.shareflow.ui.viewer.CustomFileViewerDialog
 import kotlinx.coroutines.launch
 
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.outlined.Android
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.AudioFile
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.VideoFile
+import androidx.compose.ui.graphics.Color
+import com.example.shareflow.core.designsystem.components.SFSnackbar
+
 /**
  * All 8 required ShareFlow File Manager categories.
  */
@@ -112,14 +123,14 @@ enum class FilesHubCategory(
     val icon: ImageVector,
     val domainCategory: FileCategory
 ) {
-    IMAGES(R.string.files_category_images, Icons.Filled.Image, FileCategory.IMAGES),
-    VIDEOS(R.string.files_category_videos, Icons.Filled.VideoFile, FileCategory.VIDEOS),
-    AUDIO(R.string.files_category_audio, Icons.Filled.AudioFile, FileCategory.AUDIO),
-    DOCUMENTS(R.string.files_category_documents, Icons.Filled.Description, FileCategory.DOCUMENTS),
-    ARCHIVES(R.string.files_category_archives, Icons.Filled.Archive, FileCategory.ARCHIVES),
-    APK_FILES(R.string.files_category_apks, Icons.Filled.Android, FileCategory.APKS),
-    DOWNLOADS(R.string.files_category_downloads, Icons.Filled.Download, FileCategory.DOWNLOADS),
-    OTHER_FILES(R.string.files_category_other, Icons.AutoMirrored.Filled.InsertDriveFile, FileCategory.OTHER)
+    IMAGES(R.string.files_category_images, Icons.Outlined.Image, FileCategory.IMAGES),
+    VIDEOS(R.string.files_category_videos, Icons.Outlined.VideoFile, FileCategory.VIDEOS),
+    AUDIO(R.string.files_category_audio, Icons.Outlined.AudioFile, FileCategory.AUDIO),
+    DOCUMENTS(R.string.files_category_documents, Icons.Outlined.Description, FileCategory.DOCUMENTS),
+    ARCHIVES(R.string.files_category_archives, Icons.Outlined.Archive, FileCategory.ARCHIVES),
+    APK_FILES(R.string.files_category_apks, Icons.Outlined.Android, FileCategory.APKS),
+    DOWNLOADS(R.string.files_category_downloads, Icons.Outlined.Download, FileCategory.DOWNLOADS),
+    OTHER_FILES(R.string.files_category_other, Icons.AutoMirrored.Outlined.InsertDriveFile, FileCategory.OTHER)
 }
 
 @Composable
@@ -399,11 +410,13 @@ internal fun FileManagerHost(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         snackbarHost = {
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.padding(bottom = bottomBarClearance)
+                modifier = Modifier.padding(bottom = bottomBarClearance),
+                snackbar = { data -> SFSnackbar(snackbarData = data) }
             )
         },
         topBar = {

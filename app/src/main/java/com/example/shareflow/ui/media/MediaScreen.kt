@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +62,7 @@ fun MediaScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.media_photos_title),
                     description = stringResource(R.string.media_photos_desc),
-                    icon = Icons.Filled.PhotoLibrary,
+                    icon = Icons.Outlined.PhotoLibrary,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.IMAGE_GALLERY) },
@@ -74,7 +74,7 @@ fun MediaScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.media_videos_title),
                     description = stringResource(R.string.media_videos_desc),
-                    icon = Icons.Filled.PlayCircle,
+                    icon = Icons.Outlined.PlayCircle,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.VIDEO_PLAYER) },
@@ -86,7 +86,7 @@ fun MediaScreen(
                 ModuleDirectoryCard(
                     title = stringResource(R.string.media_music_title),
                     description = stringResource(R.string.media_music_desc),
-                    icon = Icons.Filled.LibraryMusic,
+                    icon = Icons.Outlined.LibraryMusic,
                     statusLabel = stringResource(R.string.status_ready),
                     isReady = true,
                     onClick = { onNavigateToRoute(ShareFlowRoutes.MUSIC_PLAYER) },

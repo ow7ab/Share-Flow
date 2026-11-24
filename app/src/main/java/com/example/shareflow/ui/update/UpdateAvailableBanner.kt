@@ -23,8 +23,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,16 +43,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.shareflow.core.designsystem.components.SFGlassCard
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 import com.example.shareflow.data.update.UpdateDetails
 
 /**
- * Non-intrusive floating top banner shown when [com.example.shareflow.data.update.UpdateManager]
+ * Non-intrusive floating top Liquid Glass banner shown when [com.example.shareflow.data.update.UpdateManager]
  * automatically detects an optional newer release on app launch.
- *
- * Allows users to continue using ShareFlow uninterrupted, tap to inspect release notes and start
- * the verified SHA-256 download in [UpdateAvailableDialog], or dismiss cleanly.
  */
 @Composable
 fun UpdateAvailableBanner(
@@ -62,7 +60,8 @@ fun UpdateAvailableBanner(
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
-    val semantic = ShareFlowDesign.semanticColors
+    val glass = ShareFlowDesign.glass
+    val reducedMotion = ShareFlowDesign.reducedMotion
     val accentGradient = Brush.linearGradient(
         colors = listOf(
             ShareFlowMarpleColors.Ruby,
@@ -73,17 +72,25 @@ fun UpdateAvailableBanner(
 
     AnimatedVisibility(
         visible = update != null,
-        enter = slideInVertically(
-            initialOffsetY = { -it },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        ) + fadeIn(animationSpec = tween(durationMillis = 220)),
-        exit = slideOutVertically(
-            targetOffsetY = { -it },
-            animationSpec = tween(durationMillis = 180)
-        ) + fadeOut(animationSpec = tween(durationMillis = 160)),
+        enter = if (reducedMotion) {
+            fadeIn(animationSpec = tween(durationMillis = 120))
+        } else {
+            slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            ) + fadeIn(animationSpec = tween(durationMillis = 200))
+        },
+        exit = if (reducedMotion) {
+            fadeOut(animationSpec = tween(durationMillis = 100))
+        } else {
+            slideOutVertically(
+                targetOffsetY = { -it },
+                animationSpec = tween(durationMillis = 160)
+            ) + fadeOut(animationSpec = tween(durationMillis = 140))
+        },
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
@@ -94,23 +101,16 @@ fun UpdateAvailableBanner(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter
             ) {
-                Surface(
+                SFGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 560.dp)
                         .testTag("update_available_banner"),
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (semantic.isDark) {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLowest
-                    },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = ShareFlowMarpleColors.Ruby.copy(alpha = if (semantic.isDark) 0.55f else 0.35f)
-                    ),
-                    shadowElevation = 8.dp,
-                    tonalElevation = 4.dp
+                    shape = RoundedCornerShape(22.dp),
+                    containerColor = glass.overlayBackground,
+                    selected = true,
+                    shadowElevation = ShareFlowDesign.elevation.modal,
+                    enableBackdropBlur = true
                 ) {
                     Row(
                         modifier = Modifier
@@ -143,7 +143,7 @@ fun UpdateAvailableBanner(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.SystemUpdate,
+                                    imageVector = Icons.Outlined.SystemUpdate,
                                     contentDescription = null,
                                     tint = ShareFlowMarpleColors.Cream,
                                     modifier = Modifier.size(20.dp)
@@ -201,7 +201,7 @@ fun UpdateAvailableBanner(
                                 .testTag("update_banner_dismiss_action")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Close,
+                                imageVector = Icons.Outlined.Close,
                                 contentDescription = stringResource(R.string.update_banner_dismiss_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)

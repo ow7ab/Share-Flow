@@ -75,6 +75,8 @@ import com.example.shareflow.domain.model.ConnectionState
 import com.example.shareflow.domain.model.SmartConnectionPhase
 import com.example.shareflow.ui.discovery.ActiveEncryptedConnectionCard
 import com.example.shareflow.ui.discovery.AdvancedQrScannerView
+import com.example.shareflow.ui.discovery.NfcReceiverBroadcastCard
+import com.example.shareflow.ui.discovery.NfcSenderTapCard
 import com.example.shareflow.ui.discovery.RealQrCodeView
 import com.example.shareflow.ui.discovery.SmartConnectionErrorCard
 import com.example.shareflow.ui.discovery.SmartSenderProgressCard
@@ -179,6 +181,7 @@ fun QrPairingScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
             ShareFlowTopBar(
                 title = stringResource(R.string.qr_pairing_title),
@@ -311,6 +314,14 @@ fun QrPairingScreen(
                                     .padding(12.dp)
                             )
                         }
+                    }
+
+                    item(key = "qr_nfc_broadcast") {
+                        NfcReceiverBroadcastCard(
+                            pairingUri = activeUri,
+                            expiresAtEpochMillis = activeExpiresAt,
+                            isSessionExpired = isExpired
+                        )
                     }
 
                     item(key = "pin_card") {
@@ -525,6 +536,18 @@ fun QrPairingScreen(
                                 }
                             )
                         }
+                    }
+
+                    item(key = "qr_nfc_reader") {
+                        NfcSenderTapCard(
+                            enabled = connState !is ConnectionState.Connected,
+                            isConnecting = uiState.smartPhase.isInProgress,
+                            compact = true,
+                            onPairingUriReceived = { nfcUri ->
+                                manualUriInput = nfcUri
+                                viewModel.connectViaQrUri(nfcUri)
+                            }
+                        )
                     }
 
                     // Import QR from Gallery via zero-permission Android Photo Picker

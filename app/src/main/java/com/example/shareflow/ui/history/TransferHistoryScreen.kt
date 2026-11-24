@@ -194,7 +194,12 @@ fun TransferHistoryContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
+            }
+        },
         topBar = {
             if (onNavigateBack != null) {
                 ShareFlowTopBar(

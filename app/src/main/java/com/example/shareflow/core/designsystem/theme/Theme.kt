@@ -3,8 +3,9 @@ package com.example.shareflow.core.designsystem.theme
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.content.res.Configuration
-import android.os.Build
+import android.os.Bundle
 import android.view.View
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -20,12 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
-import android.content.Intent
-import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
@@ -38,6 +38,7 @@ val LocalShareFlowHostActivity = staticCompositionLocalOf<Activity?> { null }
 private val DefaultShareFlowSpacing = ShareFlowSpacing()
 private val DefaultShareFlowElevation = ShareFlowElevation()
 private val DefaultShareFlowShapeTokens = ShareFlowShapeTokens()
+private val DefaultSFMotionTokens = SFMotionTokens()
 
 /**
  * Locale-overridden [ContextWrapper] that preserves access to the hosting [Activity] and prevents
@@ -81,8 +82,17 @@ tailrec fun Context.findActivity(): Activity? = when (this) {
 
 fun Context.findFragmentActivity(): FragmentActivity? = findActivity() as? FragmentActivity
 
+/**
+ * Share Flow 2.0 unified design system token accessor.
+ * Exposes Liquid Glass tokens, spacing/dimensions, elevations, shapes, motion, semantic colors, and locale.
+ */
 object ShareFlowDesign {
     val spacing: ShareFlowSpacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalShareFlowSpacing.current
+
+    val dimensions: SFDimensions
         @Composable
         @ReadOnlyComposable
         get() = LocalShareFlowSpacing.current
@@ -96,6 +106,21 @@ object ShareFlowDesign {
         @Composable
         @ReadOnlyComposable
         get() = LocalShareFlowSemanticColors.current
+
+    val glass: SFGlassTokens
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalSFGlassTokens.current
+
+    val motion: SFMotionTokens
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalSFMotion.current
+
+    val reducedMotion: Boolean
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalSFReducedMotion.current
 
     val brandColors: ShareFlowBrandColors
         get() = ShareFlowBrandColors
@@ -115,6 +140,11 @@ object ShareFlowDesign {
 }
 
 /**
+ * Concise Share Flow 2.0 theme token alias.
+ */
+typealias SFTheme = ShareFlowDesign
+
+/**
  * Resolves the active [Locale] from user-selected [AppLanguage] and system configuration.
  */
 fun resolveShareFlowLocale(appLanguage: AppLanguage, systemLocale: Locale): Locale =
@@ -125,11 +155,11 @@ fun resolveShareFlowLocale(appLanguage: AppLanguage, systemLocale: Locale): Loca
     }
 
 /**
- * Complete Material 3 theme provider for ShareFlow supporting:
- * - Light, Dark, and System Default themes
- * - Android 12+ Dynamic Color
- * - User-selected Accent Colors
- * - Smooth theme color transitions
+ * Share Flow 2.0 Theme Provider:
+ * - Independent Light Mode (bright neutral + soft cream) and Deep Navy Dark Mode treatments
+ * - Official brand identity (#CA2851, #FF6766, #FFB173, #FFE3B3) is always the primary color source
+ *   (Android dynamic wallpaper color never replaces the brand identity)
+ * - Liquid Glass tokens, smooth theme transitions, and reduced-motion accessibility awareness
  * - Live English (LTR) and Arabic (RTL) localization & typography switching without Activity context loss
  */
 @Composable
@@ -152,8 +182,6 @@ fun ShareFlowTheme(
     val needsLocaleOverride = appLanguage != AppLanguage.SYSTEM &&
         activeLocale.language != systemLocale.language
 
-    // Key strictly on stable configuration dimensions so animations or minor recompositions
-    // never recreate Configuration/ContextImpl or trigger full-tree static CompositionLocal resets.
     val localizedConfig = remember(
         activeLocale.language,
         needsLocaleOverride,
@@ -205,21 +233,19 @@ fun ShareFlowTheme(
         ThemeMode.SYSTEM -> systemInDark
     }
 
-    val targetColorScheme = remember(isDarkTheme, useDynamicColor, accentColor, localizedContext) {
-        if (useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (isDarkTheme) {
-                androidx.compose.material3.dynamicDarkColorScheme(localizedContext)
-            } else {
-                androidx.compose.material3.dynamicLightColorScheme(localizedContext)
-            }
-        } else if (isDarkTheme) {
+    // Preserve the official Share Flow brand identity as the primary color source in all modes
+    // (Android wallpaper dynamic color never overrides the official #CA2851 / #FF6766 / #FFB173 / #FFE3B3 palette).
+    val targetColorScheme = remember(isDarkTheme, accentColor, useDynamicColor) {
+        if (isDarkTheme) {
             shareFlowDarkColorScheme(accentColor)
         } else {
             shareFlowLightColorScheme(accentColor)
         }
     }
-    val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme)
+    val reducedMotion = rememberReducedMotionEnabled()
+    val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme, reducedMotion = reducedMotion)
     val semanticColors = if (isDarkTheme) DarkShareFlowSemanticColors else LightShareFlowSemanticColors
+    val glassTokens = if (isDarkTheme) DarkSFGlassTokens else LightSFGlassTokens
     val typography = if (activeLocale.language == "ar") {
         ShareFlowArabicTypography
     } else {
@@ -234,7 +260,11 @@ fun ShareFlowTheme(
             insetsController.isAppearanceLightStatusBars = !isDarkTheme
             insetsController.isAppearanceLightNavigationBars = !isDarkTheme
             window.decorView.setBackgroundColor(
-                if (isDarkTheme) 0xFF171316.toInt() else 0xFFFFF9F5.toInt()
+                if (isDarkTheme) {
+                    ShareFlowMarpleColors.DarkBackground.toArgb()
+                } else {
+                    ShareFlowMarpleColors.LightBackground.toArgb()
+                }
             )
         }
     }
@@ -252,6 +282,9 @@ fun ShareFlowTheme(
         add(LocalShareFlowElevation provides DefaultShareFlowElevation)
         add(LocalShareFlowShapeTokens provides DefaultShareFlowShapeTokens)
         add(LocalShareFlowSemanticColors provides semanticColors)
+        add(LocalSFGlassTokens provides glassTokens)
+        add(LocalSFMotion provides DefaultSFMotionTokens)
+        add(LocalSFReducedMotion provides reducedMotion)
         if (activityResultRegistryOwner != null) {
             add(LocalActivityResultRegistryOwner provides activityResultRegistryOwner)
         }
@@ -271,7 +304,11 @@ fun ShareFlowTheme(
 }
 
 @Composable
-private fun animateShareFlowColorScheme(target: ColorScheme): ColorScheme {
+private fun animateShareFlowColorScheme(
+    target: ColorScheme,
+    reducedMotion: Boolean
+): ColorScheme {
+    if (reducedMotion) return target
     val spec = tween<Color>(durationMillis = 220)
     val primary by animateColorAsState(target.primary, spec, label = "primary")
     val onPrimary by animateColorAsState(target.onPrimary, spec, label = "onPrimary")
