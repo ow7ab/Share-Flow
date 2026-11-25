@@ -16,13 +16,13 @@ import com.example.shareflow.core.common.SystemClock
 import com.example.shareflow.core.permissions.PermissionManager
 import com.example.shareflow.core.security.ChecksumVerifier
 import java.io.File
-import java.net.URI
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 
 data class CloudUpdateManifest(
@@ -153,23 +153,27 @@ interface ApkPackageSecurityInspector {
 object CloudUpdateValidator {
     const val MAX_MANIFEST_BYTES = 64 * 1024
     const val MAX_APK_BYTES = 250L * 1024L * 1024L
-    const val MAX_URL_LENGTH = 512
+    // GitHub Releases 302 CDN redirects (release-assets.githubusercontent.com / objects.githubusercontent.com)
+    // carry signed Azure SAS + JWT query tokens that routinely exceed 900-1800 characters.
+    const val MAX_URL_LENGTH = 4096
     private val SHA256_REGEX = Regex("^[0-9a-fA-F]{64}$")
 
     /**
      * Strict public HTTPS URL validator:
      * - Allows only https:// scheme (zero cleartext HTTP, file://, javascript:, content://)
-     * - Disallows credentials in URL (userInfo)
+     * - Disallows credentials in URL (username/password)
      * - Disallows loopback, localhost, link-local, and RFC1918 private network addresses
+     * - Uses OkHttp's canonical [okhttp3.HttpUrl] parser to support RFC-valid presigned CDN
+     *   query parameters while neutralizing octal/hex/IPv6-mapped IPv4 SSRF bypasses
      */
     fun isValidPublicHttpsUrl(raw: String): Boolean {
         val trimmed = raw.trim()
         if (trimmed.isEmpty() || trimmed.length > MAX_URL_LENGTH) return false
         if (trimmed.any { it.isISOControl() || it.isWhitespace() }) return false
-        val uri = runCatching { URI(trimmed) }.getOrNull() ?: return false
-        if (!uri.scheme.equals("https", ignoreCase = true)) return false
-        if (!uri.userInfo.isNullOrEmpty()) return false
-        val host = uri.host?.lowercase()?.trim().orEmpty()
+        val httpUrl = trimmed.toHttpUrlOrNull() ?: return false
+        if (!httpUrl.scheme.equals("https", ignoreCase = true)) return false
+        if (httpUrl.username.isNotEmpty() || httpUrl.password.isNotEmpty()) return false
+        val host = httpUrl.host.lowercase().trim()
         if (host.isBlank() || !host.contains('.')) return false
         if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false
         if (isPrivateOrLoopbackHost(host)) return false

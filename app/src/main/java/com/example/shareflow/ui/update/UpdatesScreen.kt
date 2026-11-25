@@ -981,8 +981,15 @@ private fun ActiveUpdateStateCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
+                    val retryableDownloadErrors = setOf(
+                        com.example.shareflow.data.update.CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED,
+                        com.example.shareflow.data.update.CloudUpdateErrorReason.TIMEOUT,
+                        com.example.shareflow.data.update.CloudUpdateErrorReason.NO_INTERNET,
+                        com.example.shareflow.data.update.CloudUpdateErrorReason.SERVER_UNAVAILABLE,
+                        com.example.shareflow.data.update.CloudUpdateErrorReason.NETWORK_ERROR
+                    )
                     val retryAction = if (updateState.manifest != null &&
-                        updateState.reason == com.example.shareflow.data.update.CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED
+                        updateState.reason in retryableDownloadErrors
                     ) {
                         { onDownloadOrResume(updateState.manifest) }
                     } else {

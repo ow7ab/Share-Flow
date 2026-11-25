@@ -800,4 +800,90 @@ class SmartUpdateAndFcmSystemTest {
         composeTestRule.onNodeWithTag("update_dialog_later_button").performScrollTo().performClick()
         assertTrue(dismissed)
     }
+
+    @Test
+    fun `CloudUpdateValidator and OkHttp client allow long GitHub Releases presigned CDN HTTPS redirects while blocking HTTP and oversized URLs`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val longJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + "a".repeat(720) + "." + "b".repeat(260)
+        val longPresignedCdnUrl =
+            "https://release-assets.githubusercontent.com/github-production-release-asset/123456789/" +
+                "9f8e7d6c-5b4a-4321-8765-abcdef123456?sp=r&sv=2018-11-09&sr=b&spr=https" +
+                "&se=2026-11-25T16%3A30%3A00Z&rscd=attachment%3B+filename%3DShare-Flow.apk" +
+                "&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0" +
+                "&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-25T15%3A30%3A00Z" +
+                "&ske=2026-11-25T16%3A30%3A00Z&sks=b&skv=2018-11-09&sig=ABCDEF123456%3D" +
+                "&jwt=$longJwt"
+
+        assertTrue("Presigned URL should exceed old 512-char cap", longPresignedCdnUrl.length > 1200)
+        assertTrue(
+            "Valid long GitHub CDN presigned HTTPS redirect URL must be accepted",
+            CloudUpdateValidator.isValidPublicHttpsUrl(longPresignedCdnUrl)
+        )
+        // Security checks remain strict
+        assertFalse(
+            "Cleartext HTTP redirect must still be blocked",
+            CloudUpdateValidator.isValidPublicHttpsUrl(longPresignedCdnUrl.replaceFirst("https://", "http://"))
+        )
+        assertFalse(
+            "Unbounded >4096 char URL must still be blocked",
+            CloudUpdateValidator.isValidPublicHttpsUrl("https://release-assets.githubusercontent.com/a?" + "x".repeat(4200))
+        )
+        assertFalse(
+            "Private IPv4 loopback must still be blocked",
+            CloudUpdateValidator.isValidPublicHttpsUrl("https://127.0.0.1/Share-Flow.apk")
+        )
+
+        // End-to-end OkHttp 302 redirect test from github.com -> >1200-char release-assets.githubusercontent.com
+        val requestedUrls = mutableListOf<String>()
+        val httpClient = buildClientWithInterceptor(
+            interceptor = Interceptor { chain ->
+                val req = chain.request()
+                val urlStr = req.url.toString()
+                requestedUrls.add(urlStr)
+                if (urlStr.startsWith("https://github.com/")) {
+                    Response.Builder()
+                        .request(req)
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(302)
+                        .message("Found")
+                        .header("Location", longPresignedCdnUrl)
+                        .body("".toResponseBody("text/plain".toMediaType()))
+                        .build()
+                } else {
+                    assertEquals(longPresignedCdnUrl, urlStr)
+                    assertTrue(
+                        "X-GitHub-Api-Version must not be leaked to CDN host",
+                        req.header("X-GitHub-Api-Version") == null
+                    )
+                    Response.Builder()
+                        .request(req)
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(200)
+                        .message("OK")
+                        .header("Content-Length", sampleApkBytes.size.toString())
+                        .body(sampleApkBytes.toResponseBody("application/octet-stream".toMediaType()))
+                        .build()
+                }
+            },
+            maxRetryAttempts = 1,
+            dispatcher = dispatcher
+        )
+        val tempDir = File(context.cacheDir, "redirect_cdn_test_${System.nanoTime()}").apply { mkdirs() }
+        val destFile = File(tempDir, "Share-Flow-v1.0.19.apk")
+        try {
+            val downloadResult = httpClient.downloadApkResumable(
+                apkUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.19/Share-Flow.apk",
+                destinationFile = destFile,
+                resumeFromExistingPart = true,
+                onProgress = { _, _ -> }
+            )
+
+            assertTrue("Expected redirected GitHub APK download to succeed, got $downloadResult", downloadResult is AppResult.Success)
+            assertEquals(2, requestedUrls.size)
+            assertTrue(destFile.exists())
+            assertEquals(sampleApkBytes.size.toLong(), destFile.length())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

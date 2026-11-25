@@ -9,7 +9,6 @@ import com.example.shareflow.core.common.SystemClock
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
-import java.net.URI
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
@@ -352,10 +351,10 @@ class UpdateManager(
             val reqBuilder = Request.Builder()
                 .url(currentUrl)
                 .get()
-                .header("Accept", "application/vnd.github+json, application/json")
+                .header("Accept", "application/vnd.github+json, application/json;q=0.9, text/plain;q=0.5, */*;q=0.1")
                 .header("Cache-Control", "no-cache")
                 .header("User-Agent", "ShareFlow-Android/${BuildConfig.VERSION_NAME}")
-            if (redirectCount == 0 && currentUrl.contains("api.github.com", ignoreCase = true)) {
+            if (redirectCount == 0 && currentUrl.contains("://api.github.com/", ignoreCase = true)) {
                 reqBuilder.header("X-GitHub-Api-Version", "2022-11-28")
             }
 
@@ -375,9 +374,7 @@ class UpdateManager(
                                 AppError.Network("Update server returned empty redirect Location header.")
                             )
                         }
-                        val resolved = runCatching {
-                            URI(currentUrl).resolve(location).toString()
-                        }.getOrNull().orEmpty()
+                        val resolved = response.request.url.resolve(location)?.toString().orEmpty()
                         if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolved)) {
                             return AppResult.Failure(
                                 AppError.Security("Blocked non-HTTPS or private network redirect target.")

@@ -13,7 +13,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
-import java.net.URI
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
@@ -316,7 +315,7 @@ class OkHttpCloudUpdateHttpClient(
         extraHeaders: Map<String, String>
     ): AppResult<String> {
         val headers = buildMap {
-            put("Accept", "application/vnd.github+json, application/json;q=0.9, text/plain;q=0.5")
+            put("Accept", "application/vnd.github+json, application/json;q=0.9, text/plain;q=0.5, */*;q=0.1")
             put("X-GitHub-Api-Version", "2022-11-28")
             put("Cache-Control", "no-cache")
             putAll(extraHeaders)
@@ -390,9 +389,10 @@ class OkHttpCloudUpdateHttpClient(
                 .url(currentUrl)
                 .get()
                 .header("User-Agent", "ShareFlow-Android/${BuildConfig.VERSION_NAME}")
+            val isGitHubApiHost = currentUrl.contains("://api.github.com/", ignoreCase = true)
             headers.forEach { (k, v) ->
-                // Strip GitHub API specific headers when following CDN redirects off api.github.com
-                if (redirects > 0 && k.equals("X-GitHub-Api-Version", ignoreCase = true)) {
+                // Send GitHub API version header strictly to api.github.com (never CDN/Azure storage hops)
+                if (!isGitHubApiHost && k.equals("X-GitHub-Api-Version", ignoreCase = true)) {
                     return@forEach
                 }
                 reqBuilder.header(k, v)
@@ -408,6 +408,7 @@ class OkHttpCloudUpdateHttpClient(
 
             if (response.code in REDIRECT_STATUS_CODES) {
                 val location = response.header("Location")?.trim().orEmpty()
+                val requestUrl = response.request.url
                 response.close()
                 if (location.isBlank()) {
                     return AppResult.Failure(
@@ -421,9 +422,7 @@ class OkHttpCloudUpdateHttpClient(
                         )
                     )
                 }
-                val resolved = runCatching { URI(currentUrl).resolve(location).toString() }
-                    .getOrNull()
-                    .orEmpty()
+                val resolved = requestUrl.resolve(location)?.toString().orEmpty()
                 if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolved)) {
                     return AppResult.Failure(
                         AppError.Security(
