@@ -821,6 +821,43 @@ jobs:
           set -euo pipefail
           bash ./scripts/sync-public-docs.sh
 
+      - name: Restore FCM release notification dedupe cache
+        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/shareflow-fcm-dedupe
+          key: shareflow-fcm-notified-${{ steps.validate_config.outputs.release_tag }}
+
+      - name: Send instant FCM update notification to Share Flow users (non-fatal)
+        id: fcm_notify
+        continue-on-error: true
+        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          MANIFEST_PATH: ${{ steps.verify_outputs.outputs.manifest_path }}
+          RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
+          VERSION_NAME: ${{ steps.verify_outputs.outputs.version_name }}
+          VERSION_CODE: ${{ steps.verify_outputs.outputs.version_code }}
+          APK_URL: ${{ steps.verify_outputs.outputs.direct_apk_url }}
+          APK_SHA256: ${{ steps.verify_outputs.outputs.apk_sha256 }}
+          APK_SIZE: ${{ steps.verify_outputs.outputs.apk_size }}
+          PUBLISHED_AT: ${{ steps.verify_outputs.outputs.published_at }}
+          DEDUPE_MARKER: ${{ runner.temp }}/shareflow-fcm-dedupe/notified.json
+        run: |
+          set -euo pipefail
+          node ./scripts/send-fcm-release-notification.mjs \
+            --manifest-json "$MANIFEST_PATH" \
+            --release-tag "$RELEASE_TAG" \
+            --version-name "$VERSION_NAME" \
+            --version-code "$VERSION_CODE" \
+            --apk-url "$APK_URL" \
+            --sha256 "$APK_SHA256" \
+            --file-size "$APK_SIZE" \
+            --published-at "$PUBLISHED_AT" \
+            --dedupe-marker-file "$DEDUPE_MARKER"
+
       - name: Upload Release APK private workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -864,6 +901,7 @@ jobs:
           DIRECT_APK_URL: ${{ steps.verify_outputs.outputs.direct_apk_url || '' }}
           LATEST_APK_URL: ${{ steps.verify_outputs.outputs.latest_apk_url || '' }}
           WEBSITE_OUTCOME: ${{ steps.sync_website.outcome || 'skipped' }}
+          FCM_OUTCOME: ${{ steps.fcm_notify.outcome || 'skipped' }}
         run: |
           {
             echo "## Share Flow Automated Release Summary"
@@ -894,6 +932,7 @@ jobs:
               echo "| **GitHub Release** | ${RELEASE_URL} |"
             fi
             echo "| **Website & History Sync** | \`${WEBSITE_OUTCOME}\` |"
+            echo "| **FCM Push Notification** | \`${FCM_OUTCOME}\` |"
             echo "| **APK Size (bytes)** | \`${APK_SIZE}\` |"
             echo "| **APK SHA-256** | \`${APK_SHA256}\` |"
             echo "| **Signing Cert SHA-256** | \`${CERT_SHA256}\` |"

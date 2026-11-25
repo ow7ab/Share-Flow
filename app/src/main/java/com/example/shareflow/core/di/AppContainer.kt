@@ -17,8 +17,15 @@ import com.example.shareflow.data.apps.ApplicationInstallationManager
 import com.example.shareflow.data.files.ReceivedMediaStorePublisher
 import com.example.shareflow.data.update.AndroidApkPackageSecurityInspector
 import com.example.shareflow.data.update.CloudUpdateManager
-import com.example.shareflow.data.update.HttpsCloudUpdateHttpClient
+import com.example.shareflow.data.update.DataStoreUpdatePreferencesStore
+import com.example.shareflow.data.update.OkHttpCloudUpdateHttpClient
 import com.example.shareflow.data.update.UpdateManager
+import com.example.shareflow.data.update.UpdatePreferencesStore
+import com.example.shareflow.data.update.fcm.AppForegroundTracker
+import com.example.shareflow.data.update.fcm.FcmUpdateTopicCoordinator
+import com.example.shareflow.data.update.fcm.FirebaseFcmTopicBackend
+import com.example.shareflow.data.update.fcm.ShareFlowUpdateNotificationManager
+import com.example.shareflow.data.update.shareFlowUpdatePreferencesDataStore
 import com.example.shareflow.data.local.database.ShareFlowDatabase
 import com.example.shareflow.data.local.preferences.StartupAppearanceCache
 import com.example.shareflow.data.local.preferences.shareFlowSettingsDataStore
@@ -131,8 +138,12 @@ interface AppContainer {
     val zipArchiveEngine: ZipArchiveEngine
     val utilitiesRepository: UtilitiesRepository
     val contactsMigrationExporter: ContactsMigrationExporter
+    val updatePreferencesStore: UpdatePreferencesStore
+    val appForegroundTracker: AppForegroundTracker
     val cloudUpdateManager: CloudUpdateManager
     val updateManager: UpdateManager
+    val fcmUpdateTopicCoordinator: FcmUpdateTopicCoordinator
+    val updateNotificationManager: ShareFlowUpdateNotificationManager
 
     /** True only after [vaultManager] has been accessed, preventing eager DB/Keystore init on app launch. */
     val isVaultInitialized: Boolean
@@ -498,20 +509,52 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
+    override val updatePreferencesStore: UpdatePreferencesStore by lazy {
+        DataStoreUpdatePreferencesStore(appContext.shareFlowUpdatePreferencesDataStore)
+    }
+
+    override val appForegroundTracker: AppForegroundTracker = AppForegroundTracker()
+
     override val cloudUpdateManager: CloudUpdateManager by lazy {
         CloudUpdateManager(
             context = appContext,
-            httpClient = HttpsCloudUpdateHttpClient(dispatchers = dispatchers),
+            httpClient = OkHttpCloudUpdateHttpClient(
+                dispatchers = dispatchers,
+                context = appContext
+            ),
             checksumVerifier = checksumVerifier,
             packageInspector = AndroidApkPackageSecurityInspector(context = appContext),
             permissionManager = permissionManager,
-            dispatchers = dispatchers
+            dispatchers = dispatchers,
+            enableGitHubReleasesPrimary = true,
+            preferencesStore = updatePreferencesStore,
+            clock = clock
         )
     }
 
     override val updateManager: UpdateManager by lazy {
         UpdateManager(
-            dispatcher = dispatchers.io
+            dispatcher = dispatchers.io,
+            enableGitHubReleasesApi = true,
+            preferencesStore = updatePreferencesStore,
+            clock = clock
+        )
+    }
+
+    override val fcmUpdateTopicCoordinator: FcmUpdateTopicCoordinator by lazy {
+        FcmUpdateTopicCoordinator(
+            backend = FirebaseFcmTopicBackend(appContext),
+            preferencesStore = updatePreferencesStore
+        )
+    }
+
+    override val updateNotificationManager: ShareFlowUpdateNotificationManager by lazy {
+        ShareFlowUpdateNotificationManager(
+            context = appContext,
+            preferencesStore = updatePreferencesStore,
+            updateManager = updateManager,
+            cloudUpdateManager = cloudUpdateManager,
+            isAppInForegroundProvider = { appForegroundTracker.isInForeground }
         )
     }
 }

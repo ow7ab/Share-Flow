@@ -21,6 +21,8 @@ class ShareFlowApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         StartupAppearanceCache(this).syncSavedNightModeOnLaunch()
         container = DefaultAppContainer(this)
+        registerActivityLifecycleCallbacks(container.appForegroundTracker)
+        container.updateNotificationManager.ensureNotificationChannel()
     }
 
     override fun newImageLoader(): ImageLoader = ShareFlowCoilImageLoaderFactory.create(this)

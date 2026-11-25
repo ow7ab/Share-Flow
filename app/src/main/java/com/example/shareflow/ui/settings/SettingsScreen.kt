@@ -111,6 +111,7 @@ import com.example.shareflow.domain.model.ThemeMode
 @Composable
 fun SettingsScreen(
     onOpenVault: (() -> Unit)? = null,
+    onOpenUpdates: (() -> Unit)? = null,
     topBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
@@ -183,7 +184,9 @@ fun SettingsScreen(
         onSaveCloudUpdateUrl = viewModel::saveCloudUpdateUrl,
         onCheckForCloudUpdates = viewModel::checkForCloudUpdates,
         onDownloadCloudUpdate = viewModel::downloadCloudUpdate,
+        onPauseCloudUpdateDownload = viewModel::pauseCloudUpdateDownload,
         onCancelCloudUpdateDownload = viewModel::cancelCloudUpdateDownload,
+        onOpenUpdates = onOpenUpdates,
         onInstallVerifiedCloudUpdate = { apkPath ->
             viewModel.installVerifiedCloudUpdate(
                 apkPath = apkPath,
@@ -236,7 +239,9 @@ fun SettingsContent(
     onSaveCloudUpdateUrl: () -> Unit = {},
     onCheckForCloudUpdates: () -> Unit = {},
     onDownloadCloudUpdate: (CloudUpdateManifest) -> Unit = {},
+    onPauseCloudUpdateDownload: () -> Unit = {},
     onCancelCloudUpdateDownload: () -> Unit = {},
+    onOpenUpdates: (() -> Unit)? = null,
     onInstallVerifiedCloudUpdate: (String) -> Unit = {},
     onAutoCheckUpdatesOnLaunchChanged: (Boolean) -> Unit = {},
     topBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
@@ -1022,8 +1027,10 @@ fun SettingsContent(
                         updateState = uiState.cloudUpdateState,
                         onCheckForUpdates = onCheckForCloudUpdates,
                         onDownloadUpdate = onDownloadCloudUpdate,
+                        onPauseDownload = onPauseCloudUpdateDownload,
                         onCancelDownload = onCancelCloudUpdateDownload,
                         onInstallVerifiedUpdate = onInstallVerifiedCloudUpdate,
+                        onOpenUpdatesCenter = onOpenUpdates,
                         autoCheckUpdatesOnLaunch = uiState.settings.autoCheckUpdatesOnLaunch,
                         onAutoCheckUpdatesOnLaunchChanged = onAutoCheckUpdatesOnLaunchChanged
                     )

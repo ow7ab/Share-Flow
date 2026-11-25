@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.shareflow.kxrvnm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 18
-    versionName = "1.0.17"
+    versionCode = 19
+    versionName = "1.0.18"
 
     buildConfigField(
       "String",
@@ -28,6 +28,11 @@ android {
       "String",
       "CLOUD_UPDATE_PORTAL_URL",
       "\"https://ow7ab.github.io/Share-Flow-Releases/\""
+    )
+    buildConfigField(
+      "String",
+      "GITHUB_RELEASES_API_URL",
+      "\"https://api.github.com/repos/ow7ab/Share-Flow-Releases/releases\""
     )
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -96,7 +101,8 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  // implementation(platform(libs.firebase.bom))
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.camera.camera2)

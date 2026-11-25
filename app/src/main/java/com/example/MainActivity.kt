@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Display
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -14,15 +15,24 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
+import android.content.Intent
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.shareflow.core.di.LocalAppContainer
+import com.example.shareflow.data.update.fcm.ShareFlowUpdateNotificationManager
 import com.example.shareflow.domain.model.ThemeMode
 import com.example.shareflow.navigation.ShareFlowApp
+import com.example.shareflow.navigation.ShareFlowRoutes
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : FragmentActivity() {
 
     @Volatile
     private var isLaunchThemeReady: Boolean = false
+
+    private val pendingNavigationRoute = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install AndroidX SplashScreen BEFORE super.onCreate() so the system splash window
@@ -53,6 +63,21 @@ class MainActivity : FragmentActivity() {
             statusBarStyle = barStyle,
             navigationBarStyle = barStyle
         )
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
         window.decorView.setBackgroundColor(targetWindowBg)
         enableHighRefreshRateIfSupported()
 
@@ -75,11 +100,41 @@ class MainActivity : FragmentActivity() {
 
         // Release splash condition once theme tokens, window background, and edge-to-edge bars are applied.
         isLaunchThemeReady = true
+        extractDeepLinkRoute(intent)?.let { route ->
+            pendingNavigationRoute.value = route
+        }
 
         setContent {
+            val externalRoute by pendingNavigationRoute.collectAsState()
             CompositionLocalProvider(LocalAppContainer provides appContainer) {
-                ShareFlowApp(initialSettings = initialSettings)
+                ShareFlowApp(
+                    initialSettings = initialSettings,
+                    pendingExternalRoute = externalRoute,
+                    onConsumeExternalRoute = { pendingNavigationRoute.value = null }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractDeepLinkRoute(intent)?.let { route ->
+            pendingNavigationRoute.value = route
+        }
+    }
+
+    private fun extractDeepLinkRoute(intent: Intent?): String? {
+        if (intent == null) return null
+        if (intent.action == ShareFlowUpdateNotificationManager.ACTION_OPEN_UPDATES) {
+            return ShareFlowRoutes.UPDATES
+        }
+        val extraRoute = intent.getStringExtra(ShareFlowUpdateNotificationManager.EXTRA_OPEN_ROUTE)
+            ?: intent.getStringExtra("targetRoute")
+        return if (extraRoute.equals(ShareFlowRoutes.UPDATES, ignoreCase = true)) {
+            ShareFlowRoutes.UPDATES
+        } else {
+            null
         }
     }
 

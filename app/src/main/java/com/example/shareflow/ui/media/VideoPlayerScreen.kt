@@ -9,6 +9,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,15 +17,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -33,6 +41,7 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -44,8 +53,8 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,16 +76,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import coil.compose.AsyncImage
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -98,6 +112,7 @@ import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.ShareFlowTopBar
 import com.example.shareflow.core.designsystem.theme.LocalShareFlowHostActivity
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.core.designsystem.theme.findActivity
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.core.di.shareFlowViewModelFactory
@@ -320,6 +335,7 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .testTag("video_player_screen"),
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 com.example.shareflow.core.designsystem.components.SFSnackbar(snackbarData = data)
@@ -504,6 +520,8 @@ fun VideoPlayerScreen(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .background(Color.Black.copy(alpha = 0.65f))
+                                    .navigationBarsPadding()
+                                    .displayCutoutPadding()
                             )
                         }
                     }
@@ -561,23 +579,43 @@ fun VideoPlayerScreen(
                             onToggleSubtitles = viewModel::toggleSubtitles
                         )
 
-                        LazyColumn(
+                        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 152.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                                 .testTag("video_queue_list"),
-                            contentPadding = PaddingValues(spacing.screenHorizontal, spacing.sm),
+                            contentPadding = PaddingValues(
+                                start = spacing.screenHorizontal,
+                                top = spacing.sm,
+                                end = spacing.screenHorizontal,
+                                bottom = spacing.md + navBarBottom
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                             verticalArrangement = Arrangement.spacedBy(spacing.xs)
                         ) {
                             itemsIndexed(
                                 items = uiState.videos,
                                 key = { _, item -> item.uriString }
                             ) { index, item ->
-                                VideoListRow(
+                                VideoBrowserCard(
                                     video = item,
+                                    index = index,
                                     isSelected = index == uiState.currentIndex,
                                     formattedSize = ShareFlowFormatters.formatBytes(item.sizeBytes, locale),
                                     onClick = { viewModel.selectVideo(index) },
+                                    onSend = {
+                                        exoPlayer.pause()
+                                        container.localSessionController.addSelectedFiles(
+                                            listOf(item.toViewerFileEntry())
+                                        )
+                                        onNavigateToSend()
+                                    },
+                                    onMoveToVault = {
+                                        exoPlayer.pause()
+                                        inspectVideoForVault = item
+                                    },
                                     modifier = Modifier.testTag("video_list_item_$index")
                                 )
                             }
@@ -800,69 +838,145 @@ private fun VideoControlDeck(
 }
 
 @Composable
-private fun VideoListRow(
+private fun VideoBrowserCard(
     video: MediaVideoItem,
+    index: Int,
     isSelected: Boolean,
     formattedSize: String,
     onClick: () -> Unit,
+    onSend: () -> Unit,
+    onMoveToVault: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    var menuExpanded by remember { mutableStateOf(false) }
+    val thumbnailRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+        uriString = video.uriString,
+        targetSizePx = 300,
+        isVideo = true
+    )
+    val cardShape = ShareFlowDesign.shapes.card
+    Surface(
         modifier = modifier
             .fillMaxWidth()
+            .aspectRatio(1.25f)
+            .clip(cardShape)
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            }
-        ),
+        shape = cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(
-            width = 1.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            width = if (isSelected) 2.dp else 0.75.dp,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            }
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.VideoLibrary,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 1. Full-bleed downsampled video thumbnail
+            AsyncImage(
+                model = thumbnailRequest,
+                contentDescription = stringResource(R.string.media_video_play_badge_cd),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = video.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+
+            // 2. Centered translucent play badge
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.52f))
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+                    .testTag("video_tile_play_badge_$index")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(R.string.media_video_play_badge_cd),
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
-                val subtitle = buildString {
-                    append(video.folderName)
-                    append(" • ")
-                    append(formattedSize)
-                    if (video.durationMs > 0L) {
-                        append(" • ")
-                        append(formatMediaDuration(video.durationMs))
-                    }
-                    if (video.lastPositionMs > 1_000L) {
-                        append(" • ")
-                        append(formatMediaDuration(video.lastPositionMs))
+            }
+
+            // 3. Bottom gradient scrim displaying ONLY file size (no file name)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.68f)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = formattedSize,
+                    style = ShareFlowMonoStyle.copy(
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .testTag("video_tile_size_$index")
+                )
+            }
+
+            // 4. Top-end action icon
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+            ) {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("video_tile_action_$index")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.44f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.files_cd_more_options),
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.media_action_play)) },
+                        leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                        onClick = { menuExpanded = false; onClick() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.viewer_action_send_shareflow)) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null) },
+                        onClick = { menuExpanded = false; onSend() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.viewer_action_move_to_vault)) },
+                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                        onClick = { menuExpanded = false; onMoveToVault() }
+                    )
+                }
             }
         }
     }

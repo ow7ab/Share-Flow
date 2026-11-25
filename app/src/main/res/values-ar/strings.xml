@@ -1329,6 +1329,78 @@
     <string name="media_studio_grant_folder">منح وصول المجلد</string>
     <string name="media_studio_import_media">استيراد وسائط</string>
     <string name="media_video_play_badge_cd">فيديو</string>
+
+    <!-- شاشة استقبال وفتح ملفات APK بملء الشاشة ومعالجة WindowInsets -->
+    <string name="apk_intent_title">مثبّت ملفات APK</string>
+    <string name="apk_intent_inspecting">جارٍ فحص حزمة APK…</string>
+    <string name="apk_intent_ready_badge">الحزمة جاهزة للتثبيت</string>
+    <string name="apk_intent_update_badge">تحديث لتطبيق مثبّت</string>
+    <string name="apk_intent_package_label">معرّف الحزمة</string>
+    <string name="apk_intent_version_label">الإصدار</string>
+    <string name="apk_intent_size_label">حجم الملف</string>
+    <string name="apk_intent_sha256_label">بصمة SHA-256</string>
+    <string name="apk_intent_security_note">يتطلب التثبيت دائماً موافقتك الصريحة عبر مثبّت حزم Android الرسمي.</string>
+    <string name="apk_intent_invalid_uri">تعذّر فتح ملف APK هذا. تأكد من وجود الملف وأنه حزمة تطبيق Android صالحة.</string>
+    <string name="apk_intent_permission_needed">اسمح لـ ShareFlow بتثبيت التطبيقات من إعدادات Android لمتابعة التثبيت.</string>
+    <string name="apk_intent_open_settings">السماح من الإعدادات</string>
+    <string name="apk_intent_staging">جارٍ تجهيز حزمة APK… %1$d%%</string>
+    <string name="apk_intent_awaiting_confirm">أكّد التثبيت في نافذة نظام Android…</string>
+    <string name="apk_intent_installed_success">تم تثبيت التطبيق بنجاح.</string>
+    <string name="apk_intent_open_app">فتح التطبيق</string>
+    <string name="apk_intent_system_fallback_failed">لم يتم العثور على مثبّت حزم Android خارجي على هذا الجهاز.</string>
+
+    <!-- نظام التحديث الذكي ومركز التحديثات وإشعارات FCM الفورية -->
+    <string name="updates_screen_title">التحديثات</string>
+    <string name="updates_open_center_action">فتح مركز التحديثات وسجل الإصدارات</string>
+    <string name="updates_status_up_to_date">محدّث بالكامل</string>
+    <string name="updates_status_available">تحديث جديد متوفر</string>
+    <string name="updates_status_checking">جارٍ الفحص…</string>
+    <string name="updates_status_downloading">جارٍ التنزيل…</string>
+    <string name="updates_status_paused">متوقف مؤقتاً</string>
+    <string name="updates_status_verifying">جارٍ التحقق الأمني…</string>
+    <string name="updates_status_ready">جاهز للتثبيت</string>
+    <string name="updates_status_error">يلزم الانتباه</string>
+    <string name="updates_server_label">خادم التحديثات</string>
+    <string name="updates_server_connected">متصل بـ GitHub Releases</string>
+    <string name="updates_server_offline">غير متصل بالإنترنت</string>
+    <string name="updates_server_rate_limited">تجاوز حد الطلبات مؤقتاً</string>
+    <string name="updates_server_checking">جارٍ الاتصال…</string>
+    <string name="updates_server_error">مشكلة في الاتصال</string>
+    <string name="updates_server_unknown">لم يتم الفحص بعد</string>
+    <string name="updates_last_checked_label">آخر فحص للتحديثات</string>
+    <string name="updates_last_checked_never">لم يتم الفحص بعد</string>
+    <string name="updates_push_status_label">إشعارات الإصدارات الفورية</string>
+    <string name="updates_push_status_subscribed">مفعّلة (share_flow_updates)</string>
+    <string name="updates_push_status_not_configured">بانتظار ربط إعدادات Firebase</string>
+    <string name="updates_push_status_failed">سيتم إعادة المحاولة تلقائياً</string>
+    <string name="updates_push_status_unknown">جارٍ التهيئة…</string>
+    <string name="updates_version_transition_format">الحالي v%1$s  ←  الجديد v%2$s</string>
+    <string name="updates_published_date_format">تاريخ النشر: %1$s</string>
+    <string name="updates_apk_size_format">الحجم: %1$s</string>
+    <string name="updates_sha256_verified_badge">محمي بـ HTTPS و SHA-256 وتطابق التوقيع</string>
+    <string name="updates_pause_download_action">إيقاف مؤقت</string>
+    <string name="updates_resume_download_action">استئناف التنزيل</string>
+    <string name="updates_paused_progress_format">التنزيل متوقف مؤقتاً — %1$d%% (%2$s / %3$s)</string>
+    <string name="updates_downloading_total_format">جارٍ التنزيل… %1$d%% (%2$s / %3$s)</string>
+    <string name="updates_history_section_title">سجل الإصدارات السابقة</string>
+    <string name="updates_history_empty">اضغط على «فحص التحديثات الآن» لتحميل سجل إصدارات Share Flow الرسمي من GitHub Releases.</string>
+    <string name="updates_history_prerelease_badge">إصدار تجريبي</string>
+    <string name="updates_history_stable_badge">إصدار مستقر</string>
+    <string name="updates_history_no_notes">تحسينات عامة في الأداء والاستقرار.</string>
+    <string name="updates_dialog_view_details_action">عرض تفاصيل التحديث</string>
+    <string name="updates_dialog_update_now_action">تحديث الآن</string>
+    <string name="updates_notification_channel_name">تحديثات Share Flow</string>
+    <string name="updates_notification_channel_desc">إشعارات فورية فور نشر أي إصدار رسمي جديد من Share Flow على GitHub Releases.</string>
+    <string name="updates_push_default_title">تحديث جديد متوفر | Share Flow</string>
+    <string name="updates_push_default_body">يتوفر الآن الإصدار v%1$s من Share Flow. حدّث تطبيقك للاستفادة من المميزات الجديدة والتحسينات.</string>
+    <string name="updates_err_no_internet">لا يوجد اتصال نشط بالإنترنت. يرجى التحقق من Wi-Fi أو بيانات الجوال والمحاولة مجدداً.</string>
+    <string name="updates_err_timeout">انتهت مهلة الاتصال بخادم GitHub Releases. تأكد من استقرار الشبكة وأعد المحاولة.</string>
+    <string name="updates_err_ssl">فشل التحقق الآمن من شهادة TLS/SSL. يرجى التأكد من صحة التاريخ والوقت أو إعدادات الشبكة.</string>
+    <string name="updates_err_rate_limited">تم بلوغ الحد المؤقت لطلبات GitHub API. انتظر بضع دقائق ثم أعد المحاولة.</string>
+    <string name="updates_err_server_unavailable">خوادم GitHub Releases غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.</string>
+    <string name="updates_err_release_not_found">لا يوجد ملف إصدار رسمي منشور حالياً على GitHub Releases.</string>
+    <string name="updates_allow_notifications_action">تفعيل إشعارات التحديثات</string>
 </resources>
+
 
 

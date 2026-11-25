@@ -10,19 +10,15 @@ import androidx.core.content.FileProvider
 import com.example.BuildConfig
 import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
+import com.example.shareflow.core.common.Clock
 import com.example.shareflow.core.common.DispatcherProvider
+import com.example.shareflow.core.common.SystemClock
 import com.example.shareflow.core.permissions.PermissionManager
 import com.example.shareflow.core.security.ChecksumVerifier
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.net.URI
-import java.net.URL
 import java.security.MessageDigest
-import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,6 +67,19 @@ sealed class CloudUpdateState {
             }
     }
 
+    data class Paused(
+        val manifest: CloudUpdateManifest,
+        val downloadedBytes: Long,
+        val totalBytes: Long
+    ) : CloudUpdateState() {
+        val progress: Float
+            get() = if (totalBytes > 0L) {
+                (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+    }
+
     data class Verifying(
         val manifest: CloudUpdateManifest
     ) : CloudUpdateState()
@@ -90,6 +99,12 @@ sealed class CloudUpdateState {
 enum class CloudUpdateErrorReason {
     INVALID_URL,
     NETWORK_ERROR,
+    NO_INTERNET,
+    TIMEOUT,
+    SSL_ERROR,
+    RATE_LIMITED,
+    SERVER_UNAVAILABLE,
+    RELEASE_NOT_FOUND,
     INVALID_MANIFEST,
     INCOMPATIBLE_DEVICE,
     CHECKSUM_MISMATCH,
@@ -267,163 +282,18 @@ object CloudUpdateValidator {
     }
 }
 
+/**
+ * Backwards-compatible wrapper delegating to [OkHttpCloudUpdateHttpClient] so all update traffic
+ * benefits from OkHttp connection pooling, 6-hop HTTPS redirect validation, retry/backoff, and
+ * HTTP Range resumable downloads.
+ */
 class HttpsCloudUpdateHttpClient(
-    private val dispatchers: DispatcherProvider
-) : CloudUpdateHttpClient {
-
-    override suspend fun fetchManifestText(manifestUrl: String): AppResult<String> = withContext(dispatchers.io) {
-        if (!CloudUpdateValidator.isValidPublicHttpsUrl(manifestUrl)) {
-            return@withContext AppResult.Failure(AppError.Security("Only public HTTPS URLs are permitted."))
-        }
-        runCatching {
-            val conn = openValidatedHttpsConnection(manifestUrl)
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    return@withContext AppResult.Failure(AppError.Network("Update server returned HTTP $code"))
-                }
-                val out = ByteArrayOutputStream()
-                conn.inputStream.use { input ->
-                    val buf = ByteArray(4096)
-                    var total = 0
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val read = input.read(buf)
-                        if (read <= 0) break
-                        total += read
-                        if (total > CloudUpdateValidator.MAX_MANIFEST_BYTES) {
-                            return@withContext AppResult.Failure(
-                                AppError.Validation("Update manifest exceeds ${CloudUpdateValidator.MAX_MANIFEST_BYTES} byte limit.")
-                            )
-                        }
-                        out.write(buf, 0, read)
-                    }
-                }
-                AppResult.Success(out.toString(Charsets.UTF_8.name()))
-            } finally {
-                conn.disconnect()
-            }
-        }.getOrElse { err ->
-            if (err is CancellationException) throw err
-            AppResult.Failure(AppError.Network(err.message ?: "Unable to reach update server.", err))
-        }
-    }
-
-    override suspend fun downloadApkToFile(
-        apkUrl: String,
-        destinationFile: File,
-        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit
-    ): AppResult<File> = withContext(dispatchers.io) {
-        if (!CloudUpdateValidator.isValidPublicHttpsUrl(apkUrl)) {
-            return@withContext AppResult.Failure(AppError.Security("APK download URL must use public HTTPS."))
-        }
-        val parent = destinationFile.parentFile
-            ?: return@withContext AppResult.Failure(AppError.Storage("Invalid update cache destination."))
-        parent.mkdirs()
-
-        val tempPartFile = File(parent, "${destinationFile.name}.part")
-        if (tempPartFile.exists()) tempPartFile.delete()
-
-        try {
-            val conn = openValidatedHttpsConnection(apkUrl, readTimeoutMs = 30_000)
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    return@withContext AppResult.Failure(AppError.Network("APK download failed with HTTP $code"))
-                }
-                val contentLength = conn.contentLengthLong
-                if (contentLength > CloudUpdateValidator.MAX_APK_BYTES) {
-                    return@withContext AppResult.Failure(AppError.Validation("APK size exceeds safe 250 MB limit."))
-                }
-                var downloaded = 0L
-                var lastReportAt = 0L
-                conn.inputStream.use { input ->
-                    FileOutputStream(tempPartFile).use { output ->
-                        val buffer = ByteArray(32 * 1024)
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val read = input.read(buffer)
-                            if (read <= 0) break
-                            downloaded += read
-                            if (downloaded > CloudUpdateValidator.MAX_APK_BYTES) {
-                                return@withContext AppResult.Failure(
-                                    AppError.Validation("Downloaded APK exceeded safe 250 MB limit.")
-                                )
-                            }
-                            output.write(buffer, 0, read)
-                            val now = System.currentTimeMillis()
-                            if (now - lastReportAt >= 120L) {
-                                lastReportAt = now
-                                onProgress(downloaded, contentLength)
-                            }
-                        }
-                        output.fd.sync()
-                    }
-                }
-                onProgress(downloaded, if (contentLength > 0L) contentLength else downloaded)
-                if (destinationFile.exists()) destinationFile.delete()
-                if (!tempPartFile.renameTo(destinationFile)) {
-                    tempPartFile.copyTo(destinationFile, overwrite = true)
-                    tempPartFile.delete()
-                }
-                AppResult.Success(destinationFile)
-            } finally {
-                conn.disconnect()
-            }
-        } catch (ce: CancellationException) {
-            tempPartFile.delete()
-            throw ce
-        } catch (t: Throwable) {
-            tempPartFile.delete()
-            AppResult.Failure(AppError.Network(t.message ?: "Download interrupted.", t))
-        }
-    }
-
-    private fun openValidatedHttpsConnection(
-        initialUrl: String,
-        connectTimeoutMs: Int = 12_000,
-        readTimeoutMs: Int = 15_000
-    ): HttpsURLConnection {
-        var currentUrl = initialUrl
-        var redirects = 0
-        while (redirects <= MAX_REDIRECTS) {
-            if (!CloudUpdateValidator.isValidPublicHttpsUrl(currentUrl)) {
-                throw SecurityException("Redirect blocked: non-HTTPS or disallowed host")
-            }
-            val conn = (URL(currentUrl).openConnection() as? HttpsURLConnection)
-                ?: throw SecurityException("Connection did not resolve to HTTPS")
-            conn.instanceFollowRedirects = false
-            conn.connectTimeout = connectTimeoutMs
-            conn.readTimeout = readTimeoutMs
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Accept", "application/json, application/vnd.android.package-archive, */*")
-            conn.setRequestProperty("User-Agent", "ShareFlow-Android/${BuildConfig.VERSION_NAME}")
-            conn.connect()
-
-            val code = conn.responseCode
-            if (code in setOf(301, 302, 303, 307, 308)) {
-                val location = conn.getHeaderField("Location")?.trim().orEmpty()
-                conn.disconnect()
-                if (location.isBlank()) {
-                    throw IllegalStateException("Empty redirect Location header")
-                }
-                val resolved = runCatching { URI(currentUrl).resolve(location).toString() }.getOrNull().orEmpty()
-                if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolved)) {
-                    throw SecurityException("Blocked unsafe redirect target")
-                }
-                currentUrl = resolved
-                redirects++
-                continue
-            }
-            return conn
-        }
-        throw IllegalStateException("Too many redirects while contacting update server")
-    }
-
-    companion object {
-        private const val MAX_REDIRECTS = 3
-    }
-}
+    dispatchers: DispatcherProvider,
+    context: Context? = null
+) : CloudUpdateHttpClient by OkHttpCloudUpdateHttpClient(
+    dispatchers = dispatchers,
+    context = context
+)
 
 class AndroidApkPackageSecurityInspector(
     private val context: Context
@@ -451,14 +321,12 @@ class AndroidApkPackageSecurityInspector(
             AppError.Security("Downloaded file is not a valid Android APK package.")
         )
 
-        // 1. Package identity check (prevents unauthorized replacement with a different app)
         if (archiveInfo.packageName != expectedPackageName) {
             return AppResult.Failure(
                 AppError.Security("APK package ID (${archiveInfo.packageName}) does not match ShareFlow ($expectedPackageName).")
             )
         }
 
-        // 2. Anti-downgrade check
         val archiveVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             archiveInfo.longVersionCode
         } else {
@@ -472,7 +340,6 @@ class AndroidApkPackageSecurityInspector(
             )
         }
 
-        // 3. Signing certificate compatibility check (preserves user data and prevents unauthorized replacement)
         val installedInfo: PackageInfo? = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pm.getPackageInfo(expectedPackageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
@@ -517,7 +384,6 @@ class AndroidApkPackageSecurityInspector(
             }
         }.getOrNull()
         val installedDigests = extractSigningCertSha256Digests(installedInfo)
-        // If runtime cannot read installed signatures (e.g., stripped test env), defer to full APK inspection.
         if (installedDigests.isEmpty()) return true
         return installedDigests.any { CloudUpdateValidator.constantTimeHashEquals(normalizedExpected, it) }
     }
@@ -549,8 +415,9 @@ class AndroidApkPackageSecurityInspector(
 }
 
 /**
- * Coordinates secure HTTPS cloud version checks, streaming APK download, cryptographic SHA-256 +
- * signing certificate verification, and Android system installer handoff (always with user consent).
+ * Centralized Share Flow In-App Update Engine backed by GitHub Releases API + resilient OkHttp
+ * resumable downloads, mandatory SHA-256 + signing certificate + package ID + anti-downgrade
+ * verification, and Android PackageInstaller handoff.
  */
 class CloudUpdateManager(
     private val context: Context,
@@ -564,11 +431,23 @@ class CloudUpdateManager(
     private val currentSdkInt: Int = Build.VERSION.SDK_INT,
     private val expectedPackageName: String = context.packageName,
     private val defaultManifestUrl: String = BuildConfig.CLOUD_UPDATE_MANIFEST_URL,
-    private val fallbackManifestUrl: String = DEFAULT_FALLBACK_MANIFEST_URL
+    private val fallbackManifestUrl: String = DEFAULT_FALLBACK_MANIFEST_URL,
+    private val enableGitHubReleasesPrimary: Boolean = false,
+    private val githubReleasesApiUrl: String = BuildConfig.GITHUB_RELEASES_API_URL,
+    private val preferencesStore: UpdatePreferencesStore = InMemoryUpdatePreferencesStore(),
+    private val clock: Clock = SystemClock()
 ) {
     private val appContext = context.applicationContext ?: context
     private val _state = MutableStateFlow<CloudUpdateState>(CloudUpdateState.Idle)
     val state: StateFlow<CloudUpdateState> = _state.asStateFlow()
+
+    private val _releaseHistory = MutableStateFlow<List<ReleaseHistoryItem>>(emptyList())
+    val releaseHistory: StateFlow<List<ReleaseHistoryItem>> = _releaseHistory.asStateFlow()
+
+    val diagnosticsFlow = preferencesStore.snapshot
+
+    @Volatile
+    private var lastKnownManifest: CloudUpdateManifest? = null
 
     fun resolveEffectiveManifestUrl(userConfiguredUrl: String): String {
         val custom = userConfiguredUrl.trim()
@@ -576,8 +455,18 @@ class CloudUpdateManager(
         return defaultManifestUrl.trim()
     }
 
-    suspend fun checkForUpdates(manifestUrl: String): CloudUpdateState {
+    /**
+     * Checks for updates. When [enableGitHubReleasesPrimary] is active and no custom URL is passed,
+     * queries the official GitHub Releases API first (populating both the latest stable release
+     * and previous releases history in one call) and falls back gracefully to static `version.json`
+     * endpoints if GitHub API is rate-limited or temporarily unreachable.
+     */
+    suspend fun checkForUpdates(manifestUrl: String = ""): CloudUpdateState {
         val isUsingDefaultEndpoint = manifestUrl.trim().isEmpty()
+        if (isUsingDefaultEndpoint && enableGitHubReleasesPrimary) {
+            return checkViaGitHubReleasesWithFallback()
+        }
+
         val effectiveUrl = resolveEffectiveManifestUrl(manifestUrl)
         if (effectiveUrl.isBlank()) {
             val notConfigured = CloudUpdateState.PortalNotConfigured
@@ -606,11 +495,155 @@ class CloudUpdateManager(
         } else {
             primaryFetch
         }
+        return finalizeManifestFetch(fetchRes, sourceLabel = OFFICIAL_PORTAL_HOST)
+    }
+
+    private suspend fun checkViaGitHubReleasesWithFallback(): CloudUpdateState {
+        _state.value = CloudUpdateState.Checking
+        val apiListUrl = buildReleasesListUrl(githubReleasesApiUrl)
+        val listFetch = if (CloudUpdateValidator.isValidPublicHttpsUrl(apiListUrl)) {
+            httpClient.fetchManifestText(apiListUrl)
+        } else {
+            AppResult.Failure(AppError.Security("Invalid GitHub Releases API URL."))
+        }
+
+        if (listFetch is AppResult.Success) {
+            val releases = GitHubReleasesParser.parseReleasesArray(listFetch.data)
+            _releaseHistory.value = releases.map(GitHubReleasesParser::toHistoryItem)
+
+            val latestStable = releases.firstOrNull { !it.isDraft && !it.isPrerelease }
+            if (latestStable == null) {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                    sourceLabel = GITHUB_SOURCE_LABEL
+                )
+                val upToDate = CloudUpdateState.UpToDate(
+                    currentVersionName = currentVersionName,
+                    currentVersionCode = currentVersionCode,
+                    portalUrl = OFFICIAL_RELEASES_PAGE_URL
+                )
+                _state.value = upToDate
+                return upToDate
+            }
+
+            // Enrich with version.json or .sha256 sidecar if attached to the release
+            val sidecarManifest = latestStable.versionJsonAssetUrl
+                ?.takeIf { CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+                ?.let { url ->
+                    val raw = httpClient.fetchManifestText(url)
+                    if (raw is AppResult.Success) {
+                        (CloudUpdateValidator.parseManifestJson(raw.data) as? AppResult.Success)?.data
+                    } else null
+                }
+
+            val sidecarShaText = if (sidecarManifest == null && latestStable.apkAsset?.sha256Digest == null) {
+                latestStable.sha256SidecarAssetUrl
+                    ?.takeIf { CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+                    ?.let { url ->
+                        (httpClient.fetchManifestText(url) as? AppResult.Success)?.data
+                    }
+            } else {
+                null
+            }
+
+            val resolvedManifest = GitHubReleasesParser.toCloudUpdateManifest(
+                release = latestStable,
+                sidecarManifest = sidecarManifest,
+                sidecarSha256Text = sidecarShaText,
+                currentVersionCode = currentVersionCode,
+                currentVersionName = currentVersionName
+            )
+
+            if (resolvedManifest != null) {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                    sourceLabel = GITHUB_SOURCE_LABEL
+                )
+                return evaluateResolvedManifest(resolvedManifest)
+            }
+
+            // Release exists on GitHub without a downloadable APK/SHA-256 — report clearly
+            val hasNewerTag = GitHubReleasesParser.compareSemanticVersions(
+                latestStable.versionName,
+                currentVersionName
+            ) > 0
+            if (!hasNewerTag) {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                    sourceLabel = GITHUB_SOURCE_LABEL
+                )
+                val upToDate = CloudUpdateState.UpToDate(
+                    currentVersionName = currentVersionName,
+                    currentVersionCode = currentVersionCode,
+                    portalUrl = latestStable.htmlUrl.ifBlank { OFFICIAL_RELEASES_PAGE_URL }
+                )
+                _state.value = upToDate
+                return upToDate
+            }
+            val manifestErr = CloudUpdateState.Error(
+                reason = CloudUpdateErrorReason.INVALID_MANIFEST,
+                detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest."
+            )
+            preferencesStore.recordCheckResult(
+                epochMillis = clock.nowEpochMillis(),
+                serverStatus = UpdateServerConnectionStatus.ERROR,
+                sourceLabel = GITHUB_SOURCE_LABEL,
+                errorSummary = manifestErr.detail
+            )
+            _state.value = manifestErr
+            return manifestErr
+        }
+
+        // GitHub API failed (e.g., rate-limited 403/429 or temporary 5xx) — try static fallback endpoints
+        val primaryError = (listFetch as AppResult.Failure).error
+        val fallbackCandidates = listOf(fallbackManifestUrl, defaultManifestUrl)
+            .map { it.trim() }
+            .distinct()
+            .filter { it.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+
+        for (candidateUrl in fallbackCandidates) {
+            val fallbackRes = httpClient.fetchManifestText(candidateUrl)
+            if (fallbackRes is AppResult.Success) {
+                return finalizeManifestFetch(fallbackRes, sourceLabel = GITHUB_SOURCE_LABEL)
+            }
+        }
+
+        // All endpoints failed — map the root GitHub API failure accurately
+        val errorReason = mapErrorToReason(primaryError)
+        val serverStatus = mapReasonToServerStatus(errorReason)
+        preferencesStore.recordCheckResult(
+            epochMillis = clock.nowEpochMillis(),
+            serverStatus = serverStatus,
+            sourceLabel = GITHUB_SOURCE_LABEL,
+            errorSummary = primaryError.message
+        )
+        val err = CloudUpdateState.Error(
+            reason = errorReason,
+            detail = primaryError.message
+        )
+        _state.value = err
+        return err
+    }
+
+    private suspend fun finalizeManifestFetch(
+        fetchRes: AppResult<String>,
+        sourceLabel: String
+    ): CloudUpdateState {
         val rawJson = when (fetchRes) {
             is AppResult.Success -> fetchRes.data
             is AppResult.Failure -> {
+                val reason = mapErrorToReason(fetchRes.error)
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = mapReasonToServerStatus(reason),
+                    sourceLabel = sourceLabel,
+                    errorSummary = fetchRes.error.message
+                )
                 val err = CloudUpdateState.Error(
-                    reason = CloudUpdateErrorReason.NETWORK_ERROR,
+                    reason = reason,
                     detail = fetchRes.error.message
                 )
                 _state.value = err
@@ -621,6 +654,12 @@ class CloudUpdateManager(
         val manifest = when (val parsed = CloudUpdateValidator.parseManifestJson(rawJson)) {
             is AppResult.Success -> parsed.data
             is AppResult.Failure -> {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.ERROR,
+                    sourceLabel = sourceLabel,
+                    errorSummary = parsed.error.message
+                )
                 val err = CloudUpdateState.Error(
                     reason = CloudUpdateErrorReason.INVALID_MANIFEST,
                     detail = parsed.error.message
@@ -630,6 +669,15 @@ class CloudUpdateManager(
             }
         }
 
+        preferencesStore.recordCheckResult(
+            epochMillis = clock.nowEpochMillis(),
+            serverStatus = UpdateServerConnectionStatus.CONNECTED,
+            sourceLabel = sourceLabel
+        )
+        return evaluateResolvedManifest(manifest)
+    }
+
+    private suspend fun evaluateResolvedManifest(manifest: CloudUpdateManifest): CloudUpdateState {
         if (manifest.minSupportedAndroidSdk > currentSdkInt) {
             val err = CloudUpdateState.Error(
                 reason = CloudUpdateErrorReason.INCOMPATIBLE_DEVICE,
@@ -640,7 +688,16 @@ class CloudUpdateManager(
             return err
         }
 
-        val nextState = if (manifest.versionCode > currentVersionCode) {
+        val isNewer = GitHubReleasesParser.isRemoteReleaseNewer(
+            remoteVersionCode = manifest.versionCode,
+            remoteVersionName = manifest.versionName,
+            installedVersionCode = currentVersionCode,
+            installedVersionName = currentVersionName
+        )
+
+        val nextState = if (isNewer) {
+            lastKnownManifest = manifest
+            preferencesStore.clearSnoozeIfNewer(manifest.versionCode)
             CloudUpdateState.UpdateAvailable(manifest = manifest)
         } else {
             CloudUpdateState.UpToDate(
@@ -653,8 +710,27 @@ class CloudUpdateManager(
         return nextState
     }
 
+    /**
+     * Surfaces a validated update received via FCM push notification immediately in the Updates UI.
+     */
+    fun applyPushUpdateManifest(manifest: CloudUpdateManifest) {
+        val isNewer = GitHubReleasesParser.isRemoteReleaseNewer(
+            remoteVersionCode = manifest.versionCode,
+            remoteVersionName = manifest.versionName,
+            installedVersionCode = currentVersionCode,
+            installedVersionName = currentVersionName
+        )
+        if (!isNewer) return
+        if (_state.value is CloudUpdateState.Downloading || _state.value is CloudUpdateState.Verifying) {
+            return
+        }
+        lastKnownManifest = manifest
+        _state.value = CloudUpdateState.UpdateAvailable(manifest = manifest)
+    }
+
     suspend fun downloadAndVerifyUpdate(manifest: CloudUpdateManifest): CloudUpdateState =
         withContext(dispatchers.io) {
+            lastKnownManifest = manifest
             if (!CloudUpdateValidator.isValidPublicHttpsUrl(manifest.apkDownloadUrl)) {
                 val err = CloudUpdateState.Error(
                     reason = CloudUpdateErrorReason.INVALID_URL,
@@ -682,7 +758,7 @@ class CloudUpdateManager(
 
             val updatesDir = File(appContext.cacheDir, UPDATES_CACHE_DIR).apply { mkdirs() }
             val targetFile = File(updatesDir, "shareflow-v${manifest.versionCode}.apk")
-            // Path traversal confinement guard
+            val partFile = File(updatesDir, "${targetFile.name}.part")
             val canonicalBase = updatesDir.canonicalPath + File.separator
             if (!targetFile.canonicalPath.startsWith(canonicalBase)) {
                 val err = CloudUpdateState.Error(
@@ -692,13 +768,6 @@ class CloudUpdateManager(
                 )
                 _state.value = err
                 return@withContext err
-            }
-
-            // Prune stale older update APKs while keeping any matching cached version for verification
-            updatesDir.listFiles()?.forEach { old ->
-                if (old.name != targetFile.name) {
-                    runCatching { old.delete() }
-                }
             }
 
             // Avoid re-downloading the exact same version if a verified local copy already exists
@@ -726,35 +795,48 @@ class CloudUpdateManager(
                         return@withContext ready
                     }
                 }
-                // Cached file was stale, corrupted, or failed inspection — discard and re-download cleanly
                 runCatching { targetFile.delete() }
             }
 
+            // Only prune unrelated stale files (keep current .part for resume, and keep verified files until replaced)
+            updatesDir.listFiles()?.forEach { old ->
+                if (old.name != targetFile.name && old.name != partFile.name && old.name.endsWith(".part")) {
+                    runCatching { old.delete() }
+                }
+            }
+
+            val existingPartBytes = if (partFile.exists() && partFile.isFile) partFile.length() else 0L
             _state.value = CloudUpdateState.Downloading(
                 manifest = manifest,
-                downloadedBytes = 0L,
+                downloadedBytes = existingPartBytes,
                 totalBytes = manifest.fileSizeBytes
             )
 
-            val downloadRes = httpClient.downloadApkToFile(
-                apkUrl = manifest.apkDownloadUrl,
-                destinationFile = targetFile,
-                onProgress = { downloaded, total ->
-                    val effectiveTotal = if (total > 0L) total else manifest.fileSizeBytes
-                    _state.value = CloudUpdateState.Downloading(
-                        manifest = manifest,
-                        downloadedBytes = downloaded,
-                        totalBytes = effectiveTotal
-                    )
-                }
-            )
+            val downloadRes = try {
+                httpClient.downloadApkToFile(
+                    apkUrl = manifest.apkDownloadUrl,
+                    destinationFile = targetFile,
+                    onProgress = { downloaded, total ->
+                        val effectiveTotal = if (total > 0L) total else manifest.fileSizeBytes
+                        _state.value = CloudUpdateState.Downloading(
+                            manifest = manifest,
+                            downloadedBytes = downloaded,
+                            totalBytes = effectiveTotal
+                        )
+                    }
+                )
+            } catch (ce: CancellationException) {
+                // Preserve .part file if paused; pauseDownload() sets Paused state cleanly
+                throw ce
+            }
 
             val apkFile = when (downloadRes) {
                 is AppResult.Success -> downloadRes.data
                 is AppResult.Failure -> {
-                    targetFile.delete()
+                    // Never delete a previously verified APK; leave .part intact for seamless retry/resume
+                    val reason = mapDownloadFailureReason(downloadRes.error)
                     val err = CloudUpdateState.Error(
-                        reason = CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED,
+                        reason = reason,
                         detail = downloadRes.error.message,
                         manifest = manifest
                     )
@@ -773,6 +855,7 @@ class CloudUpdateManager(
             }.getOrNull()
             if (hashVerification !is AppResult.Success || !hashVerification.data) {
                 apkFile.delete()
+                partFile.delete()
                 val err = CloudUpdateState.Error(
                     reason = CloudUpdateErrorReason.CHECKSUM_MISMATCH,
                     detail = "SHA-256 verification failed. The downloaded update was discarded for safety.",
@@ -782,7 +865,7 @@ class CloudUpdateManager(
                 return@withContext err
             }
 
-            // 2. Package identity, anti-downgrade, and signing certificate compatibility verification
+            // 2. Mandatory package identity, anti-downgrade, and signing certificate compatibility verification
             when (
                 val inspectRes = packageInspector.inspectUpdateApk(
                     apkFile = apkFile,
@@ -794,6 +877,7 @@ class CloudUpdateManager(
                 is AppResult.Success -> Unit
                 is AppResult.Failure -> {
                     apkFile.delete()
+                    partFile.delete()
                     val msg = inspectRes.error.message
                     val reason = when {
                         msg.contains("signature", ignoreCase = true) ||
@@ -812,6 +896,13 @@ class CloudUpdateManager(
                 }
             }
 
+            // Clean up older verified APKs only AFTER the new APK passed all security checks
+            updatesDir.listFiles()?.forEach { old ->
+                if (old.name != apkFile.name) {
+                    runCatching { old.delete() }
+                }
+            }
+
             val ready = CloudUpdateState.ReadyToInstall(
                 manifest = manifest,
                 verifiedApkPath = apkFile.absolutePath
@@ -819,6 +910,45 @@ class CloudUpdateManager(
             _state.value = ready
             ready
         }
+
+    /**
+     * Transitions an active download to [CloudUpdateState.Paused] while preserving the `.part`
+     * file so calling [downloadAndVerifyUpdate] again resumes via HTTP Range.
+     */
+    fun markDownloadPaused() {
+        val current = _state.value
+        if (current is CloudUpdateState.Downloading) {
+            _state.value = CloudUpdateState.Paused(
+                manifest = current.manifest,
+                downloadedBytes = current.downloadedBytes,
+                totalBytes = current.totalBytes
+            )
+        }
+    }
+
+    /**
+     * Cancels an active/paused download, removes any `.part` temp file, and restores
+     * [CloudUpdateState.UpdateAvailable] without deleting previously verified APKs.
+     */
+    fun cancelActiveDownload() {
+        val manifest = when (val current = _state.value) {
+            is CloudUpdateState.Downloading -> current.manifest
+            is CloudUpdateState.Paused -> current.manifest
+            is CloudUpdateState.Error -> current.manifest
+            else -> lastKnownManifest
+        }
+        val updatesDir = File(appContext.cacheDir, UPDATES_CACHE_DIR)
+        updatesDir.listFiles()?.forEach { file ->
+            if (file.name.endsWith(".part")) {
+                runCatching { file.delete() }
+            }
+        }
+        _state.value = if (manifest != null) {
+            CloudUpdateState.UpdateAvailable(manifest)
+        } else {
+            CloudUpdateState.Idle
+        }
+    }
 
     fun launchVerifiedUpdateInstaller(apkPath: String): UpdateInstallLaunchResult {
         val apkFile = File(apkPath)
@@ -842,11 +972,15 @@ class CloudUpdateManager(
                 "${appContext.packageName}.fileprovider",
                 apkFile
             )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(contentUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val intent = com.example.shareflow.ui.viewer.ApkInstallerIntentHelper
+                .targetExternalSystemInstaller(
+                    appContext,
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(contentUri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
             appContext.startActivity(intent)
             UpdateInstallLaunchResult.LAUNCHED
         }.getOrElse { UpdateInstallLaunchResult.FAILED }
@@ -856,10 +990,61 @@ class CloudUpdateManager(
         _state.value = CloudUpdateState.Idle
     }
 
+    private fun buildReleasesListUrl(baseUrl: String): String {
+        val trimmed = baseUrl.trim().trimEnd('/')
+        return if (trimmed.contains("?")) {
+            trimmed
+        } else {
+            "$trimmed?per_page=15"
+        }
+    }
+
+    private fun mapErrorToReason(error: AppError): CloudUpdateErrorReason {
+        val netEx = error.cause as? UpdateNetworkException
+        return when (netEx?.kind) {
+            UpdateNetworkFailureKind.NO_INTERNET -> CloudUpdateErrorReason.NO_INTERNET
+            UpdateNetworkFailureKind.TIMEOUT -> CloudUpdateErrorReason.TIMEOUT
+            UpdateNetworkFailureKind.SSL_ERROR -> CloudUpdateErrorReason.SSL_ERROR
+            UpdateNetworkFailureKind.RATE_LIMITED -> CloudUpdateErrorReason.RATE_LIMITED
+            UpdateNetworkFailureKind.SERVER_UNAVAILABLE -> CloudUpdateErrorReason.SERVER_UNAVAILABLE
+            UpdateNetworkFailureKind.RELEASE_NOT_FOUND -> CloudUpdateErrorReason.RELEASE_NOT_FOUND
+            UpdateNetworkFailureKind.REDIRECT_BLOCKED -> CloudUpdateErrorReason.INVALID_URL
+            UpdateNetworkFailureKind.DNS_ERROR,
+            UpdateNetworkFailureKind.HTTP_ERROR,
+            UpdateNetworkFailureKind.IO_ERROR,
+            null -> if (error is AppError.Security) {
+                CloudUpdateErrorReason.INVALID_URL
+            } else {
+                CloudUpdateErrorReason.NETWORK_ERROR
+            }
+        }
+    }
+
+    private fun mapDownloadFailureReason(error: AppError): CloudUpdateErrorReason {
+        val netEx = error.cause as? UpdateNetworkException
+        return when (netEx?.kind) {
+            UpdateNetworkFailureKind.NO_INTERNET -> CloudUpdateErrorReason.NO_INTERNET
+            UpdateNetworkFailureKind.TIMEOUT -> CloudUpdateErrorReason.TIMEOUT
+            UpdateNetworkFailureKind.SSL_ERROR -> CloudUpdateErrorReason.SSL_ERROR
+            UpdateNetworkFailureKind.RATE_LIMITED -> CloudUpdateErrorReason.RATE_LIMITED
+            UpdateNetworkFailureKind.REDIRECT_BLOCKED -> CloudUpdateErrorReason.INVALID_URL
+            else -> CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED
+        }
+    }
+
+    private fun mapReasonToServerStatus(reason: CloudUpdateErrorReason): UpdateServerConnectionStatus =
+        when (reason) {
+            CloudUpdateErrorReason.NO_INTERNET -> UpdateServerConnectionStatus.OFFLINE
+            CloudUpdateErrorReason.RATE_LIMITED -> UpdateServerConnectionStatus.RATE_LIMITED
+            else -> UpdateServerConnectionStatus.ERROR
+        }
+
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"
+        const val GITHUB_SOURCE_LABEL = "GitHub Releases (ow7ab/Share-Flow-Releases)"
+        const val OFFICIAL_RELEASES_PAGE_URL = "https://github.com/ow7ab/Share-Flow-Releases/releases"
         const val OFFICIAL_PORTAL_URL = "https://ow7ab.github.io/Share-Flow-Releases/"
-        const val OFFICIAL_PORTAL_HOST = "ow7ab.github.io/Share-Flow-Releases"
+        const val OFFICIAL_PORTAL_HOST = "github.com/ow7ab/Share-Flow-Releases"
         const val DEFAULT_FALLBACK_MANIFEST_URL =
             "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json"
     }

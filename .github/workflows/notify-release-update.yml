@@ -1,0 +1,142 @@
+name: ShareFlow Release Push Notification (FCM)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published GitHub Release tag to notify (e.g. v1.0.19). Leave blank for latest published release."
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run (validate release metadata and FCM payload without sending push)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shareflow-fcm-release-notify-${{ github.event.release.tag_name || github.event.inputs.release_tag || 'latest' }}
+  cancel-in-progress: false
+
+jobs:
+  notify_users:
+    name: Notify Share Flow Users via FCM HTTP v1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve and verify published GitHub Release metadata
+        id: release_meta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.release_tag || '' }}
+          EVENT_TAG: ${{ github.event.release.tag_name || '' }}
+          REPO_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          WORK_DIR="${RUNNER_TEMP}/shareflow-fcm"
+          mkdir -p "$WORK_DIR"
+          RELEASE_JSON="${WORK_DIR}/release.json"
+          MANIFEST_JSON="${WORK_DIR}/version.json"
+
+          TARGET_TAG="${EVENT_TAG:-$INPUT_TAG}"
+          if [ -n "$TARGET_TAG" ]; then
+            gh api "repos/${REPO_SLUG}/releases/tags/${TARGET_TAG}" > "$RELEASE_JSON"
+          else
+            gh api "repos/${REPO_SLUG}/releases/latest" > "$RELEASE_JSON"
+          fi
+
+          RELEASE_JSON="$RELEASE_JSON" MANIFEST_JSON="$MANIFEST_JSON" python3 - <<'PYEOF'
+          import json, os, urllib.request
+
+          with open(os.environ["RELEASE_JSON"], "r", encoding="utf-8") as fh:
+              release = json.load(fh)
+
+          if release.get("draft"):
+              raise SystemExit("Release is still a draft; refusing to notify users.")
+          if release.get("prerelease"):
+              raise SystemExit("Release is marked as pre-release; skipping production FCM push.")
+
+          assets = release.get("assets") or []
+          apk_asset = next((a for a in assets if str(a.get("name", "")).lower().endswith(".apk")), None)
+          if not apk_asset:
+              raise SystemExit("No .apk asset attached to this GitHub Release.")
+
+          version_asset = next((a for a in assets if str(a.get("name", "")).lower() == "version.json"), None)
+          has_manifest = "false"
+          if version_asset and version_asset.get("browser_download_url"):
+              req = urllib.request.Request(
+                  version_asset["browser_download_url"],
+                  headers={"User-Agent": "ShareFlow-FCM-Notifier/1.0"},
+              )
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  manifest_data = resp.read()
+              with open(os.environ["MANIFEST_JSON"], "wb") as out:
+                  out.write(manifest_data)
+              has_manifest = "true"
+
+          sha_asset = next((a for a in assets if str(a.get("name", "")).lower().endswith(".sha256")), None)
+          sidecar_sha = ""
+          if sha_asset and sha_asset.get("browser_download_url"):
+              req = urllib.request.Request(
+                  sha_asset["browser_download_url"],
+                  headers={"User-Agent": "ShareFlow-FCM-Notifier/1.0"},
+              )
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  sidecar_sha = resp.read().decode("utf-8", errors="ignore").strip().split()[0]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"tag={release.get('tag_name', '')}\n")
+              out.write(f"release_json={os.environ['RELEASE_JSON']}\n")
+              out.write(f"has_manifest={has_manifest}\n")
+              out.write(f"manifest_json={os.environ['MANIFEST_JSON']}\n")
+              out.write(f"sidecar_sha={sidecar_sha}\n")
+          PYEOF
+
+      - name: Restore FCM duplicate-prevention marker cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/shareflow-fcm-dedupe
+          key: shareflow-fcm-notified-${{ steps.release_meta.outputs.tag }}
+
+      - name: Send FCM HTTP v1 update push notification (non-fatal)
+        id: fcm_push
+        continue-on-error: true
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          RELEASE_JSON: ${{ steps.release_meta.outputs.release_json }}
+          HAS_MANIFEST: ${{ steps.release_meta.outputs.has_manifest }}
+          MANIFEST_JSON: ${{ steps.release_meta.outputs.manifest_json }}
+          SIDECAR_SHA: ${{ steps.release_meta.outputs.sidecar_sha }}
+          DEDUPE_MARKER: ${{ runner.temp }}/shareflow-fcm-dedupe/notified.json
+        run: |
+          set -euo pipefail
+          ARGS=(
+            "--release-json" "$RELEASE_JSON"
+            "--dedupe-marker-file" "$DEDUPE_MARKER"
+          )
+          if [ "$HAS_MANIFEST" = "true" ]; then
+            ARGS+=("--manifest-json" "$MANIFEST_JSON")
+          fi
+          if [ -n "$SIDECAR_SHA" ]; then
+            ARGS+=("--sha256" "$SIDECAR_SHA")
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS+=("--dry-run")
+          fi
+          node ./scripts/send-fcm-release-notification.mjs "${ARGS[@]}"

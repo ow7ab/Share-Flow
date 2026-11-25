@@ -253,11 +253,13 @@ class ApplicationInstallationManager(
         val uri = runCatching {
             FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", canonicalApk)
         }.getOrNull() ?: return null
-        return Intent(Intent.ACTION_VIEW).apply {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, AndroidAppSharingRepository.APK_MIME_TYPE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        return com.example.shareflow.ui.viewer.ApkInstallerIntentHelper
+            .targetExternalSystemInstaller(appContext, intent)
     }
 
     /**

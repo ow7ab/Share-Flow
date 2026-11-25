@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
@@ -50,12 +52,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -271,15 +275,15 @@ private fun PhotoGridTile(
             )
             AsyncImage(
                 model = photoRequest,
-                contentDescription = photo.displayName,
+                contentDescription = stringResource(R.string.files_category_images),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            // Top selection badge + preview icon
+            // Top selection badge + top-end preview action icon
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(4.dp)
+                    .padding(5.dp)
                     .align(Alignment.TopCenter),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -303,33 +307,46 @@ private fun PhotoGridTile(
                 Surface(
                     onClick = onPreview,
                     shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.55f),
-                    modifier = Modifier.size(26.dp)
+                    color = Color.Black.copy(alpha = 0.52f),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("send_photo_action_${photo.displayName}")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Visibility,
-                            contentDescription = photo.displayName,
+                            contentDescription = stringResource(R.string.files_action_preview),
                             tint = Color.White,
                             modifier = Modifier.size(15.dp)
                         )
                     }
                 }
             }
-            // Bottom size overlay
+            // Bottom subtle gradient overlay displaying ONLY file size
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.66f)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
                 Text(
                     text = ShareFlowFormatters.formatBytes(photo.sizeBytes, locale),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = ShareFlowMonoStyle.copy(
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                        fontWeight = FontWeight.SemiBold
+                    ),
                     color = Color.White,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("send_photo_size_${photo.displayName}")
                 )
             }
         }
@@ -398,14 +415,26 @@ internal fun LazyListScope.sendVideosTabItems(
             )
         }
     } else {
-        items(items = uiState.videos, key = { "vid_${it.uriString}" }) { video ->
-            val selected = video.uriString in uiState.selectedUriSet
-            VideoSelectionCard(
-                video = video,
-                selected = selected,
-                onToggle = { onToggleVideo(video) },
-                onPreview = { onPreviewVideo(video) }
-            )
+        val rows = uiState.videos.chunked(2)
+        items(items = rows, key = { row -> "vid_row_" + row.joinToString("|") { it.uriString } }) { rowVideos ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ShareFlowDesign.spacing.xs)
+            ) {
+                rowVideos.forEach { video ->
+                    val selected = video.uriString in uiState.selectedUriSet
+                    VideoSelectionCard(
+                        video = video,
+                        selected = selected,
+                        onToggle = { onToggleVideo(video) },
+                        onPreview = { onPreviewVideo(video) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (rowVideos.size == 1) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -415,83 +444,126 @@ private fun VideoSelectionCard(
     video: MediaVideoItem,
     selected: Boolean,
     onToggle: () -> Unit,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
+    val cardShape = ShareFlowDesign.shapes.card
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .aspectRatio(1.15f)
+            .clip(cardShape)
             .clickable(onClick = onToggle),
-        shape = ShareFlowDesign.shapes.card,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(
-            width = if (selected) 2.dp else 1.dp,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            width = if (selected) 2.dp else 0.75.dp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 1. Full-bleed video thumbnail
+            val videoRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+                uriString = video.uriString,
+                targetSizePx = 280,
+                isVideo = true
+            )
+            AsyncImage(
+                model = videoRequest,
+                contentDescription = stringResource(R.string.media_video_play_badge_cd),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // 2. Centered translucent play indicator
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.52f))
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(R.string.media_video_play_badge_cd),
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            // 3. Top selection indicator + top-end preview action icon
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp)
+                    .align(Alignment.TopCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.45f),
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (selected) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    onClick = onPreview,
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.52f),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("send_video_action_${video.displayName}")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Visibility,
+                            contentDescription = stringResource(R.string.send_videos_preview_action),
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+            }
+
+            // 4. Bottom subtle gradient displaying ONLY file size (no file name)
             Box(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(ShareFlowDesign.shapes.card)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                contentAlignment = Alignment.Center
-            ) {
-                val videoRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
-                    uriString = video.uriString,
-                    targetSizePx = 180,
-                    isVideo = true
-                )
-                AsyncImage(
-                    model = videoRequest,
-                    contentDescription = video.displayName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Icon(
-                    imageVector = Icons.Filled.PlayCircle,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.68f)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = video.displayName,
-                    style = MaterialTheme.typography.titleSmall,
+                    text = ShareFlowFormatters.formatBytes(video.sizeBytes, locale),
+                    style = ShareFlowMonoStyle.copy(
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color.White,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val durationLabel = if (video.durationMs > 0L) formatDurationMs(video.durationMs) else ""
-                val sizeLabel = ShareFlowFormatters.formatBytes(video.sizeBytes, locale)
-                Text(
-                    text = listOf(durationLabel, sizeLabel, video.folderName)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" • "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("send_video_size_${video.displayName}")
                 )
             }
-            TextButton(onClick = onPreview) {
-                Text(stringResource(R.string.send_videos_preview_action))
-            }
-            Checkbox(
-                checked = selected,
-                onCheckedChange = { onToggle() },
-                modifier = Modifier.minimumInteractiveComponentSize()
-            )
         }
     }
 }

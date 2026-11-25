@@ -138,7 +138,9 @@ import androidx.compose.ui.zIndex
 @Composable
 fun ShareFlowApp(
     navController: NavHostController = rememberNavController(),
-    initialSettings: AppSettings? = null
+    initialSettings: AppSettings? = null,
+    pendingExternalRoute: String? = null,
+    onConsumeExternalRoute: () -> Unit = {}
 ) {
     val container = LocalAppContainer.current
     val resolvedInitialSettings = remember(container, initialSettings) {
@@ -269,12 +271,31 @@ fun ShareFlowApp(
                     mutableStateOf<Int?>(null)
                 }
 
+                LaunchedEffect(pendingExternalRoute) {
+                    val target = pendingExternalRoute ?: return@LaunchedEffect
+                    runCatching {
+                        navController.navigate(target) {
+                            launchSingleTop = true
+                        }
+                    }
+                    onConsumeExternalRoute()
+                }
+
                 if (backgroundServicesReady) {
                     ShareFlowActiveSessionBridge(
                         expandedUpdateVersionCode = expandedUpdateVersionCode,
                         onExpandedUpdateVersionCodeChange = { expandedUpdateVersionCode = it },
                         onOptionalBannerUpdateChanged = { bannerUpdate = it },
-                        onActiveTransferCountChanged = { count -> activeTransferCount = count }
+                        onActiveTransferCountChanged = { count -> activeTransferCount = count },
+                        onOpenUpdatesScreen = {
+                            expandedUpdateVersionCode = null
+                            bannerUpdate = null
+                            runCatching {
+                                navController.navigate(ShareFlowRoutes.UPDATES) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -458,7 +479,9 @@ fun ShareFlowApp(
                             onDismiss = {
                                 expandedUpdateVersionCode = null
                                 bannerUpdate = null
-                                container.updateManager.dismissOptionalUpdate()
+                                approvalScope.launch {
+                                    container.updateManager.snoozeOptionalUpdate()
+                                }
                             },
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
@@ -476,7 +499,8 @@ private fun ShareFlowActiveSessionBridge(
     expandedUpdateVersionCode: Int?,
     onExpandedUpdateVersionCodeChange: (Int?) -> Unit,
     onOptionalBannerUpdateChanged: (com.example.shareflow.data.update.UpdateDetails?) -> Unit,
-    onActiveTransferCountChanged: (Int) -> Unit
+    onActiveTransferCountChanged: (Int) -> Unit,
+    onOpenUpdatesScreen: () -> Unit = {}
 ) {
     val container = LocalAppContainer.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -520,9 +544,21 @@ private fun ShareFlowActiveSessionBridge(
         }
     }
 
-    // Background update check via OkHttp UpdateManager strictly after Frame 1 on IO dispatcher,
-    // respecting the persisted "Auto-check for updates on launch" user preference.
+    val foregroundPushVersion by container.updateManager.foregroundPushVersionCode
+        .collectAsStateWithLifecycle()
+
+    LaunchedEffect(foregroundPushVersion) {
+        val versionCode = foregroundPushVersion ?: return@LaunchedEffect
+        onExpandedUpdateVersionCodeChange(versionCode)
+        container.updateManager.consumeForegroundPushTrigger()
+    }
+
+    // Automatic login-free FCM topic subscription (`share_flow_updates`) + periodic/launch update check
     LaunchedEffect(container) {
+        withContext(container.dispatchers.io) {
+            runCatching { container.fcmUpdateTopicCoordinator.ensureSubscribed() }
+                .onFailure { if (it is CancellationException) throw it }
+        }
         val autoCheckEnabled = runCatching {
             container.settingsRepository.settings.first().autoCheckUpdatesOnLaunch
         }.getOrElse { error ->
@@ -530,7 +566,7 @@ private fun ShareFlowActiveSessionBridge(
             true
         }
         if (autoCheckEnabled) {
-            runCatching { container.updateManager.checkForUpdate() }
+            runCatching { container.updateManager.checkForUpdateIfDue() }
                 .onFailure { if (it is CancellationException) throw it }
         }
     }
@@ -568,11 +604,17 @@ private fun ShareFlowActiveSessionBridge(
                         }.onFailure { if (it is CancellationException) throw it }
                     }
                 },
+                onPauseDownload = {
+                    container.cloudUpdateManager.markDownloadPaused()
+                    activeUpdateDownloadJob?.cancel()
+                    activeUpdateDownloadJob = null
+                },
                 onCancelDownload = {
                     activeUpdateDownloadJob?.cancel()
                     activeUpdateDownloadJob = null
-                    container.cloudUpdateManager.resetState()
+                    container.cloudUpdateManager.cancelActiveDownload()
                 },
+                onViewDetails = onOpenUpdatesScreen,
                 onInstallVerifiedApk = { apkPath ->
                     when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
                         com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
@@ -584,7 +626,9 @@ private fun ShareFlowActiveSessionBridge(
                 },
                 onDismiss = {
                     onExpandedUpdateVersionCodeChange(null)
-                    container.updateManager.dismissOptionalUpdate()
+                    approvalScope.launch {
+                        container.updateManager.snoozeOptionalUpdate()
+                    }
                 }
             )
         }
@@ -727,8 +771,14 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.SETTINGS) {
             SettingsScreen(
                 onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
+                onOpenUpdates = { navigateToRoute(ShareFlowRoutes.UPDATES) },
                 topBarClearance = topLevelStatusBarClearance,
                 bottomBarClearance = topLevelBottomBarClearance
+            )
+        }
+        composable(route = ShareFlowRoutes.UPDATES) {
+            com.example.shareflow.ui.update.UpdatesScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

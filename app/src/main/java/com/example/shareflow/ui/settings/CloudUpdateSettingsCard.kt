@@ -16,9 +16,12 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VerifiedUser
+import com.example.shareflow.ui.update.cloudUpdateErrorReasonStringRes
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,8 +63,10 @@ fun CloudUpdateSettingsCard(
     updateState: CloudUpdateState,
     onCheckForUpdates: () -> Unit,
     onDownloadUpdate: (CloudUpdateManifest) -> Unit,
+    onPauseDownload: () -> Unit = {},
     onCancelDownload: () -> Unit,
     onInstallVerifiedUpdate: (String) -> Unit,
+    onOpenUpdatesCenter: (() -> Unit)? = null,
     autoCheckUpdatesOnLaunch: Boolean = true,
     onAutoCheckUpdatesOnLaunchChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -71,8 +76,7 @@ fun CloudUpdateSettingsCard(
     val semantic = ShareFlowDesign.semanticColors
     val locale = ShareFlowDesign.locale
     val isArabicLocale = locale.language.equals("ar", ignoreCase = true)
-    val officialPortalUrl = BuildConfig.CLOUD_UPDATE_PORTAL_URL
-        .ifBlank { CloudUpdateManager.OFFICIAL_PORTAL_URL }
+    val officialPortalUrl = CloudUpdateManager.OFFICIAL_RELEASES_PAGE_URL
 
     fun openSafeHttpsWebsite(url: String?) {
         val candidate = url?.trim().orEmpty()
@@ -241,6 +245,18 @@ fun CloudUpdateSettingsCard(
                     .fillMaxWidth()
                     .testTag("settings_check_updates_button")
             )
+
+            if (onOpenUpdatesCenter != null) {
+                SecondaryActionButton(
+                    text = stringResource(R.string.updates_open_center_action),
+                    onClick = onOpenUpdatesCenter,
+                    outlined = false,
+                    leadingIcon = Icons.Filled.SystemUpdate,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_open_updates_center_button")
+                )
+            }
 
             SecondaryActionButton(
                 text = stringResource(R.string.settings_update_open_portal_action),
@@ -466,16 +482,90 @@ fun CloudUpdateSettingsCard(
                             } else {
                                 ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             }
-                            SecondaryActionButton(
-                                text = stringResource(R.string.settings_update_cancel_download_action),
-                                onClick = onCancelDownload,
-                                outlined = true,
-                                isDestructive = true,
-                                leadingIcon = Icons.Filled.Close,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("settings_cancel_update_download_button")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                            ) {
+                                SecondaryActionButton(
+                                    text = stringResource(R.string.updates_pause_download_action),
+                                    onClick = onPauseDownload,
+                                    outlined = true,
+                                    leadingIcon = Icons.Filled.Pause,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("settings_pause_update_download_button")
+                                )
+                                SecondaryActionButton(
+                                    text = stringResource(R.string.settings_update_cancel_download_action),
+                                    onClick = onCancelDownload,
+                                    outlined = true,
+                                    isDestructive = true,
+                                    leadingIcon = Icons.Filled.Close,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("settings_cancel_update_download_button")
+                                )
+                            }
+                        }
+                    }
+                }
+
+                is CloudUpdateState.Paused -> {
+                    val percent = (updateState.progress * 100f).roundToInt().coerceIn(0, 100)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_update_paused_card"),
+                        shape = ShareFlowDesign.shapes.card,
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.updates_paused_progress_format,
+                                    percent,
+                                    ShareFlowFormatters.formatBytes(updateState.downloadedBytes, locale),
+                                    ShareFlowFormatters.formatBytes(
+                                        updateState.totalBytes.coerceAtLeast(updateState.downloadedBytes),
+                                        locale
+                                    )
+                                ),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            ShareFlowSignatureProgressBar(
+                                progress = updateState.progress,
+                                modifier = Modifier.fillMaxWidth(),
+                                height = 8.dp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                            ) {
+                                PrimaryActionButton(
+                                    text = stringResource(R.string.updates_resume_download_action),
+                                    onClick = { onDownloadUpdate(updateState.manifest) },
+                                    leadingIcon = Icons.Filled.PlayArrow,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("settings_resume_update_download_button")
+                                )
+                                SecondaryActionButton(
+                                    text = stringResource(R.string.settings_update_cancel_download_action),
+                                    onClick = onCancelDownload,
+                                    outlined = true,
+                                    isDestructive = true,
+                                    leadingIcon = Icons.Filled.Close,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("settings_cancel_paused_download_button")
+                                )
+                            }
                         }
                     }
                 }
@@ -551,7 +641,7 @@ fun CloudUpdateSettingsCard(
                 }
 
                 is CloudUpdateState.Error -> {
-                    val localizedMsg = stringResource(cloudUpdateErrorStringRes(updateState.reason))
+                    val localizedMsg = stringResource(cloudUpdateErrorReasonStringRes(updateState.reason))
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -602,18 +692,4 @@ fun CloudUpdateSettingsCard(
             }
         }
     }
-}
-
-private fun cloudUpdateErrorStringRes(reason: CloudUpdateErrorReason): Int = when (reason) {
-    CloudUpdateErrorReason.INVALID_URL -> R.string.settings_update_err_invalid_url
-    CloudUpdateErrorReason.NETWORK_ERROR -> R.string.settings_update_err_network
-    CloudUpdateErrorReason.INVALID_MANIFEST -> R.string.settings_update_err_manifest
-    CloudUpdateErrorReason.INCOMPATIBLE_DEVICE -> R.string.settings_update_err_incompatible
-    CloudUpdateErrorReason.CHECKSUM_MISMATCH -> R.string.settings_update_err_checksum
-    CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH -> R.string.settings_update_err_package_id
-    CloudUpdateErrorReason.SIGNATURE_MISMATCH -> R.string.settings_update_err_signature
-    CloudUpdateErrorReason.DOWNGRADE_BLOCKED -> R.string.settings_update_err_downgrade
-    CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED -> R.string.settings_update_err_download
-    CloudUpdateErrorReason.INSTALL_PERMISSION_REQUIRED -> R.string.settings_feedback_update_install_perm
-    CloudUpdateErrorReason.INSTALL_LAUNCH_FAILED -> R.string.settings_feedback_update_install_failed
 }

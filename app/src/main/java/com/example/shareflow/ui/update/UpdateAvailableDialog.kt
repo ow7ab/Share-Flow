@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -37,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.BuildConfig
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.PrimaryActionButton
@@ -50,20 +53,21 @@ import com.example.shareflow.data.update.UpdateDetails
 import kotlin.math.roundToInt
 
 /**
- * Material 3 dialog triggered when [com.example.shareflow.data.update.UpdateManager] detects a newer
- * ShareFlow release. Displays `versionName`, `releaseNotes`, and a primary "Download Now" button
- * that starts the verified APK download task.
+ * Share Flow Update Details Dialog shown automatically on foreground FCM release pushes,
+ * mandatory releases, or tapping the top update banner.
  *
- * Strictly non-dismissible (back press & outside taps disabled, "Later" hidden) when
- * [UpdateDetails.mandatory] is `true`.
+ * Displays Share Flow logo, current -> new version, publish date, APK size, release notes,
+ * "Update Now" (with live progress + Pause/Resume), "View Update Details", and "Later" (snooze).
  */
 @Composable
 fun UpdateAvailableDialog(
     update: UpdateDetails,
     downloadState: CloudUpdateState = CloudUpdateState.Idle,
     onDownloadNow: (UpdateDetails) -> Unit,
+    onPauseDownload: () -> Unit = {},
     onInstallVerifiedApk: (String) -> Unit = {},
     onCancelDownload: () -> Unit = {},
+    onViewDetails: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -87,12 +91,14 @@ fun UpdateAvailableDialog(
         properties = DialogProperties(
             dismissOnBackPress = canDismiss,
             dismissOnClickOutside = canDismiss,
-            usePlatformDefaultWidth = true
+            usePlatformDefaultWidth = true,
+            decorFitsSystemWindows = false
         )
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .safeDrawingPadding()
                 .testTag("update_available_dialog"),
             shape = ShareFlowDesign.shapes.dialog,
             color = glass.overlayBackground,
@@ -103,10 +109,11 @@ fun UpdateAvailableDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(spacing.md)
+                verticalArrangement = Arrangement.spacedBy(spacing.sm)
             ) {
-                // Header with new ShareFlow logo + title + versionName badge
+                // Header with Share Flow logo + title + version transition + metadata
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -148,6 +155,29 @@ fun UpdateAvailableDialog(
                     }
                 }
 
+                // Current -> New version + Published Date
+                Text(
+                    text = stringResource(
+                        R.string.updates_version_transition_format,
+                        BuildConfig.VERSION_NAME,
+                        update.versionName
+                    ),
+                    style = ShareFlowMonoStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag("update_dialog_version_transition")
+                )
+                if (update.publishedAt.isNotBlank()) {
+                    Text(
+                        text = stringResource(
+                            R.string.updates_published_date_format,
+                            update.publishedAt.take(10)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("update_dialog_published_date")
+                    )
+                }
+
                 if (update.mandatory) {
                     StatusPill(
                         label = stringResource(R.string.update_dialog_mandatory_badge),
@@ -169,7 +199,7 @@ fun UpdateAvailableDialog(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 180.dp),
+                            .heightIn(max = 170.dp),
                         shape = ShareFlowDesign.shapes.input,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -187,7 +217,7 @@ fun UpdateAvailableDialog(
                     }
                 }
 
-                // Live Download / Verification / Ready / Error Controls
+                // Live Download / Paused / Verification / Ready / Error Controls
                 when (downloadState) {
                     is CloudUpdateState.Downloading -> {
                         val percent = (downloadState.progress * 100f).roundToInt().coerceIn(0, 100)
@@ -215,18 +245,69 @@ fun UpdateAvailableDialog(
                             } else {
                                 ShareFlowSignatureProgressBar(modifier = Modifier.fillMaxWidth())
                             }
-                            if (!update.mandatory) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                            ) {
                                 SecondaryActionButton(
-                                    text = stringResource(R.string.settings_update_cancel_download_action),
-                                    onClick = onCancelDownload,
+                                    text = stringResource(R.string.updates_pause_download_action),
+                                    onClick = onPauseDownload,
                                     outlined = true,
-                                    isDestructive = true,
-                                    leadingIcon = Icons.Filled.Close,
+                                    leadingIcon = Icons.Filled.Pause,
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("update_dialog_cancel_download_button")
+                                        .weight(1f)
+                                        .testTag("update_dialog_pause_download_button")
                                 )
+                                if (!update.mandatory) {
+                                    SecondaryActionButton(
+                                        text = stringResource(R.string.settings_update_cancel_download_action),
+                                        onClick = onCancelDownload,
+                                        outlined = true,
+                                        isDestructive = true,
+                                        leadingIcon = Icons.Filled.Close,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("update_dialog_cancel_download_button")
+                                    )
+                                }
                             }
+                        }
+                    }
+
+                    is CloudUpdateState.Paused -> {
+                        val percent = (downloadState.progress * 100f).roundToInt().coerceIn(0, 100)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("update_dialog_paused_section"),
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.updates_paused_progress_format,
+                                    percent,
+                                    ShareFlowFormatters.formatBytes(downloadState.downloadedBytes, locale),
+                                    ShareFlowFormatters.formatBytes(
+                                        downloadState.totalBytes.coerceAtLeast(downloadState.downloadedBytes),
+                                        locale
+                                    )
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            ShareFlowSignatureProgressBar(
+                                progress = downloadState.progress,
+                                modifier = Modifier.fillMaxWidth(),
+                                height = 8.dp
+                            )
+                            PrimaryActionButton(
+                                text = stringResource(R.string.updates_resume_download_action),
+                                onClick = { onDownloadNow(update) },
+                                leadingIcon = Icons.Filled.PlayArrow,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("update_dialog_resume_button")
+                            )
                         }
                     }
 
@@ -286,6 +367,7 @@ fun UpdateAvailableDialog(
                     }
 
                     is CloudUpdateState.Error -> {
+                        val localizedErr = stringResource(cloudUpdateErrorReasonStringRes(downloadState.reason))
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -303,13 +385,13 @@ fun UpdateAvailableDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = downloadState.detail,
+                                    text = localizedErr,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
                             PrimaryActionButton(
-                                text = stringResource(R.string.update_dialog_download_now),
+                                text = stringResource(R.string.updates_dialog_update_now_action),
                                 onClick = { onDownloadNow(update) },
                                 leadingIcon = Icons.Filled.Refresh,
                                 modifier = Modifier
@@ -321,7 +403,7 @@ fun UpdateAvailableDialog(
 
                     else -> {
                         PrimaryActionButton(
-                            text = stringResource(R.string.update_dialog_download_now),
+                            text = stringResource(R.string.updates_dialog_update_now_action),
                             onClick = { onDownloadNow(update) },
                             leadingIcon = Icons.Filled.CloudDownload,
                             modifier = Modifier
@@ -331,7 +413,20 @@ fun UpdateAvailableDialog(
                     }
                 }
 
-                // Dismiss button is ONLY shown when mandatory == false
+                // "View Update Details" button opens the dedicated Updates Center page
+                if (onViewDetails != null && !isDownloadingOrVerifying) {
+                    SecondaryActionButton(
+                        text = stringResource(R.string.updates_dialog_view_details_action),
+                        onClick = onViewDetails,
+                        outlined = true,
+                        leadingIcon = Icons.Filled.Info,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("update_dialog_view_details_button")
+                    )
+                }
+
+                // Dismiss ("Later") button is ONLY shown when mandatory == false
                 if (!update.mandatory && !isDownloadingOrVerifying) {
                     SecondaryActionButton(
                         text = stringResource(R.string.update_dialog_later_action),

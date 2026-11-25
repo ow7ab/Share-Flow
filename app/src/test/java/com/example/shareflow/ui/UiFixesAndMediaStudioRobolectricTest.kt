@@ -1,6 +1,10 @@
 package com.example.shareflow.ui
 
 import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,11 +48,21 @@ import com.example.shareflow.ui.files.FileManagerViewModel
 import com.example.shareflow.ui.files.FileViewLayout
 import com.example.shareflow.ui.home.HomeDashboardContent
 import com.example.shareflow.ui.home.HomeUiState
+import com.example.BuildConfig
+import com.example.shareflow.ui.media.ImageGalleryScreen
+import com.example.shareflow.ui.media.ImageGalleryViewModel
 import com.example.shareflow.ui.media.MediaStudioContent
 import com.example.shareflow.ui.media.MediaStudioTab
 import com.example.shareflow.ui.media.MediaStudioUiState
 import com.example.shareflow.ui.media.MediaStudioViewModel
+import com.example.shareflow.ui.viewer.ApkInstallIntentActivity
+import com.example.shareflow.ui.viewer.ApkInstallIntentScreen
 import com.example.shareflow.ui.viewer.CustomFileViewerDialog
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +79,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -563,5 +578,109 @@ class UiFixesAndMediaStudioRobolectricTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun `ImageGalleryScreen cards render full-bleed thumbnails with size only at bottom and top action icon without file name`() {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val appContainer = DefaultAppContainer(context)
+        val tempDir = File(context.cacheDir, "gallery_card_spec_${UUID.randomUUID()}").apply { mkdirs() }
+        val pngFile = File(tempDir, "secret_gallery_filename_1018.png")
+        try {
+            val bmp = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+            bmp.eraseColor(Color.RED)
+            FileOutputStream(pngFile).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bmp.recycle()
+
+            val viewModel = ImageGalleryViewModel(appContainer.mediaCenterRepository)
+            viewModel.addPickedUris(listOf(Uri.fromFile(pngFile).toString()))
+
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalAppContainer provides appContainer) {
+                    ShareFlowTheme {
+                        ImageGalleryScreen(onNavigateBack = {}, providedViewModel = viewModel)
+                    }
+                }
+            }
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule.onAllNodesWithTag("gallery_grid_item_0", useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+
+            // Full-bleed spec: NO file name text, size at bottom, top-end action icon
+            assertTrue(
+                "Gallery card must hide file name completely",
+                composeTestRule.onAllNodesWithText("secret_gallery_filename_1018.png", useUnmergedTree = true)
+                    .fetchSemanticsNodes().isEmpty()
+            )
+            composeTestRule.onNodeWithTag("gallery_tile_size_0", useUnmergedTree = true).assertIsDisplayed()
+            composeTestRule.onNodeWithTag("gallery_tile_action_0", useUnmergedTree = true).assertIsDisplayed()
+        } finally {
+            runCatching { appContainer.database.close() }
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `ApkInstallIntentActivity configures edge-to-edge transparent system bars and exposes inset-safe installer dock`() {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val tempDir = File(context.cacheDir, "apk_intent_test_${UUID.randomUUID()}").apply { mkdirs() }
+        val sampleApk = File(tempDir, "demo_release.apk")
+        try {
+            // Create a valid minimal APK ZIP containing AndroidManifest.xml
+            ZipOutputStream(FileOutputStream(sampleApk)).use { zos ->
+                zos.putNextEntry(ZipEntry("AndroidManifest.xml"))
+                zos.write("manifest-placeholder".toByteArray())
+                zos.closeEntry()
+            }
+
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setClass(context, ApkInstallIntentActivity::class.java)
+                setDataAndType(Uri.fromFile(sampleApk), "application/vnd.android.package-archive")
+            }
+
+            val controller = Robolectric.buildActivity(ApkInstallIntentActivity::class.java, viewIntent).setup()
+            val activity = controller.get()
+            @Suppress("DEPRECATION")
+            assertEquals(Color.TRANSPARENT, activity.window.statusBarColor)
+            @Suppress("DEPRECATION")
+            assertEquals(Color.TRANSPARENT, activity.window.navigationBarColor)
+            controller.pause().stop().destroy()
+
+            val appContainer = DefaultAppContainer(context)
+            try {
+                composeTestRule.setContent {
+                    CompositionLocalProvider(LocalAppContainer provides appContainer) {
+                        ShareFlowTheme {
+                            ApkInstallIntentScreen(
+                                incomingUri = Uri.fromFile(sampleApk),
+                                onClose = {}
+                            )
+                        }
+                    }
+                }
+
+                composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                    composeTestRule.onAllNodesWithTag("apk_intent_metadata_card", useUnmergedTree = true)
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
+                composeTestRule.onNodeWithTag("apk_intent_receiver_screen").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("apk_intent_bottom_dock").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("apk_intent_install_button").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("apk_intent_system_installer_button").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("apk_intent_close_button").assertIsDisplayed()
+            } finally {
+                runCatching { appContainer.database.close() }
+            }
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `application BuildConfig version is updated to 1_0_18`() {
+        assertEquals("1.0.18", BuildConfig.VERSION_NAME)
+        assertEquals(19, BuildConfig.VERSION_CODE)
     }
 }

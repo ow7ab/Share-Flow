@@ -431,10 +431,16 @@ class SettingsViewModel(
         }
     }
 
+    fun pauseCloudUpdateDownload() {
+        cloudUpdateManager?.markDownloadPaused()
+        activeUpdateJob?.cancel()
+        activeUpdateJob = null
+    }
+
     fun cancelCloudUpdateDownload() {
         activeUpdateJob?.cancel()
         activeUpdateJob = null
-        cloudUpdateManager?.resetState()
+        cloudUpdateManager?.cancelActiveDownload()
     }
 
     fun installVerifiedCloudUpdate(apkPath: String, onNeedInstallPermission: () -> Unit) {

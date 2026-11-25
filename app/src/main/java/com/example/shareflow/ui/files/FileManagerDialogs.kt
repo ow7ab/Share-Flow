@@ -150,6 +150,13 @@ object FileSharesheetHelper {
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, effectiveMime)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }.let { raw ->
+            if (isApk) {
+                com.example.shareflow.ui.viewer.ApkInstallerIntentHelper
+                    .targetExternalSystemInstaller(context, raw)
+            } else {
+                raw
+            }
         }
         return runCatching {
             context.startActivity(intent)

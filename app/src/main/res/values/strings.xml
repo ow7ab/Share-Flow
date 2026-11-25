@@ -1329,6 +1329,78 @@
     <string name="media_studio_grant_folder">Grant Folder Access</string>
     <string name="media_studio_import_media">Import Media</string>
     <string name="media_video_play_badge_cd">Video</string>
+
+    <!-- Edge-to-Edge APK Launch Intent Receiver -->
+    <string name="apk_intent_title">APK Installer</string>
+    <string name="apk_intent_inspecting">Inspecting APK package…</string>
+    <string name="apk_intent_ready_badge">Package Ready to Install</string>
+    <string name="apk_intent_update_badge">Updates Installed App</string>
+    <string name="apk_intent_package_label">Package ID</string>
+    <string name="apk_intent_version_label">Version</string>
+    <string name="apk_intent_size_label">File Size</string>
+    <string name="apk_intent_sha256_label">SHA-256</string>
+    <string name="apk_intent_security_note">Installation always requires your explicit confirmation in Android\'s official Package Installer.</string>
+    <string name="apk_intent_invalid_uri">Unable to open this APK file. Make sure the file exists and is a valid Android application package.</string>
+    <string name="apk_intent_permission_needed">Allow ShareFlow to install apps in Android Settings to proceed with installation.</string>
+    <string name="apk_intent_open_settings">Allow in Settings</string>
+    <string name="apk_intent_staging">Staging APK package… %1$d%%</string>
+    <string name="apk_intent_awaiting_confirm">Confirm installation in the Android system dialog…</string>
+    <string name="apk_intent_installed_success">Application installed successfully.</string>
+    <string name="apk_intent_open_app">Open App</string>
+    <string name="apk_intent_system_fallback_failed">No external Android package installer was found on this device.</string>
+
+    <!-- Smart In-App Update System, Updates Center & FCM Push Notifications -->
+    <string name="updates_screen_title">App Updates</string>
+    <string name="updates_open_center_action">Open Updates Center &amp; Release History</string>
+    <string name="updates_status_up_to_date">Up to Date</string>
+    <string name="updates_status_available">Update Available</string>
+    <string name="updates_status_checking">Checking…</string>
+    <string name="updates_status_downloading">Downloading…</string>
+    <string name="updates_status_paused">Paused</string>
+    <string name="updates_status_verifying">Verifying…</string>
+    <string name="updates_status_ready">Ready to Install</string>
+    <string name="updates_status_error">Attention Needed</string>
+    <string name="updates_server_label">Update Server</string>
+    <string name="updates_server_connected">Connected to GitHub Releases</string>
+    <string name="updates_server_offline">Offline</string>
+    <string name="updates_server_rate_limited">Rate Limited</string>
+    <string name="updates_server_checking">Connecting…</string>
+    <string name="updates_server_error">Connection Issue</string>
+    <string name="updates_server_unknown">Not checked yet</string>
+    <string name="updates_last_checked_label">Last Checked</string>
+    <string name="updates_last_checked_never">Not checked yet</string>
+    <string name="updates_push_status_label">Instant Release Alerts</string>
+    <string name="updates_push_status_subscribed">Active (share_flow_updates)</string>
+    <string name="updates_push_status_not_configured">Waiting for Firebase setup</string>
+    <string name="updates_push_status_failed">Retry on next launch</string>
+    <string name="updates_push_status_unknown">Initializing…</string>
+    <string name="updates_version_transition_format">Current v%1$s  →  New v%2$s</string>
+    <string name="updates_published_date_format">Published: %1$s</string>
+    <string name="updates_apk_size_format">Size: %1$s</string>
+    <string name="updates_sha256_verified_badge">HTTPS + SHA-256 + Signature Verified</string>
+    <string name="updates_pause_download_action">Pause</string>
+    <string name="updates_resume_download_action">Resume Download</string>
+    <string name="updates_paused_progress_format">Download paused — %1$d%% (%2$s / %3$s)</string>
+    <string name="updates_downloading_total_format">Downloading… %1$d%% (%2$s / %3$s)</string>
+    <string name="updates_history_section_title">Previous Releases</string>
+    <string name="updates_history_empty">Tap Check for Updates to load the official Share Flow release history from GitHub Releases.</string>
+    <string name="updates_history_prerelease_badge">Pre-release</string>
+    <string name="updates_history_stable_badge">Stable</string>
+    <string name="updates_history_no_notes">General stability and performance improvements.</string>
+    <string name="updates_dialog_view_details_action">View Update Details</string>
+    <string name="updates_dialog_update_now_action">Update Now</string>
+    <string name="updates_notification_channel_name">Share Flow Updates</string>
+    <string name="updates_notification_channel_desc">Instant alerts whenever a new verified Share Flow release is published on GitHub Releases.</string>
+    <string name="updates_push_default_title">New Update Available | Share Flow</string>
+    <string name="updates_push_default_body">Share Flow v%1$s is now available. Update your app to enjoy new features and improvements.</string>
+    <string name="updates_err_no_internet">No active internet connection. Connect to Wi-Fi or mobile data and try again.</string>
+    <string name="updates_err_timeout">Connection to GitHub Releases timed out. Please check your signal and retry.</string>
+    <string name="updates_err_ssl">Secure TLS/SSL verification failed. Check your device date &amp; time or network proxy.</string>
+    <string name="updates_err_rate_limited">GitHub Releases API rate limit reached temporarily. Please wait a few minutes and retry.</string>
+    <string name="updates_err_server_unavailable">GitHub Releases servers are temporarily unavailable. Please try again shortly.</string>
+    <string name="updates_err_release_not_found">No official release package was found on GitHub Releases yet.</string>
+    <string name="updates_allow_notifications_action">Enable Push Alerts</string>
 </resources>
+
 
 

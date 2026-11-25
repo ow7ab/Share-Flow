@@ -66,6 +66,7 @@ object ShareFlowRoutes {
     const val FAVORITES = "favorites"
     const val QR_SCANNER = "qr_scanner"
     const val CONNECTION_DIAGNOSTICS = "connection_diagnostics"
+    const val UPDATES = "updates"
 
     const val FILE_CATEGORY_PATTERN = "file_category/{category}"
     const val MODULE_DETAIL_PATTERN = "module_foundation/{moduleId}"

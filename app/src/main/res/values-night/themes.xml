@@ -2,6 +2,10 @@
 <resources>
     <style name="Theme.ShareFlow" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">#0D1220</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
     <style name="Theme.ShareFlow.Splash" parent="Theme.SplashScreen">

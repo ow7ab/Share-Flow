@@ -79,11 +79,32 @@
             android:configChanges="uiMode"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.ShareFlow.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="OPEN_SHAREFLOW_UPDATES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".shareflow.ui.viewer.ApkInstallIntentActivity"
+            android:configChanges="uiMode"
+            android:exported="true"
+            android:label="@string/apk_intent_title"
+            android:theme="@style/Theme.ShareFlow">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/vnd.android.package-archive" />
             </intent-filter>
         </activity>
 
@@ -96,6 +117,24 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/shareflow_file_paths" />
         </provider>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="share_flow_updates_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification_update" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/shareflow_brand_ruby" />
+
+        <service
+            android:name=".shareflow.data.update.fcm.ShareFlowFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".shareflow.media.music.ShareFlowMediaSessionService"

@@ -13,20 +13,22 @@ sealed interface AppResult<out T> {
  */
 sealed interface AppError {
     val message: String
+    val cause: Throwable?
+        get() = null
 
     data class Validation(override val message: String) : AppError
     data class NotFound(override val message: String) : AppError
-    data class PermissionDenied(override val message: String, val cause: Throwable? = null) : AppError
-    data class Storage(override val message: String, val cause: Throwable? = null) : AppError
-    data class Security(override val message: String, val cause: Throwable? = null) : AppError
-    data class Network(override val message: String, val cause: Throwable? = null) : AppError
+    data class PermissionDenied(override val message: String, override val cause: Throwable? = null) : AppError
+    data class Storage(override val message: String, override val cause: Throwable? = null) : AppError
+    data class Security(override val message: String, override val cause: Throwable? = null) : AppError
+    data class Network(override val message: String, override val cause: Throwable? = null) : AppError
     data class IntegrityMismatch(
         override val message: String,
         val expectedHash: String,
         val actualHash: String
     ) : AppError
     data class NotSupported(override val message: String) : AppError
-    data class Unexpected(override val message: String, val cause: Throwable? = null) : AppError
+    data class Unexpected(override val message: String, override val cause: Throwable? = null) : AppError
 }
 
 inline fun <T, R> AppResult<T>.map(transform: (T) -> R): AppResult<R> = when (this) {
