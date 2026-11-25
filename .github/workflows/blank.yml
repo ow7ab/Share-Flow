@@ -207,8 +207,8 @@ jobs:
             PKG_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)
             VERSION_CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" | head -n 1)
             VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n 1)
-            if [ "$PKG_NAME" != "com.aistudio.shareflow.kxrvnm" ]; then
-              echo "::error::Unexpected package name '$PKG_NAME'. Expected 'com.aistudio.shareflow.kxrvnm'."
+            if [ "$PKG_NAME" != "com.shareflow" ]; then
+              echo "::error::Unexpected package name '$PKG_NAME'. Expected 'com.shareflow'."
               exit 1
             fi
             echo "Verified package=${PKG_NAME} versionName=${VERSION_NAME} versionCode=${VERSION_CODE}"

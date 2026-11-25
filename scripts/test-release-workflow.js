@@ -182,7 +182,7 @@ test("release_helpers validate-prebuild blocks equal/downgraded versionCode, tag
     const badGradle = path.join(tmp, "bad.build.gradle.kts");
     fs.writeFileSync(
       badGradle,
-      gradleText.replace("com.aistudio.shareflow.kxrvnm", "com.evil.otherapp")
+      gradleText.replace("com.shareflow", "com.evil.otherapp")
     );
     assert.throws(() =>
       runHelper([

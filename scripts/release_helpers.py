@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-EXPECTED_APPLICATION_ID = "com.aistudio.shareflow.kxrvnm"
+EXPECTED_APPLICATION_ID = "com.shareflow"
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 TAG_RE = re.compile(r"^v([0-9]+\.[0-9]+\.[0-9]+)$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")

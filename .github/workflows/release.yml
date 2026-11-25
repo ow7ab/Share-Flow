@@ -562,8 +562,8 @@ jobs:
           MIN_SDK=$(printf '%s\n' "$BADGING" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)
           HAS_LAUNCHER=$(printf '%s\n' "$BADGING" | grep -c "^launchable-activity:" || true)
 
-          if [ "$PKG_NAME" != "com.aistudio.shareflow.kxrvnm" ]; then
-            echo "::error::Unexpected package name '$PKG_NAME'. Expected 'com.aistudio.shareflow.kxrvnm'."
+          if [ "$PKG_NAME" != "com.shareflow" ]; then
+            echo "::error::Unexpected package name '$PKG_NAME'. Expected 'com.shareflow'."
             exit 1
           fi
           if [ -z "$VERSION_CODE" ] || [ -z "$VERSION_NAME" ] || [ "$HAS_LAUNCHER" -lt 1 ]; then
@@ -918,7 +918,7 @@ jobs:
             echo "|---|---|"
             echo "| **Version** | \`v${VERSION_NAME}\` (Build \`${VERSION_CODE}\`) |"
             echo "| **Release Tag** | \`${RELEASE_TAG}\` |"
-            echo "| **Application ID** | \`com.aistudio.shareflow.kxrvnm\` |"
+            echo "| **Application ID** | \`com.shareflow\` |"
             echo "| **Public Releases Repo** | \`${PUBLIC_REPO}\` |"
             echo "| **Official Website** | ${PORTAL_URL} |"
             echo "| **Update Manifest (\`version.json\`)** | ${PORTAL_URL%/}/version.json |"

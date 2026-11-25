@@ -17,8 +17,8 @@
 
 - **هوية التطبيق المحفوظة دون أي تعديل:**
   - `namespace`: `com.example`
-  - `applicationId`: `com.aistudio.shareflow.kxrvnm`
-  - `versionName`: `1.0.18` | `versionCode`: `19`
+  - `applicationId`: `com.shareflow`
+  - `versionName`: `1.0.12` | `versionCode`: `13`
   - `minSdk`: `24` | `targetSdk`: `36`
 
 > **قواعد حماية الشيفرة والبيانات:** لا يُنسخ أي ملف Kotlin أو Gradle أو XML أو `google-services.json` أو Keystore أو سر إلى `ow7ab/Share-Flow-Releases` أبداً. يتحقق السكربت `scripts/sync-public-docs.sh` بقائمة سماح صارمة (Allowlist) وفحص للأسرار قبل أي دفع إلى المستودع العام.
@@ -101,7 +101,7 @@
 2. **التحقق من الأسرار والمستودع العام:** وجود `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_PASSWORD`, `PUBLIC_RELEASES_TOKEN` (عند النشر الفعلي)، ومنع تطابق المستودع العام مع المستودع الخاص.
 3. **الفحص قبل البناء (`validate-prebuild` في `scripts/release_helpers.py`):** قبل تشغيل Gradle، يتحقق من:
    - أن `ow7ab/Share-Flow-Releases` عام (`Public`) وأن الوسم `vX.Y.Z` غير منشور مسبقاً.
-   - ثبات `applicationId = com.aistudio.shareflow.kxrvnm`.
+   - ثبات `applicationId = com.shareflow`.
    - صحة `versionName` (صيغة `X.Y.Z`) وتطابقه مع `release_tag`.
    - زيادة `versionCode` بصرامة مقارنة بآخر `version.json` منشور.
 4. فك تشفير Keystore الأصلي داخل `${RUNNER_TEMP}` بصلاحية `600` والتحقق من `PrivateKeyEntry` عبر `keytool -storepass:env`.
@@ -111,7 +111,7 @@
 8. التحقق الصارم بعد البناء عبر:
    - `apksigner verify --verbose --print-certs` + مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق (`verify-postbuild`).
    - `zipalign -c -v 4`.
-   - `aapt2 dump badging` (تطابق `com.aistudio.shareflow.kxrvnm`، تطابق `v${VERSION_NAME}` مع الوسم، ووجود النشاط الرئيسي).
+   - `aapt2 dump badging` (تطابق `com.shareflow`، تطابق `v${VERSION_NAME}` مع الوسم، ووجود النشاط الرئيسي).
    - `jarsigner -verify -strict` لملف AAB.
    - توليد `version.json` موحّد (`versionCode`, `versionName`, `apkUrl`, `apkDownloadUrl`, `releaseNotes`, `sha256`, ...) والتحقق المباشر من قبوله داخل محلل الموقع `docs/app.js`.
 9. **نشر ذرّي آمن (`Draft → Verify → Promote`):**
@@ -142,6 +142,6 @@
    - **نسخ الاختبار (`Debug APK` عبر `blank.yml`):** يقرأ سير العمل المفتاح الدائم وفق الأولوية التالية: السر `ANDROID_DEBUG_KEYSTORE_BASE64` ← ملف `debug.keystore.base64` إن وُجد ← نسخة `debug.keystore` المحفوظة في كاش GitHub Actions (`shareflow-ci-debug-keystore-v1`)، ثم يتحقق عبر `apksigner` من مطابقة بصمة SHA-256 في كل بناء. ولضمان استمرارية دائمة لا تتأثر بانتهاء الكاش (بعد 7 أيام من عدم النشاط)، أضف السر `ANDROID_DEBUG_KEYSTORE_BASE64` في إعدادات المستودع.
    - **نسخ الإنتاج الرسمية (`Release APK` عبر `release.yml` والموقع):** يوقّع `.github/workflows/release.yml` دائماً بالمفتاح الإنتاجي الدائم `ANDROID_KEYSTORE_BASE64` ويتحقق من مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق قبل النشر. لذلك يتحدّث أي `Release APK` جديد مباشرة فوق الإصدار السابق.
    - **ملاحظة انتقال لمرة واحدة فقط:** إذا كانت النسخة المثبّتة حالياً على هاتفك مبنية بمفتاح مختلف (مثلاً نسخة `Debug` قديمة قبل الإصلاح أو عند الانتقال الأول من `Debug` إلى `Release`)، فسيطلب Android حذفها **مرة واحدة فقط** عند الانتقال، وبعدها ستتحدّث جميع الإصدارات اللاحقة من نفس المسار مباشرة دون حذف التطبيق أبداً.
-2. **تطابق معرّف الحزمة (`applicationId`):** ثابت دائماً على `com.aistudio.shareflow.kxrvnm`.
-3. **زيادة رقم البناء (`versionCode`):** يجب زيادة `versionCode` و`versionName` في `app/build.gradle.kts` عند كل إصدار جديد (مثلاً `19 -> 20` و`1.0.18 -> 1.0.19`).
+2. **تطابق معرّف الحزمة (`applicationId`):** ثابت دائماً على `com.shareflow`.
+3. **زيادة رقم البناء (`versionCode`):** يجب زيادة `versionCode` و`versionName` في `app/build.gradle.kts` عند كل إصدار جديد (مثلاً `13 -> 14` و`1.0.12 -> 1.0.13`).
 

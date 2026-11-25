@@ -66,7 +66,7 @@ class CloudUpdateManagerTest {
             "VERSION_NAME must follow semantic versioning",
             Regex("^\\d+\\.\\d+\\.\\d+([-.][0-9A-Za-z.]+)?$").matches(BuildConfig.VERSION_NAME)
         )
-        assertEquals("com.aistudio.shareflow.kxrvnm", BuildConfig.APPLICATION_ID)
+        assertEquals("com.shareflow", BuildConfig.APPLICATION_ID)
         assertEquals(
             "https://ow7ab.github.io/Share-Flow-Releases/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
