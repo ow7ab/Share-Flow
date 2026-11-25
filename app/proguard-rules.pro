@@ -1,7 +1,7 @@
 # ==============================================================================
 # ShareFlow Production R8 / ProGuard Configuration
 # Aggressive release shrinking, optimization, and APK size reduction while
-# strictly preserving Room, Firebase, Coroutines, Media3, CameraX, and ML Kit.
+# strictly preserving Room, Firebase, Coroutines, Media3, CameraX, and ZXing.
 # ==============================================================================
 
 # Aggressive R8 / ProGuard optimization passes & DEX size compaction
@@ -19,6 +19,8 @@
 # ------------------------------------------------------------------------------
 -keep public class com.example.ShareFlowApplication { *; }
 -keep public class com.example.MainActivity { *; }
+-keep public class com.example.shareflow.ui.apps.ApkInstallIntentActivity { *; }
+-keep public class com.example.shareflow.data.update.fcm.ShareFlowFirebaseMessagingService { *; }
 -keep public class com.example.shareflow.media.music.ShareFlowMediaSessionService { *; }
 -keep public class com.example.shareflow.network.nfc.ShareFlowNfcHceService { *; }
 -keep public class com.example.shareflow.data.apps.PackageInstallStatusReceiver { *; }
@@ -96,7 +98,7 @@
 }
 
 # ------------------------------------------------------------------------------
-# 5. Precision Keep Rules for Media3, CameraX, Biometric, OkHttp & ML Kit
+# 5. Precision Keep Rules for Media3, CameraX, Biometric & OkHttp
 # Avoid blanket `** { *; }` rules so R8 removes unused classes and methods!
 # ------------------------------------------------------------------------------
 -keep class androidx.media3.session.MediaSessionService { *; }
@@ -104,9 +106,7 @@
 -keep class androidx.camera.camera2.Camera2Config$DefaultProvider { *; }
 -keep class androidx.biometric.BiometricPrompt { *; }
 -keep class androidx.biometric.BiometricPrompt$* { *; }
--keep class com.google.mlkit.vision.barcode.BarcodeScanning { *; }
 -dontwarn androidx.media3.**
--dontwarn com.google.mlkit.**
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn org.conscrypt.**

@@ -144,12 +144,15 @@ fun FilesScreen(
 ) {
     val container = LocalAppContainer.current
     val factory = remember(container) {
+        val perf = container.devicePerformanceProfile
         shareFlowViewModelFactory {
             FileManagerViewModel(
                 fileManagerRepository = container.fileManagerRepository,
                 storageAnalyzerRepository = container.storageAnalyzerRepository,
                 sessionController = container.localSessionController,
-                initialCategory = null
+                initialCategory = null,
+                pageSize = perf.pagingPageSize,
+                prefetchDistance = perf.pagingPrefetchDistance
             )
         }
     }
@@ -180,16 +183,22 @@ fun FileCategoryDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
-    val viewModel: FileManagerViewModel = viewModel(
-        key = "file_manager_category_${category.name}",
-        factory = shareFlowViewModelFactory {
+    val factory = remember(container, category) {
+        val perf = container.devicePerformanceProfile
+        shareFlowViewModelFactory {
             FileManagerViewModel(
                 fileManagerRepository = container.fileManagerRepository,
                 storageAnalyzerRepository = container.storageAnalyzerRepository,
                 sessionController = container.localSessionController,
-                initialCategory = category.domainCategory
+                initialCategory = category.domainCategory,
+                pageSize = perf.pagingPageSize,
+                prefetchDistance = perf.pagingPrefetchDistance
             )
         }
+    }
+    val viewModel: FileManagerViewModel = viewModel(
+        key = "file_manager_category_${category.name}",
+        factory = factory
     )
 
     FileManagerHost(
@@ -729,7 +738,10 @@ private fun FileManagerBody(
                     } else {
                         items(
                             count = pagedFiles.itemCount,
-                            key = { idx -> pagedFiles[idx]?.uriString ?: "grid_$idx" }
+                            key = { idx -> pagedFiles.peek(idx)?.uriString ?: "grid_$idx" },
+                            contentType = { idx ->
+                                if (pagedFiles.peek(idx)?.isVisualMedia() == true) "media_grid" else "file_grid"
+                            }
                         ) { index ->
                             val item = pagedFiles[index]
                             if (item != null) {
@@ -809,7 +821,8 @@ private fun FileManagerBody(
                     } else {
                         items(
                             count = pagedFiles.itemCount,
-                            key = { idx -> pagedFiles[idx]?.uriString ?: "list_$idx" }
+                            key = { idx -> pagedFiles.peek(idx)?.uriString ?: "list_$idx" },
+                            contentType = { "file_row" }
                         ) { index ->
                             val item = pagedFiles[index]
                             if (item != null) {

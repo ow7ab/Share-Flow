@@ -8,6 +8,8 @@ import com.example.shareflow.core.common.Clock
 import com.example.shareflow.core.common.DefaultDispatcherProvider
 import com.example.shareflow.core.common.DispatcherProvider
 import com.example.shareflow.core.common.SystemClock
+import com.example.shareflow.core.performance.DevicePerformanceClassifier
+import com.example.shareflow.core.performance.DevicePerformanceProfile
 import com.example.shareflow.core.permissions.PermissionManager
 import com.example.shareflow.core.security.AndroidKeystoreCipher
 import com.example.shareflow.core.security.ChecksumVerifier
@@ -145,12 +147,28 @@ interface AppContainer {
     val fcmUpdateTopicCoordinator: FcmUpdateTopicCoordinator
     val updateNotificationManager: ShareFlowUpdateNotificationManager
 
+    /** Hardware-metric runtime device tier used to tune caching, pagination, and GPU effects. */
+    val devicePerformanceProfile: DevicePerformanceProfile
+        get() = DevicePerformanceProfile.defaultBalanced()
+
     /** True only after [vaultManager] has been accessed, preventing eager DB/Keystore init on app launch. */
     val isVaultInitialized: Boolean
         get() = true
 
     /** True only after [smartConnectionCoordinator] has been accessed, avoiding unnecessary startup work. */
     val isSmartCoordinatorInitialized: Boolean
+        get() = true
+
+    /** True only after [database] has been accessed lazily. */
+    val isDatabaseInitialized: Boolean
+        get() = true
+
+    /** True only after [updateManager] has been accessed lazily. */
+    val isUpdateManagerInitialized: Boolean
+        get() = true
+
+    /** True only after [cloudUpdateManager] has been accessed lazily. */
+    val isCloudUpdateInitialized: Boolean
         get() = true
 }
 
@@ -162,9 +180,18 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val keystoreCipher: KeystoreCipher = AndroidKeystoreCipher()
     override val checksumVerifier: ChecksumVerifier = Sha256ChecksumVerifier()
 
-    override val database: ShareFlowDatabase by lazy {
+    override val devicePerformanceProfile: DevicePerformanceProfile by lazy {
+        DevicePerformanceClassifier.fromContext(appContext)
+    }
+
+    private val databaseLazy = lazy {
         ShareFlowDatabase.create(appContext)
     }
+
+    override val database: ShareFlowDatabase by databaseLazy
+
+    override val isDatabaseInitialized: Boolean
+        get() = databaseLazy.isInitialized()
 
     private val startupAppearanceCache: StartupAppearanceCache by lazy {
         StartupAppearanceCache(appContext)
@@ -515,12 +542,27 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val appForegroundTracker: AppForegroundTracker = AppForegroundTracker()
 
-    override val cloudUpdateManager: CloudUpdateManager by lazy {
+    private val sharedBaseOkHttpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    private val cloudUpdateManagerLazy = lazy {
+        val downloadClient = sharedBaseOkHttpClient.newBuilder()
+            .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
         CloudUpdateManager(
             context = appContext,
             httpClient = OkHttpCloudUpdateHttpClient(
                 dispatchers = dispatchers,
-                context = appContext
+                context = appContext,
+                okHttpClient = downloadClient
             ),
             checksumVerifier = checksumVerifier,
             packageInspector = AndroidApkPackageSecurityInspector(context = appContext),
@@ -532,14 +574,25 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
-    override val updateManager: UpdateManager by lazy {
+    override val cloudUpdateManager: CloudUpdateManager by cloudUpdateManagerLazy
+
+    override val isCloudUpdateInitialized: Boolean
+        get() = cloudUpdateManagerLazy.isInitialized()
+
+    private val updateManagerLazy = lazy {
         UpdateManager(
+            okHttpClient = sharedBaseOkHttpClient,
             dispatcher = dispatchers.io,
             enableGitHubReleasesApi = true,
             preferencesStore = updatePreferencesStore,
             clock = clock
         )
     }
+
+    override val updateManager: UpdateManager by updateManagerLazy
+
+    override val isUpdateManagerInitialized: Boolean
+        get() = updateManagerLazy.isInitialized()
 
     override val fcmUpdateTopicCoordinator: FcmUpdateTopicCoordinator by lazy {
         FcmUpdateTopicCoordinator(

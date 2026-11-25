@@ -679,7 +679,7 @@ class UiFixesAndMediaStudioRobolectricTest {
     }
 
     @Test
-    fun `application BuildConfig version is updated to 1_0_19`() {
+    fun `application BuildConfig version is preserved at 1_0_19`() {
         assertEquals("1.0.19", BuildConfig.VERSION_NAME)
         assertEquals(20, BuildConfig.VERSION_CODE)
     }

@@ -278,6 +278,7 @@ abstract class ShareFlowDatabase : RoomDatabase() {
                 ShareFlowDatabase::class.java,
                 DATABASE_NAME
             )
+                .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }

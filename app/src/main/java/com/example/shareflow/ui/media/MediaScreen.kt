@@ -95,6 +95,13 @@ import com.example.shareflow.ui.files.FullBleedMediaCard
 import com.example.shareflow.ui.files.isVideoMedia
 import com.example.shareflow.ui.viewer.CustomFileViewerDialog
 
+private val AlbumBottomScrimBrush: Brush = Brush.verticalGradient(
+    colors = listOf(
+        Color.Transparent,
+        Color.Black.copy(alpha = 0.78f)
+    )
+)
+
 @Composable
 fun MediaScreen(
     onNavigateToRoute: (String) -> Unit,
@@ -532,7 +539,8 @@ internal fun MediaStudioContent(
                         } else {
                             items(
                                 items = uiState.albums,
-                                key = { "album_${it.name}" }
+                                key = { "album_${it.name}" },
+                                contentType = { "album_tile" }
                             ) { album ->
                                 MediaAlbumTile(
                                     album = album,
@@ -564,7 +572,8 @@ internal fun MediaStudioContent(
                     else -> {
                         items(
                             items = uiState.displayedItems,
-                            key = { "media_${it.uriString}" }
+                            key = { "media_${it.uriString}" },
+                            contentType = { "media_card" }
                         ) { entry ->
                             FullBleedMediaCard(
                                 file = entry,
@@ -645,8 +654,12 @@ private fun MediaAlbumTile(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val targetSizePx = remember(density) {
-        with(density) { 180.dp.toPx().toInt().coerceIn(220, 420) }
+    val performanceProfile = ShareFlowDesign.performanceProfile
+    val targetSizePx = remember(density, performanceProfile.gridThumbnailTargetDp, performanceProfile.gridThumbnailMaxPx) {
+        with(density) {
+            performanceProfile.gridThumbnailTargetDp.dp.toPx().toInt()
+                .coerceIn(180, performanceProfile.gridThumbnailMaxPx)
+        }
     }
     val coverRequest = rememberThumbnailImageRequest(
         uriString = album.coverItem.uriString,
@@ -675,14 +688,7 @@ private fun MediaAlbumTile(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.78f)
-                            )
-                        )
-                    )
+                    .background(AlbumBottomScrimBrush)
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -67,7 +67,11 @@ fun SFGlassCard(
     val elevation = ShareFlowDesign.elevation
     val motion = ShareFlowDesign.motion
     val reducedMotion = ShareFlowDesign.reducedMotion
-    val supportsBlur = enableBackdropBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val performanceProfile = ShareFlowDesign.performanceProfile
+    val supportsBlur = enableBackdropBlur &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        performanceProfile.allowGlassBackdropBlur
+    val enablePressScale = !reducedMotion && performanceProfile.allowPressScaleMicroAnimations
 
     val resolvedBg = containerColor ?: when {
         elevated -> glass.cardElevatedBackground
@@ -104,17 +108,22 @@ fun SFGlassCard(
 
     val interactiveModifier = if (onClick != null) {
         val interactionSource = remember { MutableInteractionSource() }
-        val isPressed by interactionSource.collectIsPressedAsState()
-        val pressScale by animateFloatAsState(
-            targetValue = if (isPressed && enabled && !reducedMotion) motion.pressScale else 1f,
-            animationSpec = motion.buttonSpring(),
-            label = "sf_glass_card_press"
-        )
-        Modifier
-            .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+        val scaleModifier = if (enablePressScale) {
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val pressScaleState = animateFloatAsState(
+                targetValue = if (isPressed && enabled) motion.pressScale else 1f,
+                animationSpec = motion.buttonSpring(),
+                label = "sf_glass_card_press"
+            )
+            Modifier.graphicsLayer {
+                val scale = pressScaleState.value
+                scaleX = scale
+                scaleY = scale
             }
+        } else {
+            Modifier
+        }
+        scaleModifier
             .then(
                 if (resolvedShadow > 0.dp) {
                     Modifier.shadow(

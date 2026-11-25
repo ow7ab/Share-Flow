@@ -38,6 +38,25 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  androidResources {
+    localeFilters += listOf("en", "ar")
+  }
+
+  packaging {
+    resources {
+      excludes += setOf(
+        "/META-INF/{AL2.0,LGPL2.1}",
+        "META-INF/LICENSE*",
+        "META-INF/NOTICE*",
+        "META-INF/*.version",
+        "META-INF/*.kotlin_module",
+        "DebugProbesKt.bin",
+        "kotlin-tooling-metadata.json",
+        "kotlin/**"
+      )
+    }
+  }
+
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
   // and updating Android apps in AI Studio.
   signingConfigs {
@@ -58,7 +77,7 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
+      isCrunchPngs = true
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -114,7 +133,7 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
-  implementation(libs.androidx.compose.ui.tooling.preview)
+  // Moved ui-tooling-preview to debugImplementation to avoid shipping preview metadata in Release
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.core.splashscreen)
   implementation(libs.androidx.datastore.preferences)
@@ -134,7 +153,8 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.zxing.core)
-  implementation(libs.mlkit.barcode.scanning)
+  // Removed bundled ~21 MB native libbarhopper_v3.so + TFLite models; QR scanning uses offline ZXing Core:
+  // implementation(libs.mlkit.barcode.scanning)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   // Uncomment to use Firestore:
@@ -168,6 +188,7 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.androidx.compose.ui.tooling.preview)
   "kspDebug"(libs.androidx.room.compiler)
   "kspRelease"(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)

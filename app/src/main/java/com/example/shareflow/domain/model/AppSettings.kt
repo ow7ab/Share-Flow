@@ -1,5 +1,7 @@
 package com.example.shareflow.domain.model
 
+import androidx.compose.runtime.Immutable
+
 enum class ThemeMode {
     SYSTEM,
     LIGHT,
@@ -50,6 +52,7 @@ enum class PreferredConnectionMode {
  * Pure domain model representing persisted user-configurable ShareFlow settings.
  * Automatic transfer acceptance is strictly disabled by default.
  */
+@Immutable
 data class AppSettings(
     val deviceName: String = DEFAULT_DEVICE_NAME,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,

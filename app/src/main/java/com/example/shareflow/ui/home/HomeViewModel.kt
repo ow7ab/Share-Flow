@@ -1,5 +1,6 @@
 package com.example.shareflow.ui.home
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.shareflow.core.common.AppResult
@@ -23,8 +24,10 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@Immutable
 sealed interface HomeUiState {
     data object Loading : HomeUiState
+    @Immutable
     data class Ready(
         val settings: AppSettings,
         val totalTransferCount: Int,

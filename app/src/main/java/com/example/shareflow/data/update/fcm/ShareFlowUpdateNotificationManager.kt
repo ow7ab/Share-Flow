@@ -46,21 +46,7 @@ class ShareFlowUpdateNotificationManager(
     private val appContext = context.applicationContext ?: context
 
     fun ensureNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            appContext.getString(R.string.updates_notification_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = appContext.getString(R.string.updates_notification_channel_desc)
-            enableLights(true)
-            lightColor = ContextCompat.getColor(appContext, R.color.shareflow_brand_ruby)
-            enableVibration(true)
-        }
-        nm.createNotificationChannel(channel)
+        ensureNotificationChannel(appContext)
     }
 
     fun canPostUpdateNotifications(): Boolean {
@@ -177,5 +163,28 @@ class ShareFlowUpdateNotificationManager(
         const val EXTRA_UPDATE_VERSION_CODE = "shareflow_extra_update_version_code"
         const val NOTIFICATION_TAG = "shareflow_app_update"
         const val NOTIFICATION_ID = 41018
+
+        /**
+         * Lightweight notification channel setup safe to call from `Application.onCreate()`
+         * without instantiating DataStore, OkHttp, or update managers.
+         */
+        fun ensureNotificationChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val appCtx = context.applicationContext ?: context
+            val nm = appCtx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                appCtx.getString(R.string.updates_notification_channel_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = appCtx.getString(R.string.updates_notification_channel_desc)
+                enableLights(true)
+                lightColor = ContextCompat.getColor(appCtx, R.color.shareflow_brand_ruby)
+                enableVibration(true)
+            }
+            nm.createNotificationChannel(channel)
+        }
     }
 }

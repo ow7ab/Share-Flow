@@ -1,6 +1,7 @@
 package com.example.shareflow.ui.media
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.shareflow.core.common.AppResult
@@ -30,6 +31,7 @@ enum class MediaStudioTab {
     ALBUMS
 }
 
+@Immutable
 data class MediaStudioAlbum(
     val name: String,
     val coverItem: LocalFileEntry,
@@ -38,6 +40,7 @@ data class MediaStudioAlbum(
     val itemCount: Int get() = items.size
 }
 
+@Immutable
 data class MediaStudioUiState(
     val activeTab: MediaStudioTab = MediaStudioTab.ALL_MEDIA,
     val selectedAlbumName: String? = null,

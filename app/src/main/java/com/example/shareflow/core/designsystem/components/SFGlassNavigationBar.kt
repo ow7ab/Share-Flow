@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -37,13 +37,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -58,6 +60,7 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowBrandGradients
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors
 
+@Immutable
 data class SFNavBarItem(
     val route: String,
     val label: String,
@@ -88,9 +91,14 @@ fun SFGlassNavigationBar(
     val shapes = ShareFlowDesign.shapes
     val motion = ShareFlowDesign.motion
     val reducedMotion = ShareFlowDesign.reducedMotion
+    val performanceProfile = ShareFlowDesign.performanceProfile
     val isDark = glass.isDark
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val supportsRealBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val supportsRealBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        performanceProfile.allowGlassBackdropBlur
+    val animateSpringLift = !reducedMotion && performanceProfile.allowPressScaleMicroAnimations
+    val density = LocalDensity.current
+    val liftOffsetPx = remember(density) { with(density) { (-1.5).dp.toPx() } }
 
     val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val rawSelectedFraction = if (items.size > 1) {
@@ -99,7 +107,7 @@ fun SFGlassNavigationBar(
         0.5f
     }
     val visualTargetFraction = if (isRtl) 1f - rawSelectedFraction else rawSelectedFraction
-    val animatedBloomFraction by animateFloatAsState(
+    val animatedBloomFractionState = animateFloatAsState(
         targetValue = visualTargetFraction,
         animationSpec = if (reducedMotion) tween(0) else motion.navSpring(),
         label = "sf_glass_nav_bloom"
@@ -193,7 +201,7 @@ fun SFGlassNavigationBar(
                 )
                 .testTag("shareflow_navigation_bar")
         ) {
-            // Layer 1: Dense frosted backdrop with real Gaussian RenderEffect blur on API 31+
+            // Layer 1: Dense frosted backdrop with selective Gaussian RenderEffect blur on BALANCED/HIGH API 31+
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -208,19 +216,27 @@ fun SFGlassNavigationBar(
                             Modifier
                         }
                     )
-                    .drawBehind {
-                        drawRect(color = glass.navBase.copy(alpha = frostedTintAlpha))
-                        val bloomCenterX = (0.10f + 0.80f * animatedBloomFraction) * size.width
+                    .drawWithCache {
+                        val backdropTint = glass.navBase.copy(alpha = frostedTintAlpha)
                         val bloomRadius = (size.height * 1.25f).coerceAtLeast(1f)
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = bloomColors,
-                                center = Offset(bloomCenterX, size.height * 0.50f),
-                                radius = bloomRadius
-                            ),
-                            center = Offset(bloomCenterX, size.height * 0.50f),
+                        val centerY = size.height * 0.50f
+                        // Cached once per size/theme — zero Brush allocations per 120Hz animation frame
+                        val cachedBloomBrush = Brush.radialGradient(
+                            colors = bloomColors,
+                            center = Offset(0f, centerY),
                             radius = bloomRadius
                         )
+                        onDrawBehind {
+                            drawRect(color = backdropTint)
+                            val bloomCenterX = (0.10f + 0.80f * animatedBloomFractionState.value) * size.width
+                            withTransform({ translate(left = bloomCenterX) }) {
+                                drawCircle(
+                                    brush = cachedBloomBrush,
+                                    center = Offset(0f, centerY),
+                                    radius = bloomRadius
+                                )
+                            }
+                        }
                     }
             )
 
@@ -257,16 +273,24 @@ fun SFGlassNavigationBar(
                         animationSpec = tween(durationMillis = if (reducedMotion) 0 else motion.durationStandardMs),
                         label = "sf_nav_pill_${item.route}"
                     )
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected && !reducedMotion) motion.navSelectedIconScale else 1f,
-                        animationSpec = if (reducedMotion) tween(0) else motion.navSpring(),
-                        label = "sf_nav_scale_${item.route}"
-                    )
-                    val iconLift by animateDpAsState(
-                        targetValue = if (isSelected && !reducedMotion) (-1.5).dp else 0.dp,
-                        animationSpec = motion.dpSpec(reducedMotion),
-                        label = "sf_nav_lift_${item.route}"
-                    )
+                    val iconScaleState = if (animateSpringLift) {
+                        animateFloatAsState(
+                            targetValue = if (isSelected) motion.navSelectedIconScale else 1f,
+                            animationSpec = motion.navSpring(),
+                            label = "sf_nav_scale_${item.route}"
+                        )
+                    } else {
+                        null
+                    }
+                    val iconLiftFractionState = if (animateSpringLift) {
+                        animateFloatAsState(
+                            targetValue = if (isSelected) 1f else 0f,
+                            animationSpec = motion.navSpring(),
+                            label = "sf_nav_lift_${item.route}"
+                        )
+                    } else {
+                        null
+                    }
                     val indicatorWidth by animateDpAsState(
                         targetValue = if (isSelected) 18.dp else 0.dp,
                         animationSpec = motion.dpSpec(reducedMotion),
@@ -300,10 +324,11 @@ fun SFGlassNavigationBar(
                                 tint = iconTint,
                                 modifier = Modifier
                                     .size(22.dp)
-                                    .offset(y = iconLift)
                                     .graphicsLayer {
-                                        scaleX = iconScale
-                                        scaleY = iconScale
+                                        val scale = iconScaleState?.value ?: 1f
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationY = (iconLiftFractionState?.value ?: 0f) * liftOffsetPx
                                     }
                             )
                             Text(

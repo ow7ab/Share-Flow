@@ -80,6 +80,13 @@ import com.example.shareflow.core.designsystem.theme.ShareFlowMonoStyle
 import com.example.shareflow.domain.model.FileCategory
 import com.example.shareflow.domain.model.LocalFileEntry
 
+private val MediaBottomScrimBrush: Brush = Brush.verticalGradient(
+    colors = listOf(
+        Color.Transparent,
+        Color.Black.copy(alpha = 0.66f)
+    )
+)
+
 @Composable
 fun FileSelectionActionBar(
     selectedCount: Int,
@@ -533,17 +540,27 @@ fun FullBleedMediaCard(
     showOverflowMenu: Boolean = true
 ) {
     val locale = ShareFlowDesign.locale
+    val performanceProfile = ShareFlowDesign.performanceProfile
+    val reducedMotion = ShareFlowDesign.reducedMotion
     val isVideo = file.isVideoMedia()
     var menuExpanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        label = "media_card_press_scale"
-    )
+    val animatePress = performanceProfile.allowPressScaleMicroAnimations && !reducedMotion
+    val pressScaleState = if (animatePress) {
+        val isPressed by interactionSource.collectIsPressedAsState()
+        animateFloatAsState(
+            targetValue = if (isPressed) 0.97f else 1f,
+            label = "media_card_press_scale"
+        )
+    } else {
+        null
+    }
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val targetSizePx = remember(density) {
-        with(density) { 180.dp.toPx().toInt().coerceIn(220, 420) }
+    val targetSizePx = remember(density, performanceProfile.gridThumbnailTargetDp, performanceProfile.gridThumbnailMaxPx) {
+        with(density) {
+            performanceProfile.gridThumbnailTargetDp.dp.toPx().toInt()
+                .coerceIn(180, performanceProfile.gridThumbnailMaxPx)
+        }
     }
     val imageRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
         uriString = file.uriString,
@@ -560,10 +577,17 @@ fun FullBleedMediaCard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(0.92f)
-            .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
-            }
+            .then(
+                if (pressScaleState != null) {
+                    Modifier.graphicsLayer {
+                        val s = pressScaleState.value
+                        scaleX = s
+                        scaleY = s
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .clip(cardShape)
             .combinedClickable(
                 interactionSource = interactionSource,
@@ -630,14 +654,7 @@ fun FullBleedMediaCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.66f)
-                            )
-                        )
-                    )
+                    .background(MediaBottomScrimBrush)
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Text(

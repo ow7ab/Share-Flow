@@ -1,38 +1,18 @@
 package com.example.shareflow.navigation
 
-import android.os.Build
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -40,7 +20,6 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,27 +30,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -84,12 +53,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import com.example.shareflow.core.designsystem.components.SFBackground
 import com.example.shareflow.core.designsystem.components.SFGlassNavigationBar
 import com.example.shareflow.core.designsystem.components.SFNavBarItem
+import com.example.shareflow.core.designsystem.motion.AutoHideBottomBarState
 import com.example.shareflow.core.designsystem.motion.ElasticOverscrollContainer
 import com.example.shareflow.core.designsystem.motion.rememberAutoHideBottomBarState
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
@@ -130,10 +97,10 @@ import com.example.shareflow.ui.utilities.QrScannerScreen
 import com.example.shareflow.ui.utilities.RecentFilesScreen
 import com.example.shareflow.ui.vault.VaultScreen
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.zIndex
 
 @Composable
 fun ShareFlowApp(
@@ -173,6 +140,10 @@ fun ShareFlowApp(
     }
 
     LaunchedEffect(container) {
+        val warmupDelayMs = container.devicePerformanceProfile.startupBackgroundWarmupDelayMs
+        if (warmupDelayMs > 0L) {
+            delay(warmupDelayMs)
+        }
         runCatching {
             withContext(container.dispatchers.io) {
                 container.connectionRepository
@@ -236,7 +207,8 @@ fun ShareFlowApp(
         themeMode = settings.themeMode,
         useDynamicColor = settings.useDynamicColor,
         accentColor = settings.accentColor,
-        appLanguage = effectiveLanguage
+        appLanguage = effectiveLanguage,
+        performanceProfile = container.devicePerformanceProfile
     ) {
         val showOnboarding = !onboardingDismissed && !settings.hasCompletedOnboarding
 
@@ -368,22 +340,8 @@ fun ShareFlowApp(
                                 routeKey = currentRoute,
                                 enabled = showFloatingBottomBar
                             )
-                            val reducedMotion = ShareFlowDesign.reducedMotion
                             val density = LocalDensity.current
                             var measuredNavBarHeightPx by remember { mutableIntStateOf(0) }
-                            val navBarRevealProgress by animateFloatAsState(
-                                targetValue = if (autoHideNavState.isVisible) 1f else 0f,
-                                animationSpec = if (reducedMotion) {
-                                    tween(durationMillis = 0)
-                                } else {
-                                    spring(
-                                        dampingRatio = 0.88f,
-                                        stiffness = 420f
-                                    )
-                                },
-                                label = "sf_auto_hide_nav_progress"
-                            )
-                            val extraHideMarginPx = with(density) { 18.dp.toPx() }
                             val fallbackNavClearance = 92.dp
                             val measuredClearanceDp = if (measuredNavBarHeightPx > 0) {
                                 with(density) { measuredNavBarHeightPx.toDp() }
@@ -440,32 +398,28 @@ fun ShareFlowApp(
                                     }
                                 }
 
-                                // GPU-accelerated floating frosted bottom navigation bar overlay:
-                                // hides cleanly off-screen on scroll down with ZERO viewport relayout jump.
+                                // Isolated GPU draw-phase floating frosted bottom bar overlay:
+                                // slide animation NEVER recomposes Scaffold or ShareFlowNavHost and
+                                // never tears down/recreates nav animations on scroll.
                                 if (showFloatingBottomBar) {
-                                    Box(
+                                    FloatingAutoHideNavBarOverlay(
+                                        autoHideNavState = autoHideNavState,
+                                        currentRoute = currentRoute,
+                                        measuredNavBarHeightPx = measuredNavBarHeightPx,
+                                        fallbackNavClearance = fallbackNavClearance,
+                                        onMeasuredHeightPx = { heightPx ->
+                                            if (heightPx > 0 && heightPx != measuredNavBarHeightPx) {
+                                                measuredNavBarHeightPx = heightPx
+                                            }
+                                        },
+                                        onNavigateTopLevel = { route ->
+                                            autoHideNavState.showImmediately()
+                                            navigateTopLevel(route)
+                                        },
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             .zIndex(5f)
-                                            .onSizeChanged { measuredNavBarHeightPx = it.height }
-                                            .graphicsLayer {
-                                                val slideDistance = (measuredNavBarHeightPx.takeIf { it > 0 }?.toFloat()
-                                                    ?: with(density) { fallbackNavClearance.toPx() }) + extraHideMarginPx
-                                                translationY = (1f - navBarRevealProgress) * slideDistance
-                                                alpha = (0.18f + 0.82f * navBarRevealProgress).coerceIn(0f, 1f)
-                                            }
-                                            .testTag("shareflow_floating_nav_container")
-                                    ) {
-                                        if (navBarRevealProgress > 0.04f) {
-                                            ShareFlowFloatingGlassNavBar(
-                                                currentRoute = currentRoute,
-                                                onNavigateTopLevel = { route ->
-                                                    autoHideNavState.showImmediately()
-                                                    navigateTopLevel(route)
-                                                }
-                                            )
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -675,6 +629,56 @@ private fun ShareFlowActiveSessionBridge(
 }
 
 /**
+ * Isolated floating bottom navigation container that reads reveal progress strictly in the
+ * GPU `graphicsLayer` draw phase so scrolling never recomposes [Scaffold] or [ShareFlowNavHost].
+ */
+@Composable
+private fun FloatingAutoHideNavBarOverlay(
+    autoHideNavState: AutoHideBottomBarState,
+    currentRoute: String?,
+    measuredNavBarHeightPx: Int,
+    fallbackNavClearance: Dp,
+    onMeasuredHeightPx: (Int) -> Unit,
+    onNavigateTopLevel: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val reducedMotion = ShareFlowDesign.reducedMotion
+    val density = LocalDensity.current
+    val extraHideMarginPx = remember(density) { with(density) { 18.dp.toPx() } }
+    val fallbackPx = remember(density, fallbackNavClearance) { with(density) { fallbackNavClearance.toPx() } }
+    val navBarRevealProgressState = animateFloatAsState(
+        targetValue = if (autoHideNavState.isVisible) 1f else 0f,
+        animationSpec = if (reducedMotion) {
+            tween(durationMillis = 0)
+        } else {
+            spring(
+                dampingRatio = 0.88f,
+                stiffness = 420f
+            )
+        },
+        label = "sf_auto_hide_nav_progress"
+    )
+
+    Box(
+        modifier = modifier
+            .onSizeChanged { onMeasuredHeightPx(it.height) }
+            .graphicsLayer {
+                val progress = navBarRevealProgressState.value
+                val slideDistance = (if (measuredNavBarHeightPx > 0) measuredNavBarHeightPx.toFloat() else fallbackPx) +
+                    extraHideMarginPx
+                translationY = (1f - progress) * slideDistance
+                alpha = if (progress <= 0.01f) 0f else (0.18f + 0.82f * progress).coerceIn(0f, 1f)
+            }
+            .testTag("shareflow_floating_nav_container")
+    ) {
+        ShareFlowFloatingGlassNavBar(
+            currentRoute = currentRoute,
+            onNavigateTopLevel = onNavigateTopLevel
+        )
+    }
+}
+
+/**
  * Share Flow 2.0 Floating Liquid Glass Bottom Navigation Bar wrapper delegating to [SFGlassNavigationBar].
  */
 @Composable
@@ -683,14 +687,17 @@ internal fun ShareFlowFloatingGlassNavBar(
     onNavigateTopLevel: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val navItems = TopLevelDestination.entries.map { destination ->
-        SFNavBarItem(
-            route = destination.route,
-            label = stringResource(destination.labelRes),
-            selectedIcon = destination.selectedIcon,
-            unselectedIcon = destination.unselectedIcon,
-            testTag = destination.testTag
-        )
+    val labels = TopLevelDestination.entries.map { stringResource(it.labelRes) }
+    val navItems = remember(labels) {
+        TopLevelDestination.entries.mapIndexed { index, destination ->
+            SFNavBarItem(
+                route = destination.route,
+                label = labels[index],
+                selectedIcon = destination.selectedIcon,
+                unselectedIcon = destination.unselectedIcon,
+                testTag = destination.testTag
+            )
+        }
     }
     SFGlassNavigationBar(
         items = navItems,

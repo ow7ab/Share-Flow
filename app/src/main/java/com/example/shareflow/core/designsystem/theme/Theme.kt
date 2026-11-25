@@ -22,6 +22,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.fragment.app.FragmentActivity
+import com.example.shareflow.core.performance.DevicePerformanceClassifier
+import com.example.shareflow.core.performance.DevicePerformanceProfile
+import com.example.shareflow.core.performance.LocalDevicePerformanceProfile
 import com.example.shareflow.domain.model.AccentColor
 import com.example.shareflow.domain.model.AppLanguage
 import com.example.shareflow.domain.model.ThemeMode
@@ -132,6 +135,11 @@ object ShareFlowDesign {
         @Composable
         @ReadOnlyComposable
         get() = LocalShareFlowLocale.current
+
+    val performanceProfile: DevicePerformanceProfile
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalDevicePerformanceProfile.current
 }
 
 /**
@@ -163,9 +171,13 @@ fun ShareFlowTheme(
     useDynamicColor: Boolean = false,
     accentColor: AccentColor = AccentColor.COBALT,
     appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    performanceProfile: DevicePerformanceProfile? = null,
     content: @Composable () -> Unit
 ) {
     val baseContext = LocalContext.current
+    val resolvedPerformanceProfile = performanceProfile ?: remember(baseContext) {
+        DevicePerformanceClassifier.fromContext(baseContext)
+    }
     val baseConfig = LocalConfiguration.current
     val hostActivity = LocalShareFlowHostActivity.current ?: remember(baseContext) { baseContext.findActivity() }
     val systemLocale = remember(baseConfig.locales) {
@@ -294,6 +306,7 @@ fun ShareFlowTheme(
         add(LocalSFGlassTokens provides glassTokens)
         add(LocalSFMotion provides DefaultSFMotionTokens)
         add(LocalSFReducedMotion provides reducedMotion)
+        add(LocalDevicePerformanceProfile provides resolvedPerformanceProfile)
         if (activityResultRegistryOwner != null) {
             add(LocalActivityResultRegistryOwner provides activityResultRegistryOwner)
         }

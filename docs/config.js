@@ -19,7 +19,7 @@ window.SHAREFLOW_PORTAL_CONFIG = Object.freeze({
   // Real bundled project visuals; add real phone captures under docs/screenshots/ to extend the gallery automatically.
   galleryItems: Object.freeze([
     Object.freeze({
-      src: "assets/shareflow-icon.png",
+      src: "assets/shareflow-icon.webp",
       altAr: "شعار تطبيق Share Flow الرسمي لأندرويد",
       altEn: "Official Share Flow Android app icon",
       titleAr: "هوية Share Flow البصرية",
@@ -28,7 +28,7 @@ window.SHAREFLOW_PORTAL_CONFIG = Object.freeze({
       captionEn: "Official Share Flow Android launcher icon representing fast direct file flow."
     }),
     Object.freeze({
-      src: "assets/shareflow-hero.jpg",
+      src: "assets/shareflow-hero.webp",
       altAr: "تصميم موجات النقل الرقمي لتطبيق Share Flow",
       altEn: "Share Flow local transfer wave artwork",
       titleAr: "موجات النقل المحلي السريع",

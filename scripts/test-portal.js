@@ -413,11 +413,20 @@ test("official Share Flow 4-color branding variables and frameless contain icon 
     }
   }
 
-  // Verify PNG magic signature on both shareflow-icon.png and favicon.png
+  // Verify PNG magic signature on both shareflow-icon.png (apple-touch-icon) and favicon.png
   const pngSig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   for (const imgRel of ["assets/shareflow-icon.png", "assets/favicon.png"]) {
     const buf = fs.readFileSync(path.join(docsDir, imgRel));
     assert.ok(buf.subarray(0, 8).equals(pngSig), `Expected valid PNG signature for docs/${imgRel}`);
+  }
+
+  // Verify optimized WebP magic bytes (RIFF....WEBP) and docs/index.html references
+  assert.ok(html.includes('src="assets/shareflow-hero.webp"'), "Expected hero backdrop to reference assets/shareflow-hero.webp");
+  assert.ok(html.includes('src="assets/shareflow-icon.webp"'), "Expected inline logos to reference assets/shareflow-icon.webp");
+  for (const webpRel of ["assets/shareflow-hero.webp", "assets/shareflow-icon.webp"]) {
+    const buf = fs.readFileSync(path.join(docsDir, webpRel));
+    assert.equal(buf.subarray(0, 4).toString("ascii"), "RIFF", `Expected RIFF header for docs/${webpRel}`);
+    assert.equal(buf.subarray(8, 12).toString("ascii"), "WEBP", `Expected WEBP header for docs/${webpRel}`);
   }
 });
 

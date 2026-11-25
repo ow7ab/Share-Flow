@@ -1,5 +1,6 @@
 package com.example.shareflow.ui.files
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -52,11 +53,13 @@ enum class PendingTransferOperation {
     MOVE
 }
 
+@Immutable
 data class CategoryCountSummary(
     val count: Int = 0,
     val totalBytes: Long = 0L
 )
 
+@Immutable
 data class FileManagerUiState(
     val browseMode: FileBrowseMode = FileBrowseMode.OVERVIEW,
     val activeCategory: FileCategory? = null,
@@ -101,7 +104,9 @@ class FileManagerViewModel(
     private val fileManagerRepository: FileManagerRepository,
     private val storageAnalyzerRepository: StorageAnalyzerRepository,
     private val sessionController: LocalSessionController,
-    initialCategory: FileCategory? = null
+    initialCategory: FileCategory? = null,
+    private val pageSize: Int = PAGE_SIZE,
+    private val prefetchDistance: Int = PREFETCH_DISTANCE
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -178,9 +183,9 @@ class FileManagerViewModel(
     }.distinctUntilChanged().flatMapLatest { key ->
         Pager(
             config = PagingConfig(
-                pageSize = PAGE_SIZE,
-                initialLoadSize = PAGE_SIZE * 2,
-                prefetchDistance = PREFETCH_DISTANCE,
+                pageSize = pageSize.coerceAtLeast(16),
+                initialLoadSize = (pageSize * 2).coerceAtLeast(32),
+                prefetchDistance = prefetchDistance.coerceAtLeast(4),
                 enablePlaceholders = false
             ),
             pagingSourceFactory = {

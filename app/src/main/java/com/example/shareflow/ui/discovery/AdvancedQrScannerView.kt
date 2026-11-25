@@ -74,23 +74,19 @@ import com.example.shareflow.core.designsystem.components.StatusPill
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
 import com.example.shareflow.domain.model.QrScannerUiState
 import com.example.shareflow.network.qr.QrCodeCodec
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 /**
- * Phase 6 Advanced QR Scanner powered by CameraX + ML Kit Barcode Scanning (with ZXing fallback).
- * Supports tap-to-focus, auto center focus, auto-zoom for distant QR codes, torch/flash toggle,
- * explicit scan state indicators, and duplicate scan prevention.
+ * Advanced offline QR Scanner powered by CameraX + ZXing Core ([QrCodeCodec]).
+ * Zero bundled native ML Kit binaries: uses a single reusable Y-plane buffer (zero per-frame GC
+ * allocations) with adaptive frame throttling per device performance tier while preserving
+ * tap-to-focus, auto center focus, auto-zoom for distant QR codes, torch toggle, inline retry,
+ * and duplicate-scan prevention.
  */
 @OptIn(ExperimentalGetImage::class)
 @Composable
@@ -103,14 +99,9 @@ fun AdvancedQrScannerView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val semantic = ShareFlowDesign.semanticColors
+    val performanceProfile = ShareFlowDesign.performanceProfile
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-    val barcodeScanner = remember {
-        BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        )
-    }
+    val minAnalysisIntervalMs = performanceProfile.qrAnalysisMinIntervalMs
 
     var cameraRef by remember { mutableStateOf<Camera?>(null) }
     var cameraProviderRef by remember { mutableStateOf<ProcessCameraProvider?>(null) }
@@ -147,7 +138,6 @@ fun AdvancedQrScannerView(
             isDisposed.set(true)
             runCatching { cameraRef?.cameraControl?.enableTorch(false) }
             runCatching { cameraProviderRef?.unbindAll() }
-            runCatching { barcodeScanner.close() }
             runCatching { analysisExecutor.shutdown() }
         }
     }
@@ -244,101 +234,57 @@ fun AdvancedQrScannerView(
                                 }
                             }
 
+                            var reusableYBuffer = ByteArray(0)
+                            var lastAnalyzedFrameMs = 0L
+
                             analysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                                if (isDisposed.get() || scanLocked.get()) {
-                                    runCatching { imageProxy.close() }
-                                    return@setAnalyzer
-                                }
-                                val mediaImage = runCatching { imageProxy.image }.getOrNull()
-                                if (mediaImage == null) {
-                                    runCatching { imageProxy.close() }
-                                    return@setAnalyzer
-                                }
+                                try {
+                                    if (isDisposed.get() || scanLocked.get()) return@setAnalyzer
+                                    val nowMs = System.currentTimeMillis()
+                                    if (nowMs - lastAnalyzedFrameMs < minAnalysisIntervalMs) {
+                                        return@setAnalyzer
+                                    }
+                                    lastAnalyzedFrameMs = nowMs
 
-                                val frameWidth = imageProxy.width.coerceAtLeast(1)
-                                val frameHeight = imageProxy.height.coerceAtLeast(1)
-                                val inputImage = runCatching {
-                                    InputImage.fromMediaImage(
-                                        mediaImage,
-                                        imageProxy.imageInfo.rotationDegrees
+                                    val yPlane = imageProxy.planes.firstOrNull() ?: return@setAnalyzer
+                                    val frameWidth = imageProxy.width.coerceAtLeast(1)
+                                    val frameHeight = imageProxy.height.coerceAtLeast(1)
+                                    val rowStride = yPlane.rowStride.coerceAtLeast(frameWidth)
+                                    val yBuffer = yPlane.buffer
+                                    yBuffer.rewind()
+                                    val needed = yBuffer.remaining()
+                                    if (needed <= 0) return@setAnalyzer
+                                    if (reusableYBuffer.size < needed) {
+                                        reusableYBuffer = ByteArray(needed)
+                                    }
+                                    yBuffer.get(reusableYBuffer, 0, needed)
+
+                                    val decoded = QrCodeCodec.decodeFromYuvLuminanceDetailed(
+                                        yPlaneData = reusableYBuffer,
+                                        width = frameWidth,
+                                        height = frameHeight,
+                                        rowStride = rowStride
                                     )
-                                }.getOrNull()
-                                if (inputImage == null) {
-                                    runCatching { imageProxy.close() }
-                                    return@setAnalyzer
-                                }
-
-                                val processTask = runCatching {
-                                    barcodeScanner.process(inputImage)
-                                }.getOrElse {
-                                    runCatching { imageProxy.close() }
-                                    return@setAnalyzer
-                                }
-
-                                // Single completion callback guarantees ImageProxy is NEVER closed
-                                // before Y-plane bytes are copied; ZXing CPU decoding runs on
-                                // analysisExecutor using only the detached ByteArray snapshot.
-                                processTask.addOnCompleteListener { task ->
-                                    var fallbackYData: ByteArray? = null
-                                    try {
-                                        if (!isDisposed.get() && task.isSuccessful) {
-                                            val barcodes = task.result.orEmpty()
-                                            val match = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }
-                                            if (match != null) {
-                                                val box = match.boundingBox
-                                                if (box != null) {
-                                                    val boxWidthFraction = box.width().toFloat() / frameWidth.toFloat()
-                                                    val now = System.currentTimeMillis()
-                                                    if (boxWidthFraction in 0.01f..0.20f &&
-                                                        (now - lastAutoZoomTime.get()) > 900L
-                                                    ) {
-                                                        lastAutoZoomTime.set(now)
-                                                        val cam = cameraRef
-                                                        if (cam != null) {
-                                                            val maxZoom = cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 2.0f
-                                                            val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
-                                                            val nextZoom = (currentZoom * 1.35f).coerceAtMost(minOf(maxZoom, 2.5f))
-                                                            runCatching { cam.cameraControl.setZoomRatio(nextZoom) }
-                                                            activeZoomRatio = nextZoom
-                                                        }
-                                                    }
-                                                }
-                                                match.rawValue?.let(::deliverCandidate)
-                                            } else if (!scanLocked.get()) {
-                                                // Snapshot Y-plane bytes strictly before closing ImageProxy
-                                                runCatching {
-                                                    val yPlane = imageProxy.planes.firstOrNull()
-                                                    if (yPlane != null) {
-                                                        val readOnly = yPlane.buffer.asReadOnlyBuffer()
-                                                        readOnly.rewind()
-                                                        val copy = ByteArray(readOnly.remaining())
-                                                        readOnly.get(copy)
-                                                        fallbackYData = copy
-                                                    }
-                                                }
+                                    if (decoded != null && decoded.text.isNotBlank()) {
+                                        val boxWidthFraction = decoded.boundingWidthFraction
+                                        if (boxWidthFraction != null &&
+                                            boxWidthFraction in 0.01f..0.20f &&
+                                            (nowMs - lastAutoZoomTime.get()) > 900L
+                                        ) {
+                                            lastAutoZoomTime.set(nowMs)
+                                            val cam = cameraRef
+                                            if (cam != null) {
+                                                val maxZoom = cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 2.0f
+                                                val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
+                                                val nextZoom = (currentZoom * 1.35f).coerceAtMost(minOf(maxZoom, 2.5f))
+                                                runCatching { cam.cameraControl.setZoomRatio(nextZoom) }
+                                                activeZoomRatio = nextZoom
                                             }
                                         }
-                                    } finally {
-                                        runCatching { imageProxy.close() }
+                                        deliverCandidate(decoded.text)
                                     }
-
-                                    val detachedY = fallbackYData
-                                    if (detachedY != null && !isDisposed.get() && !scanLocked.get() && !analysisExecutor.isShutdown) {
-                                        runCatching {
-                                            analysisExecutor.execute {
-                                                if (!isDisposed.get() && !scanLocked.get()) {
-                                                    val zxingText = QrCodeCodec.decodeFromYuvLuminance(
-                                                        yPlaneData = detachedY,
-                                                        width = frameWidth,
-                                                        height = frameHeight
-                                                    )
-                                                    if (!zxingText.isNullOrBlank()) {
-                                                        deliverCandidate(zxingText)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                } finally {
+                                    runCatching { imageProxy.close() }
                                 }
                             }
 
@@ -617,38 +563,10 @@ fun AdvancedQrScannerView(
 }
 
 /**
- * Decodes a QR code from a user-selected gallery image URI (zero-permission Android Photo Picker).
- * Uses ML Kit Barcode Scanning first, then falls back to ZXing Bitmap decoding.
+ * Decodes a QR code from a user-selected gallery image URI (zero-permission Android Photo Picker)
+ * using safe memory-bounded bitmap downsampling and offline ZXing Core decoding.
  */
 suspend fun decodeQrCodeFromGalleryUri(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
-    // 1. Try ML Kit directly from content URI
-    val mlKitResult = runCatching {
-        val image = InputImage.fromFilePath(context, uri)
-        val scanner = BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        )
-        try {
-            suspendCancellableCoroutine<String?> { continuation ->
-                scanner.process(image)
-                    .addOnSuccessListener { barcodes ->
-                        if (continuation.isActive) {
-                            continuation.resume(barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue)
-                        }
-                    }
-                    .addOnFailureListener {
-                        if (continuation.isActive) continuation.resume(null)
-                    }
-            }
-        } finally {
-            runCatching { scanner.close() }
-        }
-    }.getOrNull()
-
-    if (!mlKitResult.isNullOrBlank()) return@withContext mlKitResult.trim()
-
-    // 2. Fallback to safe downsampled ZXing bitmap decoding
     runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { stream ->

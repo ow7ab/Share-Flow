@@ -1,5 +1,7 @@
 package com.example.shareflow.domain.model
 
+import androidx.compose.runtime.Immutable
+
 enum class FileCategory {
     IMAGES,
     VIDEOS,
@@ -18,6 +20,7 @@ enum class FileSource {
     PHOTO_PICKER
 }
 
+@Immutable
 data class FileCapabilities(
     val canRead: Boolean = true,
     val canWrite: Boolean = false,
@@ -38,12 +41,14 @@ enum class SortDirection {
     DESCENDING
 }
 
+@Immutable
 data class FileSortSpec(
     val field: FileSortField = FileSortField.NAME,
     val direction: SortDirection = SortDirection.ASCENDING,
     val foldersFirst: Boolean = true
 )
 
+@Immutable
 data class GrantedDirectory(
     val treeUriString: String,
     val displayName: String,
@@ -51,6 +56,7 @@ data class GrantedDirectory(
     val isAccessible: Boolean
 )
 
+@Immutable
 data class DirectoryBreadcrumb(
     val uriString: String,
     val displayName: String
@@ -71,6 +77,7 @@ data class FileOperationResult(
     val isFullySuccessful: Boolean get() = failures.isEmpty() && succeededUris.isNotEmpty()
 }
 
+@Immutable
 data class LocalFileEntry(
     val uriString: String,
     val displayName: String,
@@ -109,6 +116,7 @@ object FileNameValidator {
     }
 }
 
+@Immutable
 data class InstalledAppInfo(
     val packageName: String,
     val appName: String,
@@ -121,6 +129,7 @@ data class InstalledAppInfo(
 /**
  * Encrypted Private Vault item metadata. Raw secrets or plaintext paths are never stored unencrypted.
  */
+@Immutable
 data class VaultItem(
     val id: String,
     val displayName: String,
@@ -132,12 +141,14 @@ data class VaultItem(
     val createdAtEpochMillis: Long
 )
 
+@Immutable
 data class StorageCategoryUsage(
     val category: FileCategory,
     val bytesUsed: Long,
     val itemCount: Int
 )
 
+@Immutable
 data class StorageSummary(
     val totalBytes: Long,
     val availableBytes: Long,

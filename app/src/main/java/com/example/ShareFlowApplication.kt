@@ -7,10 +7,14 @@ import com.example.shareflow.core.common.ShareFlowCoilImageLoaderFactory
 import com.example.shareflow.core.di.AppContainer
 import com.example.shareflow.core.di.DefaultAppContainer
 import com.example.shareflow.data.local.preferences.StartupAppearanceCache
+import com.example.shareflow.data.update.fcm.ShareFlowUpdateNotificationManager
 
 /**
  * ShareFlow Android Application entry point initializing the modular dependency container
- * and optimized global Coil [ImageLoader] (bounded RAM/disk thumbnail caches + video thumbnails).
+ * and adaptive global Coil [ImageLoader] (tier-scaled RAM/disk thumbnail caches + video thumbnails).
+ *
+ * Keeps `onCreate()` strictly lightweight so cold start never initializes OkHttp, DataStore,
+ * Room, or Firebase Messaging synchronously on the Main Thread before Frame 1.
  */
 class ShareFlowApplication : Application(), ImageLoaderFactory {
 
@@ -22,8 +26,12 @@ class ShareFlowApplication : Application(), ImageLoaderFactory {
         StartupAppearanceCache(this).syncSavedNightModeOnLaunch()
         container = DefaultAppContainer(this)
         registerActivityLifecycleCallbacks(container.appForegroundTracker)
-        container.updateNotificationManager.ensureNotificationChannel()
+        ShareFlowUpdateNotificationManager.ensureNotificationChannel(this)
     }
 
-    override fun newImageLoader(): ImageLoader = ShareFlowCoilImageLoaderFactory.create(this)
+    override fun newImageLoader(): ImageLoader =
+        ShareFlowCoilImageLoaderFactory.create(
+            context = this,
+            performanceProfile = container.devicePerformanceProfile
+        )
 }

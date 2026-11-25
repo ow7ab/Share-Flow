@@ -23,6 +23,9 @@ import coil.request.Options
 import coil.size.Precision
 import coil.size.Scale
 import coil.size.pxOrElse
+import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+import com.example.shareflow.core.performance.DevicePerformanceClassifier
+import com.example.shareflow.core.performance.DevicePerformanceProfile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,23 +40,23 @@ data class VideoThumbnailModel(
 )
 
 /**
- * High-performance Coil [ImageLoader] configuration for ShareFlow:
- * - Bounded RAM memory cache (22% of app heap) to prevent GC churn and OOM during rapid flings.
- * - Dedicated 64 MB disk cache for decoded thumbnails.
+ * Adaptive high-performance Coil [ImageLoader] configuration for ShareFlow:
+ * - Tier-scaled RAM memory cache (12% LOW / 18% BALANCED / 22% HIGH) to prevent GC churn & OOM.
+ * - Tier-scaled disk cache (32 MB / 48 MB / 64 MB) for decoded thumbnails.
  * - Hardware bitmaps + RGB_565 default for thumbnails (50% RAM reduction vs ARGB_8888).
  * - Built-in [AndroidVideoThumbnailFetcher] for local content:// and file:// videos.
  */
 object ShareFlowCoilImageLoaderFactory {
 
-    private const val MEMORY_CACHE_PERCENT = 0.22
-    private const val DISK_CACHE_MAX_BYTES = 64L * 1024L * 1024L
-
-    fun create(context: Context): ImageLoader {
+    fun create(
+        context: Context,
+        performanceProfile: DevicePerformanceProfile = DevicePerformanceClassifier.fromContext(context)
+    ): ImageLoader {
         val appContext = context.applicationContext
-        return ImageLoader.Builder(appContext)
+        val builder = ImageLoader.Builder(appContext)
             .memoryCache {
                 MemoryCache.Builder(appContext)
-                    .maxSizePercent(MEMORY_CACHE_PERCENT)
+                    .maxSizePercent(performanceProfile.coilMemoryCachePercent)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
@@ -61,7 +64,7 @@ object ShareFlowCoilImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(File(appContext.cacheDir, "sf_thumbnail_cache"))
-                    .maxSizeBytes(DISK_CACHE_MAX_BYTES)
+                    .maxSizeBytes(performanceProfile.coilDiskCacheBytes)
                     .build()
             }
             .components {
@@ -69,9 +72,14 @@ object ShareFlowCoilImageLoaderFactory {
             }
             .bitmapConfig(Bitmap.Config.RGB_565)
             .allowHardware(true)
-            .crossfade(110)
             .respectCacheHeaders(false)
-            .build()
+
+        if (performanceProfile.thumbnailCrossfadeMs > 0) {
+            builder.crossfade(performanceProfile.thumbnailCrossfadeMs)
+        } else {
+            builder.crossfade(false)
+        }
+        return builder.build()
     }
 }
 
@@ -154,8 +162,10 @@ fun rememberThumbnailImageRequest(
     isVideo: Boolean = false
 ): ImageRequest {
     val context = LocalContext.current
-    val safeSize = targetSizePx.coerceIn(64, 512)
-    return remember(context, uriString, safeSize, isVideo) {
+    val perf = ShareFlowDesign.performanceProfile
+    val safeSize = targetSizePx.coerceIn(64, perf.gridThumbnailMaxPx)
+    val crossfadeMs = perf.thumbnailCrossfadeMs
+    return remember(context, uriString, safeSize, isVideo, crossfadeMs) {
         val data: Any = if (isVideo) {
             VideoThumbnailModel(uriString = uriString, targetSizePx = safeSize)
         } else {
@@ -173,7 +183,9 @@ fun rememberThumbnailImageRequest(
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
-            .crossfade(100)
+            .apply {
+                if (crossfadeMs > 0) crossfade(crossfadeMs) else crossfade(false)
+            }
             .build()
     }
 }
@@ -187,8 +199,10 @@ fun rememberPreviewImageRequest(
     maxSizePx: Int = 1080
 ): ImageRequest {
     val context = LocalContext.current
-    val safeSize = maxSizePx.coerceIn(320, 1440)
-    return remember(context, uriString, safeSize) {
+    val perf = ShareFlowDesign.performanceProfile
+    val safeSize = maxSizePx.coerceIn(320, perf.previewMaxSizePx)
+    val crossfadeMs = perf.thumbnailCrossfadeMs
+    return remember(context, uriString, safeSize, crossfadeMs) {
         ImageRequest.Builder(context)
             .data(Uri.parse(uriString))
             .size(safeSize, safeSize)
@@ -198,7 +212,9 @@ fun rememberPreviewImageRequest(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCacheKey("prev_${safeSize}_$uriString")
-            .crossfade(140)
+            .apply {
+                if (crossfadeMs > 0) crossfade(crossfadeMs) else crossfade(false)
+            }
             .build()
     }
 }
