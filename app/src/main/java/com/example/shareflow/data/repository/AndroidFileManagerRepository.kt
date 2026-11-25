@@ -103,9 +103,13 @@ class AndroidFileManagerRepository(
 
             val mediaResult = mediaStoreScanner.scanAccessibleMedia()
             val receivedEntries = scanReceivedDirectoryEntries()
+            val safEntries = scanGrantedSafDirectoriesRecursive()
             val mediaEntries = (mediaResult as? AppResult.Success)?.data.orEmpty()
-            val merged = mergeDeduplicatedEntries(mediaEntries, receivedEntries)
-            if (merged.isEmpty() && mediaResult is AppResult.Failure) {
+            val merged = mergeDeduplicatedEntries(
+                primary = mediaEntries,
+                secondary = receivedEntries + safEntries
+            )
+            if (merged.isEmpty() && mediaResult is AppResult.Failure && grantedDirectoriesState.value.isEmpty()) {
                 mediaResult
             } else {
                 cachedMediaIndex = merged
@@ -133,27 +137,13 @@ class AndroidFileManagerRepository(
 
     override suspend fun queryByCategory(category: FileCategory): AppResult<List<LocalFileEntry>> =
         withContext(dispatchers.io) {
-            val mediaResult = scanAccessibleMedia()
-            val baseEntries = (mediaResult as? AppResult.Success)?.data
-                ?.filter { it.matchesCategory(category) }
-                .orEmpty()
-
-            val safEntries = mutableListOf<LocalFileEntry>()
-            val granted = grantedDirectoriesState.value.filter { it.isAccessible }
-            for (dir in granted) {
-                val listed = safEngine.listDirectory(dir.treeUriString)
-                if (listed is AppResult.Success) {
-                    safEntries.addAll(
-                        listed.data.filter { !it.isDirectory && it.matchesCategory(category) }
-                    )
+            when (val mediaResult = scanAccessibleMedia()) {
+                is AppResult.Success -> {
+                    val filtered = mediaResult.data.filter { !it.isDirectory && it.matchesCategory(category) }
+                    AppResult.Success(filtered)
                 }
+                is AppResult.Failure -> mediaResult
             }
-
-            val merged = mergeDeduplicatedEntries(baseEntries, safEntries)
-            if (merged.isEmpty() && mediaResult is AppResult.Failure && granted.isEmpty()) {
-                return@withContext mediaResult
-            }
-            AppResult.Success(merged)
         }
 
     override suspend fun createFolder(
@@ -162,6 +152,7 @@ class AndroidFileManagerRepository(
     ): AppResult<LocalFileEntry> = withContext(dispatchers.io) {
         val result = safEngine.createFolder(parentDirectoryUriString, folderName)
         if (result is AppResult.Success) {
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
         }
         result
@@ -185,6 +176,7 @@ class AndroidFileManagerRepository(
                 return@withContext AppResult.Failure(AppError.Validation("A file with that name already exists."))
             }
             return@withContext if (localFile.renameTo(target)) {
+                invalidateMediaCache()
                 mutationEvents.tryEmit(Unit)
                 AppResult.Success(localFileToEntry(target))
             } else {
@@ -193,6 +185,7 @@ class AndroidFileManagerRepository(
         }
         val result = safEngine.renameFile(documentUriString, newName)
         if (result is AppResult.Success) {
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
         }
         result
@@ -204,6 +197,7 @@ class AndroidFileManagerRepository(
     ): AppResult<FileOperationResult> = withContext(dispatchers.io) {
         val result = safEngine.copyFiles(sourceUris, targetDirectoryUriString)
         if (result is AppResult.Success && result.data.succeededCount > 0) {
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
         }
         result
@@ -215,6 +209,7 @@ class AndroidFileManagerRepository(
     ): AppResult<FileOperationResult> = withContext(dispatchers.io) {
         val result = safEngine.moveFiles(sourceUris, targetDirectoryUriString)
         if (result is AppResult.Success && result.data.succeededCount > 0) {
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
         }
         result
@@ -272,6 +267,7 @@ class AndroidFileManagerRepository(
         }
 
         if (succeeded.isNotEmpty()) {
+            invalidateMediaCache()
             mutationEvents.tryEmit(Unit)
         }
         AppResult.Success(
@@ -394,19 +390,39 @@ class AndroidFileManagerRepository(
         )
     }
 
+    private fun scanGrantedSafDirectoriesRecursive(): List<LocalFileEntry> {
+        val granted = grantedDirectoriesState.value.filter { it.isAccessible }
+        if (granted.isEmpty()) return emptyList()
+        val collected = ArrayList<LocalFileEntry>()
+        val remainingCap = SafStorageEngine.DEFAULT_RECURSIVE_MAX_ENTRIES
+        for (dir in granted) {
+            val budget = (remainingCap - collected.size).coerceAtLeast(0)
+            if (budget <= 0) break
+            val listed = safEngine.listDirectoryRecursive(
+                treeUriString = dir.treeUriString,
+                maxDepth = SafStorageEngine.DEFAULT_RECURSIVE_MAX_DEPTH,
+                maxEntries = budget
+            )
+            if (listed is AppResult.Success) {
+                collected.addAll(listed.data)
+            }
+        }
+        return collected
+    }
+
     private fun mergeDeduplicatedEntries(
         primary: List<LocalFileEntry>,
-        received: List<LocalFileEntry>
+        secondary: List<LocalFileEntry>
     ): List<LocalFileEntry> {
-        val byUri = LinkedHashMap<String, LocalFileEntry>(primary.size + received.size)
-        val seenSignatures = HashSet<String>(primary.size + received.size)
+        val byUri = LinkedHashMap<String, LocalFileEntry>(primary.size + secondary.size)
+        val seenSignatures = HashSet<String>(primary.size + secondary.size)
 
         for (entry in primary) {
             if (byUri.putIfAbsent(entry.uriString, entry) == null) {
                 seenSignatures.add(dedupeSignature(entry))
             }
         }
-        for (entry in received) {
+        for (entry in secondary) {
             val sig = dedupeSignature(entry)
             if (sig !in seenSignatures && !byUri.containsKey(entry.uriString)) {
                 byUri[entry.uriString] = entry

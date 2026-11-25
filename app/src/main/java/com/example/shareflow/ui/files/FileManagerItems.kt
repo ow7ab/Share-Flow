@@ -1,17 +1,26 @@
 package com.example.shareflow.ui.files
 
 import android.net.Uri
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -30,6 +39,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VideoFile
@@ -51,10 +61,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -90,7 +104,11 @@ fun FileSelectionActionBar(
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         tonalElevation = ShareFlowDesign.elevation.raised
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -326,6 +344,20 @@ fun FileManagerListRow(
     }
 }
 
+fun LocalFileEntry.isVisualMedia(): Boolean =
+    !isDirectory && (
+        category == FileCategory.IMAGES ||
+            category == FileCategory.VIDEOS ||
+            mimeType.startsWith("image/", ignoreCase = true) ||
+            mimeType.startsWith("video/", ignoreCase = true)
+        )
+
+fun LocalFileEntry.isVideoMedia(): Boolean =
+    !isDirectory && (
+        category == FileCategory.VIDEOS ||
+            mimeType.startsWith("video/", ignoreCase = true)
+        )
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileManagerGridTile(
@@ -345,6 +377,27 @@ fun FileManagerGridTile(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (file.isVisualMedia()) {
+        FullBleedMediaCard(
+            file = file,
+            isSelectionMode = isSelectionMode,
+            isSelected = isSelected,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            onToggleSelect = onToggleSelect,
+            onPreview = onPreview,
+            onDetails = onDetails,
+            onRename = onRename,
+            onCopy = onCopy,
+            onMove = onMove,
+            onShare = onShare,
+            onSend = onSend,
+            onDelete = onDelete,
+            modifier = modifier
+        )
+        return
+    }
+
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
     var menuExpanded by remember { mutableStateOf(false) }
@@ -402,7 +455,9 @@ fun FileManagerGridTile(
                     Box(modifier = Modifier.align(Alignment.TopEnd)) {
                         IconButton(
                             onClick = { menuExpanded = true },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("file_item_menu_${file.displayName}")
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
@@ -445,6 +500,225 @@ fun FileManagerGridTile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+/**
+ * Full-Bleed Media Thumbnail Card for Photos & Videos:
+ * - Thumbnail fills 100% of the rounded card with [ContentScale.Crop] (downsampled off main thread)
+ * - File name is intentionally hidden for a clean, modern gallery presentation
+ * - Top-end corner shows ONLY the 3-dot overflow menu button (or selection indicator in selection mode)
+ * - Bottom subtle gradient scrim displays ONLY the formatted file size
+ * - Videos display a clean centered play indicator badge without cluttering the preview
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FullBleedMediaCard(
+    file: LocalFileEntry,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onToggleSelect: () -> Unit,
+    onPreview: () -> Unit,
+    onDetails: () -> Unit,
+    onRename: () -> Unit,
+    onCopy: () -> Unit,
+    onMove: () -> Unit,
+    onShare: () -> Unit,
+    onSend: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    showOverflowMenu: Boolean = true
+) {
+    val locale = ShareFlowDesign.locale
+    val isVideo = file.isVideoMedia()
+    var menuExpanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        label = "media_card_press_scale"
+    )
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val targetSizePx = remember(density) {
+        with(density) { 180.dp.toPx().toInt().coerceIn(220, 420) }
+    }
+    val imageRequest = com.example.shareflow.core.common.rememberThumbnailImageRequest(
+        uriString = file.uriString,
+        targetSizePx = targetSizePx,
+        isVideo = isVideo
+    )
+
+    val cardShape = ShareFlowDesign.shapes.card
+    val formattedSize = remember(file.sizeBytes, locale) {
+        ShareFlowFormatters.formatBytes(file.sizeBytes, locale)
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(0.92f)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(cardShape)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.material3.ripple(),
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 0.75.dp,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            }
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 1. Edge-to-edge full-bleed downsampled thumbnail
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = if (isVideo) {
+                    stringResource(R.string.media_video_play_badge_cd)
+                } else {
+                    stringResource(R.string.files_category_images)
+                },
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Subtle selection scrim when selected
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.22f))
+                )
+            }
+
+            // 2. Centered translucent video play badge (videos only)
+            if (isVideo) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.52f))
+                        .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+                        .testTag("media_card_video_badge_${file.displayName}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.media_video_play_badge_cd),
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // 3. Bottom subtle gradient overlay displaying ONLY file size
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.66f)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = formattedSize,
+                    style = ShareFlowMonoStyle.copy(
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .testTag("media_card_size_${file.displayName}")
+                )
+            }
+
+            // 4. Top-end corner: ONLY selection indicator OR 3-dot overflow menu button
+            if (isSelectionMode) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.48f)
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else if (showOverflowMenu) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(2.dp)
+                ) {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("file_item_menu_${file.displayName}")
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.44f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.files_cd_more_options),
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    FileItemActionMenu(
+                        file = file,
+                        expanded = menuExpanded,
+                        onDismiss = { menuExpanded = false },
+                        onSelect = { menuExpanded = false; onToggleSelect() },
+                        onPreview = { menuExpanded = false; onPreview() },
+                        onDetails = { menuExpanded = false; onDetails() },
+                        onRename = { menuExpanded = false; onRename() },
+                        onCopy = { menuExpanded = false; onCopy() },
+                        onMove = { menuExpanded = false; onMove() },
+                        onShare = { menuExpanded = false; onShare() },
+                        onSend = { menuExpanded = false; onSend() },
+                        onDelete = { menuExpanded = false; onDelete() }
+                    )
+                }
+            }
         }
     }
 }

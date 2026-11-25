@@ -1309,6 +1309,26 @@
     <string name="wifi_prompt_dismiss_cd">Dismiss Wi-Fi prompt</string>
     <string name="files_filter_all">All</string>
     <string name="files_auto_indexed_count_format">%1$d ready</string>
+
+    <!-- Persistent Folder Access & Organized Media Studio -->
+    <string name="files_persistent_access_title">Grant Persistent Folder Access</string>
+    <string name="files_persistent_access_body">Link your storage folder once so ShareFlow automatically indexes your files, photos, videos, and tools every time you open the app — without asking again.</string>
+    <string name="files_persistent_access_action">Grant Access Once</string>
+    <string name="media_studio_tab_all">All Media</string>
+    <string name="media_studio_tab_images">Images</string>
+    <string name="media_studio_tab_videos">Videos</string>
+    <string name="media_studio_tab_albums">Albums</string>
+    <string name="media_studio_quick_players">Media Players</string>
+    <string name="media_studio_album_items_format">%1$d items</string>
+    <string name="media_studio_back_to_albums">All Albums</string>
+    <string name="media_studio_empty_title">No Media Indexed Yet</string>
+    <string name="media_studio_empty_body">Grant persistent folder access once or pick photos and videos to organize and browse them automatically here.</string>
+    <string name="media_studio_empty_images">No images found yet. Grant folder access once or import photos.</string>
+    <string name="media_studio_empty_videos">No videos found yet. Grant folder access once or import videos.</string>
+    <string name="media_studio_empty_albums">No albums available yet. Grant folder access or import media to group items by folder.</string>
+    <string name="media_studio_grant_folder">Grant Folder Access</string>
+    <string name="media_studio_import_media">Import Media</string>
+    <string name="media_video_play_badge_cd">Video</string>
 </resources>
 
 

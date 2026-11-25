@@ -28,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Storage
@@ -72,7 +71,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.shareflow.core.common.ShareFlowFormatters
 import com.example.shareflow.core.designsystem.components.EmptyState
-import com.example.shareflow.core.designsystem.components.FileItem
 import com.example.shareflow.core.designsystem.components.LoadingState
 import com.example.shareflow.core.designsystem.components.SFGlassCard
 import com.example.shareflow.core.designsystem.components.SFSectionHeader
@@ -92,6 +90,7 @@ import com.example.shareflow.network.DeviceNetworkStatus
 @Composable
 fun HomeDashboardScreen(
     onNavigateToRoute: (String) -> Unit,
+    topBarClearance: Dp = 0.dp,
     bottomBarClearance: Dp = 0.dp,
     activeTransferCount: Int = 0,
     modifier: Modifier = Modifier
@@ -130,6 +129,7 @@ fun HomeDashboardScreen(
                 }
         },
         activeTransferCount = activeTransferCount,
+        topBarClearance = topBarClearance,
         bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
@@ -142,6 +142,7 @@ fun HomeDashboardContent(
     onSelectRecentFile: (LocalFileEntry) -> Unit = {},
     onOpenWifiPanel: () -> Unit = {},
     activeTransferCount: Int = 0,
+    topBarClearance: Dp = 0.dp,
     bottomBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
@@ -181,7 +182,7 @@ fun HomeDashboardContent(
                     contentPadding = PaddingValues(
                         start = spacing.screenHorizontal,
                         end = spacing.screenHorizontal,
-                        top = spacing.sm,
+                        top = topBarClearance + spacing.sm,
                         bottom = bottomBarClearance + spacing.lg
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -332,42 +333,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    // 5. Recent Files Section
-                    item(key = "recent_files_header") {
-                        SFSectionHeader(
-                            title = stringResource(R.string.home_section_recent_files),
-                            actionLabel = stringResource(R.string.home_view_all),
-                            onActionClick = { onNavigateToRoute(ShareFlowRoutes.FILES_HUB) },
-                            actionTestTag = "home_recent_files_view_all",
-                            modifier = Modifier.testTag("home_section_recent_files")
-                        )
-                    }
-
-                    if (uiState.recentFiles.isEmpty()) {
-                        item(key = "recent_files_empty") {
-                            EmptyState(
-                                icon = Icons.Outlined.FolderOpen,
-                                title = stringResource(R.string.home_section_recent_files_empty_title),
-                                body = stringResource(R.string.home_section_recent_files_empty_body),
-                                actionLabel = stringResource(R.string.home_section_recent_files_action),
-                                onAction = { onNavigateToRoute(ShareFlowRoutes.FILES_HUB) },
-                                modifier = Modifier.testTag("home_recent_files_empty")
-                            )
-                        }
-                    } else {
-                        items(
-                            items = uiState.recentFiles,
-                            key = { "recent_file_${it.uriString}" }
-                        ) { file ->
-                            FileItem(
-                                file = file,
-                                onClick = { onSelectRecentFile(file) },
-                                modifier = Modifier.testTag("home_recent_file_${file.displayName}")
-                            )
-                        }
-                    }
-
-                    // 6. Storage Overview Section
+                    // 5. Storage Overview Section
                     item(key = "storage_overview") {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(spacing.xs),

@@ -75,6 +75,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ToolsScreen(
     onNavigateToRoute: (String) -> Unit,
+    topBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
@@ -92,7 +93,7 @@ fun ToolsScreen(
             contentPadding = PaddingValues(
                 start = spacing.screenHorizontal,
                 end = spacing.screenHorizontal,
-                top = spacing.md,
+                top = topBarClearance + spacing.md,
                 bottom = spacing.md + bottomBarClearance
             ),
             verticalArrangement = Arrangement.spacedBy(spacing.sm)

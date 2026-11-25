@@ -1309,6 +1309,26 @@
     <string name="wifi_prompt_dismiss_cd">إغلاق تنبيه Wi-Fi</string>
     <string name="files_filter_all">الكل</string>
     <string name="files_auto_indexed_count_format">%1$d جاهز</string>
+
+    <!-- الوصول الدائم للمجلدات وتنظيم استوديو الوسائط -->
+    <string name="files_persistent_access_title">منح صلاحية الوصول الدائم للملفات</string>
+    <string name="files_persistent_access_body">اربط مجلد التخزين مرة واحدة فقط ليقوم ShareFlow بفهرسة ملفاتك وصورك وفيديوهاتك وأدوات الفحص تلقائياً عند كل فتح للتطبيق دون تكرار الطلب.</string>
+    <string name="files_persistent_access_action">منح الوصول مرة واحدة</string>
+    <string name="media_studio_tab_all">جميع الوسائط</string>
+    <string name="media_studio_tab_images">الصور</string>
+    <string name="media_studio_tab_videos">الفيديوهات</string>
+    <string name="media_studio_tab_albums">الألبومات</string>
+    <string name="media_studio_quick_players">مشغّلات الوسائط</string>
+    <string name="media_studio_album_items_format">%1$d عنصر</string>
+    <string name="media_studio_back_to_albums">كل الألبومات</string>
+    <string name="media_studio_empty_title">لا توجد وسائط مفهرسة بعد</string>
+    <string name="media_studio_empty_body">امنح الوصول لمجلد التخزين مرة واحدة أو استورد الصور والفيديوهات ليتم تنظيمها وعرضها تلقائياً هنا.</string>
+    <string name="media_studio_empty_images">لم يتم العثور على صور بعد. امنح وصول المجلد مرة واحدة أو استورد صوراً.</string>
+    <string name="media_studio_empty_videos">لم يتم العثور على فيديوهات بعد. امنح وصول المجلد مرة واحدة أو استورد فيديوهات.</string>
+    <string name="media_studio_empty_albums">لا توجد ألبومات متاحة بعد. امنح وصول المجلد أو استورد وسائط لترتيبها حسب المجلدات.</string>
+    <string name="media_studio_grant_folder">منح وصول المجلد</string>
+    <string name="media_studio_import_media">استيراد وسائط</string>
+    <string name="media_video_play_badge_cd">فيديو</string>
 </resources>
 
 

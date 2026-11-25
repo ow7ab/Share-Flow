@@ -217,7 +217,6 @@ internal fun FileManagerHost(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val container = LocalAppContainer.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pagedFiles = viewModel.pagedFiles.collectAsLazyPagingItems()
@@ -353,6 +352,7 @@ internal fun FileManagerHost(
     }
 
     uiState.previewTarget?.let { previewFile ->
+        val container = LocalAppContainer.current
         val isApkFile = previewFile.category == FileCategory.APKS ||
             previewFile.displayName.endsWith(".apk", ignoreCase = true)
         CustomFileViewerDialog(
@@ -881,6 +881,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.overviewHeaderListIte
     item(key = "overview_directories") {
         OverviewDirectoriesSection(
             grantedDirectories = uiState.grantedDirectories,
+            onSelectFolder = onSelectFolder,
             onOpenGrantedDirectory = onOpenGrantedDirectory
         )
     }
@@ -965,6 +966,7 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.overviewHeaderGr
     item(span = { GridItemSpan(maxLineSpan) }, key = "grid_overview_directories") {
         OverviewDirectoriesSection(
             grantedDirectories = uiState.grantedDirectories,
+            onSelectFolder = onSelectFolder,
             onOpenGrantedDirectory = onOpenGrantedDirectory
         )
     }
@@ -1119,18 +1121,52 @@ private fun OverviewQuickActionsRow(
 @Composable
 private fun OverviewDirectoriesSection(
     grantedDirectories: List<GrantedDirectory>,
+    onSelectFolder: () -> Unit,
     onOpenGrantedDirectory: (GrantedDirectory) -> Unit
 ) {
     val spacing = ShareFlowDesign.spacing
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         SectionHeader(title = stringResource(R.string.files_section_directories))
         if (grantedDirectories.isEmpty()) {
-            Text(
-                text = stringResource(R.string.files_directories_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("files_directories_empty_hint")
-            )
+            com.example.shareflow.core.designsystem.components.SFGlassCard(
+                contentPadding = PaddingValues(spacing.md),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("files_persistent_access_card")
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.FolderOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.files_persistent_access_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.files_persistent_access_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("files_directories_empty_hint")
+                    )
+                    com.example.shareflow.core.designsystem.components.PrimaryActionButton(
+                        text = stringResource(R.string.files_persistent_access_action),
+                        onClick = onSelectFolder,
+                        leadingIcon = Icons.Filled.FolderOpen,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("files_persistent_access_button")
+                    )
+                }
+            }
         } else {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),

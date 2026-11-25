@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
@@ -136,7 +137,12 @@ class CustomFileViewerAndArabicStabilityTest {
 
             // Tapping Move to Vault on uninitialized vault opens setup prompt
             composeTestRule.onNodeWithTag("viewer_action_move_to_vault").performClick()
-            composeTestRule.waitForIdle()
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag("viewer_vault_setup_dialog", useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
             composeTestRule.onNodeWithTag("viewer_vault_setup_dialog").assertIsDisplayed()
             composeTestRule.onNodeWithTag("viewer_vault_setup_confirm").performClick()
             composeTestRule.waitForIdle()

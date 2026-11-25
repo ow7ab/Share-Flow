@@ -111,6 +111,7 @@ import com.example.shareflow.domain.model.ThemeMode
 @Composable
 fun SettingsScreen(
     onOpenVault: (() -> Unit)? = null,
+    topBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
@@ -193,6 +194,7 @@ fun SettingsScreen(
             )
         },
         onAutoCheckUpdatesOnLaunchChanged = viewModel::onAutoCheckUpdatesOnLaunchChanged,
+        topBarClearance = topBarClearance,
         bottomBarClearance = bottomBarClearance,
         modifier = modifier
     )
@@ -237,6 +239,7 @@ fun SettingsContent(
     onCancelCloudUpdateDownload: () -> Unit = {},
     onInstallVerifiedCloudUpdate: (String) -> Unit = {},
     onAutoCheckUpdatesOnLaunchChanged: (Boolean) -> Unit = {},
+    topBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     bottomBarClearance: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
@@ -415,7 +418,7 @@ fun SettingsContent(
                 contentPadding = PaddingValues(
                     start = spacing.screenHorizontal,
                     end = spacing.screenHorizontal,
-                    top = spacing.md,
+                    top = topBarClearance + spacing.md,
                     bottom = spacing.md + bottomBarClearance
                 ),
                 verticalArrangement = Arrangement.spacedBy(spacing.md)

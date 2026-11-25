@@ -175,6 +175,64 @@ class SafStorageEngine(
         }
     }
 
+    /**
+     * Performs a bounded breadth-first recursive scan of a persisted SAF tree URI (including
+     * nested subfolders such as DCIM/Camera, Pictures/Screenshots, Movies, Documents) while
+     * skipping hidden dot-folders, respecting [maxDepth] and [maxEntries], and deduplicating URIs.
+     */
+    fun listDirectoryRecursive(
+        treeUriString: String,
+        maxDepth: Int = DEFAULT_RECURSIVE_MAX_DEPTH,
+        maxEntries: Int = DEFAULT_RECURSIVE_MAX_ENTRIES
+    ): AppResult<List<LocalFileEntry>> {
+        val rootUri = parseUri(treeUriString)
+            ?: return AppResult.Failure(AppError.Validation("Invalid directory URI"))
+        val safeMaxDepth = maxDepth.coerceIn(0, 8)
+        val safeMaxEntries = maxEntries.coerceIn(1, 10_000)
+
+        val collected = ArrayList<LocalFileEntry>()
+        val seenFileUris = HashSet<String>()
+        val visitedDirs = HashSet<String>()
+        val queue = ArrayDeque<Pair<String, Int>>()
+        queue.add(rootUri.toString() to 0)
+        visitedDirs.add(rootUri.toString())
+
+        var firstError: AppError? = null
+
+        while (queue.isNotEmpty() && collected.size < safeMaxEntries) {
+            val (dirUri, depth) = queue.removeFirst()
+            when (val listed = listDirectory(dirUri)) {
+                is AppResult.Success -> {
+                    for (entry in listed.data) {
+                        if (collected.size >= safeMaxEntries) break
+                        if (entry.isDirectory) {
+                            val name = entry.displayName.trim()
+                            val skipHidden = name.startsWith(".") ||
+                                name.equals("Android", ignoreCase = true) ||
+                                name.equals("LOST.DIR", ignoreCase = true)
+                            if (depth < safeMaxDepth && !skipHidden && visitedDirs.add(entry.uriString)) {
+                                queue.add(entry.uriString to (depth + 1))
+                            }
+                        } else if (entry.isAccessible && seenFileUris.add(entry.uriString)) {
+                            collected.add(entry)
+                        }
+                    }
+                }
+                is AppResult.Failure -> {
+                    if (depth == 0 && firstError == null) {
+                        firstError = listed.error
+                    }
+                }
+            }
+        }
+
+        return if (collected.isEmpty() && firstError != null) {
+            AppResult.Failure(firstError)
+        } else {
+            AppResult.Success(collected)
+        }
+    }
+
     private fun queryChildDocuments(
         treeUri: Uri,
         parentUriString: String,
@@ -660,5 +718,7 @@ class SafStorageEngine(
     companion object {
         const val COPY_BUFFER_SIZE = 64 * 1024
         private const val MAX_TEXT_PREVIEW_BYTES = 64 * 1024
+        const val DEFAULT_RECURSIVE_MAX_DEPTH = 4
+        const val DEFAULT_RECURSIVE_MAX_ENTRIES = 3_000
     }
 }

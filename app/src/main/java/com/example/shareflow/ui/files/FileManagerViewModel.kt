@@ -107,7 +107,12 @@ class FileManagerViewModel(
     private val _uiState = MutableStateFlow(
         FileManagerUiState(
             browseMode = if (initialCategory != null) FileBrowseMode.CATEGORY else FileBrowseMode.OVERVIEW,
-            activeCategory = initialCategory
+            activeCategory = initialCategory,
+            viewLayout = if (initialCategory == FileCategory.IMAGES || initialCategory == FileCategory.VIDEOS) {
+                FileViewLayout.GRID
+            } else {
+                FileViewLayout.LIST
+            }
         )
     )
     val uiState: StateFlow<FileManagerUiState> = _uiState.asStateFlow()
@@ -245,7 +250,15 @@ class FileManagerViewModel(
     fun setOverviewCategoryFilter(category: FileCategory?) {
         _uiState.update { state ->
             val next = if (state.overviewCategoryFilter == category) null else category
-            state.copy(overviewCategoryFilter = next)
+            val nextLayout = if (next == FileCategory.IMAGES || next == FileCategory.VIDEOS) {
+                FileViewLayout.GRID
+            } else {
+                state.viewLayout
+            }
+            state.copy(
+                overviewCategoryFilter = next,
+                viewLayout = nextLayout
+            )
         }
         updateVisibleCountForCurrentMode()
     }
@@ -301,15 +314,6 @@ class FileManagerViewModel(
             }
             is AppResult.Failure -> {
                 mediaError = mediaResult.error
-            }
-        }
-
-        // Also include top-level files from accessible granted SAF directories
-        val granted = _uiState.value.grantedDirectories.filter { it.isAccessible }
-        for (dir in granted) {
-            val listed = fileManagerRepository.listDirectory(dir.treeUriString)
-            if (listed is AppResult.Success) {
-                listed.data.filterNot { it.isDirectory }.forEach { merged[it.uriString] = it }
             }
         }
 

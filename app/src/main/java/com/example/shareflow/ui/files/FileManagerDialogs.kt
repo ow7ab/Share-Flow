@@ -140,8 +140,15 @@ object FileSharesheetHelper {
 
     fun openExternally(context: Context, entry: LocalFileEntry): Boolean {
         val uri = resolveShareableUri(context, entry.uriString) ?: return false
+        val isApk = entry.category == FileCategory.APKS ||
+            entry.displayName.endsWith(".apk", ignoreCase = true)
+        val effectiveMime = when {
+            isApk -> "application/vnd.android.package-archive"
+            entry.mimeType.isNotBlank() -> entry.mimeType
+            else -> "*/*"
+        }
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, entry.mimeType.ifBlank { "*/*" })
+            setDataAndType(uri, effectiveMime)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return runCatching {

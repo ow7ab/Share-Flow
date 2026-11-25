@@ -93,8 +93,17 @@ class ShareFlowNavigationRobolectricTest {
         list.performScrollToNode(hasTestTag("home_section_recent_transfers"))
         composeTestRule.onNodeWithTag("home_section_recent_transfers").assertIsDisplayed()
 
-        list.performScrollToNode(hasTestTag("home_section_recent_files"))
-        composeTestRule.onNodeWithTag("home_section_recent_files").assertIsDisplayed()
+        // Recent Files card must NOT appear on the Home Dashboard
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("home_section_recent_files", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+        org.junit.Assert.assertTrue(
+            composeTestRule.onAllNodesWithTag("home_recent_files_empty", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
 
         list.performScrollToNode(hasTestTag("home_section_storage"))
         composeTestRule.onNodeWithTag("home_section_storage").assertIsDisplayed()
@@ -191,7 +200,9 @@ class ShareFlowNavigationRobolectricTest {
             composeTestRule.onNodeWithTag(sectionTag).assertIsDisplayed()
         }
 
-        // 5. Return to Home tab
+        // 5. Return to Home tab (scroll up / allow auto-hide bottom bar to reveal)
+        settingsList.performScrollToNode(hasTestTag("settings_section_appearance"))
+        waitForTag("nav_item_home")
         composeTestRule.onNodeWithTag("nav_item_home").performClick()
         waitForTag("home_send_button")
         composeTestRule.onNodeWithTag("home_send_button").assertIsDisplayed()

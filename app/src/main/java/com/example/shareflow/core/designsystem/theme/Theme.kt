@@ -256,6 +256,14 @@ fun ShareFlowTheme(
     if (!view.isInEditMode) {
         androidx.compose.runtime.LaunchedEffect(isDarkTheme, hostActivity, view) {
             val window = hostActivity?.window ?: return@LaunchedEffect
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            @Suppress("DEPRECATION")
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+            }
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !isDarkTheme
             insetsController.isAppearanceLightNavigationBars = !isDarkTheme

@@ -2,6 +2,8 @@ package com.example.shareflow.ui.viewer
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -11,14 +13,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,6 +67,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -77,6 +84,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -86,6 +94,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -231,73 +242,13 @@ fun CustomFileViewerDialog(
         }
     }
 
-    if (showVaultPinDialog) {
-        VaultQuickUnlockDialog(
-            isUnlocking = isUnlockingVault,
-            errorMessage = vaultPinError,
-            onConfirmPin = { pin ->
-                scope.launch {
-                    isUnlockingVault = true
-                    vaultPinError = null
-                    when (val unlockRes = container.vaultManager.unlockWithPin(pin)) {
-                        is AppResult.Success -> {
-                            isUnlockingVault = false
-                            showVaultPinDialog = false
-                            performVaultImport()
-                        }
-                        is AppResult.Failure -> {
-                            isUnlockingVault = false
-                            vaultPinError = unlockRes.error.message
-                        }
-                    }
-                }
-            },
-            onDismiss = {
-                if (!isUnlockingVault) showVaultPinDialog = false
-            }
-        )
-    }
-
-    if (showVaultNotSetupDialog) {
-        AlertDialog(
-            onDismissRequest = { showVaultNotSetupDialog = false },
-            modifier = Modifier.testTag("viewer_vault_setup_dialog"),
-            shape = ShareFlowDesign.shapes.dialog,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = ShareFlowDesign.elevation.modal,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            icon = {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            },
-            title = { Text(stringResource(R.string.viewer_vault_not_setup_title)) },
-            text = { Text(stringResource(R.string.viewer_vault_not_setup_body)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showVaultNotSetupDialog = false
-                        onOpenVaultSetup?.invoke()
-                    },
-                    enabled = onOpenVaultSetup != null,
-                    shape = ShareFlowDesign.shapes.button,
-                    modifier = Modifier.testTag("viewer_vault_setup_confirm")
-                ) {
-                    Text(stringResource(R.string.viewer_vault_setup_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showVaultNotSetupDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
-
     val isMediaDarkStage = isImage || isVideo
+    // Capture real host Activity WindowInsets before entering the separate DialogWindow so both
+    // Gesture Navigation and 3-Button Navigation bars always receive exact system safe insets even
+    // on Android OEMs where DialogWindow initially reports zero navigation bar insets.
+    val hostStatusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val hostCutoutTop = WindowInsets.displayCutout.asPaddingValues().calculateTopPadding()
+    val hostNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -306,6 +257,44 @@ fun CustomFileViewerDialog(
             decorFitsSystemWindows = false
         )
     ) {
+        val dialogView = LocalView.current
+        val useLightSystemBars = !isMediaDarkStage && !semantic.isDark
+        LaunchedEffect(dialogView, useLightSystemBars) {
+            val dialogWindow = (dialogView.parent as? DialogWindowProvider)?.window
+            if (dialogWindow != null) {
+                WindowCompat.setDecorFitsSystemWindows(dialogWindow, false)
+                dialogWindow.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT
+                )
+                @Suppress("DEPRECATION")
+                dialogWindow.statusBarColor = android.graphics.Color.TRANSPARENT
+                @Suppress("DEPRECATION")
+                dialogWindow.navigationBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    dialogWindow.isNavigationBarContrastEnforced = false
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    dialogWindow.attributes = dialogWindow.attributes.apply {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                val insetsController = WindowCompat.getInsetsController(dialogWindow, dialogView)
+                insetsController.isAppearanceLightStatusBars = useLightSystemBars
+                insetsController.isAppearanceLightNavigationBars = useLightSystemBars
+                ViewCompat.requestApplyInsets(dialogView)
+            }
+        }
+
+        val dialogStatusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val dialogCutoutTop = WindowInsets.displayCutout.asPaddingValues().calculateTopPadding()
+        val dialogNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val dialogImeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+
+        val effectiveTopInset = maxOf(dialogStatusTop, dialogCutoutTop, hostStatusTop, hostCutoutTop)
+        val effectiveBottomInset = maxOf(dialogNavBottom, dialogImeBottom, hostNavBottom)
+
         Surface(
             modifier = modifier
                 .fillMaxSize()
@@ -329,7 +318,7 @@ fun CustomFileViewerDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .statusBarsPadding()
+                            .padding(top = effectiveTopInset)
                             .padding(horizontal = spacing.xs, vertical = spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(spacing.xs)
@@ -470,15 +459,22 @@ fun CustomFileViewerDialog(
                         }
 
                         isAudio -> {
-                            Media3AudioStage(
-                                uriString = file.uriString,
-                                displayName = file.displayName,
-                                sizeBytes = file.sizeBytes,
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .widthIn(max = spacing.maxContentWidth)
-                                    .padding(spacing.screenHorizontal)
-                            )
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Media3AudioStage(
+                                    uriString = file.uriString,
+                                    displayName = file.displayName,
+                                    sizeBytes = file.sizeBytes,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = spacing.maxContentWidth)
+                                        .padding(spacing.screenHorizontal)
+                                )
+                            }
                         }
 
                         isText -> {
@@ -493,21 +489,30 @@ fun CustomFileViewerDialog(
                         }
 
                         else -> {
-                            GenericFilePreviewCard(
-                                file = file,
-                                isApk = isApk,
-                                onInstallApk = onInstallApk,
-                                onOpenExternal = onOpenExternal,
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .widthIn(max = spacing.maxContentWidth)
-                                    .padding(spacing.screenHorizontal)
-                            )
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                GenericFilePreviewCard(
+                                    file = file,
+                                    isApk = isApk,
+                                    onInstallApk = onInstallApk,
+                                    onOpenExternal = onOpenExternal,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = spacing.maxContentWidth)
+                                        .padding(spacing.screenHorizontal, spacing.md)
+                                )
+                            }
                         }
                     }
                 }
 
                 // Bottom Action Dock: Send via ShareFlow + Move to Private Vault (+ Install APK)
+                // Always padded with exact real system navigation bar / IME bottom inset so controls
+                // never hide behind Gesture Navigation or 3-Button Navigation bars.
                 Surface(
                     color = if (isMediaDarkStage) {
                         com.example.shareflow.core.designsystem.theme.ShareFlowMarpleColors.DarkSurface
@@ -522,12 +527,13 @@ fun CustomFileViewerDialog(
                         } else {
                             MaterialTheme.colorScheme.outlineVariant
                         }
-                    )
+                    ),
+                    modifier = Modifier.testTag("viewer_bottom_action_dock")
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .navigationBarsPadding()
+                            .padding(bottom = effectiveBottomInset)
                             .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
                         verticalArrangement = Arrangement.spacedBy(spacing.xs)
                     ) {
@@ -609,6 +615,72 @@ fun CustomFileViewerDialog(
                     }
                 }
             }
+        }
+
+        if (showVaultPinDialog) {
+            VaultQuickUnlockDialog(
+                isUnlocking = isUnlockingVault,
+                errorMessage = vaultPinError,
+                onConfirmPin = { pin ->
+                    scope.launch {
+                        isUnlockingVault = true
+                        vaultPinError = null
+                        when (val unlockRes = container.vaultManager.unlockWithPin(pin)) {
+                            is AppResult.Success -> {
+                                isUnlockingVault = false
+                                showVaultPinDialog = false
+                                performVaultImport()
+                            }
+                            is AppResult.Failure -> {
+                                isUnlockingVault = false
+                                vaultPinError = unlockRes.error.message
+                            }
+                        }
+                    }
+                },
+                onDismiss = {
+                    if (!isUnlockingVault) showVaultPinDialog = false
+                }
+            )
+        }
+
+        if (showVaultNotSetupDialog) {
+            AlertDialog(
+                onDismissRequest = { showVaultNotSetupDialog = false },
+                modifier = Modifier.testTag("viewer_vault_setup_dialog"),
+                shape = ShareFlowDesign.shapes.dialog,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = ShareFlowDesign.elevation.modal,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                title = { Text(stringResource(R.string.viewer_vault_not_setup_title)) },
+                text = { Text(stringResource(R.string.viewer_vault_not_setup_body)) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showVaultNotSetupDialog = false
+                            onOpenVaultSetup?.invoke()
+                        },
+                        enabled = onOpenVaultSetup != null,
+                        shape = ShareFlowDesign.shapes.button,
+                        modifier = Modifier.testTag("viewer_vault_setup_confirm")
+                    ) {
+                        Text(stringResource(R.string.viewer_vault_setup_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showVaultNotSetupDialog = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                }
+            )
         }
     }
 }

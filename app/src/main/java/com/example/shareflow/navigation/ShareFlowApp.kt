@@ -183,10 +183,13 @@ fun ShareFlowApp(
         backgroundServicesReady = true
     }
 
+    var hasEnteredBackground by remember(container) { mutableStateOf(false) }
+
     DisposableEffect(lifecycleOwner, container) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
+                    hasEnteredBackground = true
                     container.localSessionController.stopNetworkMonitoring()
                     approvalScope.launch(container.dispatchers.io) {
                         if (container.isVaultInitialized) {
@@ -200,9 +203,15 @@ fun ShareFlowApp(
                     }
                 }
                 Lifecycle.Event.ON_START -> {
+                    val returningFromBackground = hasEnteredBackground
+                    hasEnteredBackground = false
                     approvalScope.launch(container.dispatchers.io) {
                         runCatching { container.localSessionController.startNetworkMonitoring() }
                             .onFailure { if (it is CancellationException) throw it }
+                        if (returningFromBackground) {
+                            runCatching { container.fileManagerRepository.notifyStorageChanged() }
+                                .onFailure { if (it is CancellationException) throw it }
+                        }
                         if (container.isVaultInitialized) {
                             runCatching { container.vaultManager.checkAutoLock() }
                                 .onFailure { if (it is CancellationException) throw it }
@@ -368,12 +377,16 @@ fun ShareFlowApp(
                                     contentWindowInsets = WindowInsets.safeDrawing
                                 ) { innerPadding ->
                                     val layoutDirection = LocalLayoutDirection.current
+                                    val statusBarTopInset = innerPadding.calculateTopPadding()
                                     val bottomInset = innerPadding.calculateBottomPadding()
                                     val contentBottomClearance = if (showFloatingBottomBar) {
                                         measuredClearanceDp + bottomInset
                                     } else {
                                         0.dp
                                     }
+                                    // True Edge-to-Edge: DO NOT clip at the status bar boundary.
+                                    // Scrollable screens apply statusBarTopInset inside contentPadding so
+                                    // items rest below the status bar and scroll smoothly behind it.
                                     ElasticOverscrollContainer(
                                         resetKey = currentRoute,
                                         revealBackgroundColor = Color.Transparent,
@@ -387,7 +400,6 @@ fun ShareFlowApp(
                                                 }
                                             )
                                             .padding(
-                                                top = innerPadding.calculateTopPadding(),
                                                 start = innerPadding.calculateStartPadding(layoutDirection),
                                                 end = innerPadding.calculateEndPadding(layoutDirection),
                                                 bottom = if (showFloatingBottomBar) 0.dp else bottomInset
@@ -399,6 +411,7 @@ fun ShareFlowApp(
                                                 autoHideNavState.showImmediately()
                                                 navigateTopLevel(route)
                                             },
+                                            topLevelStatusBarClearance = statusBarTopInset,
                                             topLevelBottomBarClearance = contentBottomClearance,
                                             activeTransferCount = activeTransferCount,
                                             modifier = Modifier.fillMaxSize()
@@ -647,6 +660,7 @@ internal fun ShareFlowFloatingGlassNavBar(
 private fun ShareFlowNavHost(
     navController: NavHostController,
     onNavigateTopLevel: (String) -> Unit,
+    topLevelStatusBarClearance: Dp = 0.dp,
     topLevelBottomBarClearance: Dp = 0.dp,
     activeTransferCount: Int = 0,
     modifier: Modifier = Modifier
@@ -678,6 +692,7 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.HOME) {
             HomeDashboardScreen(
                 onNavigateToRoute = navigateToRoute,
+                topBarClearance = topLevelStatusBarClearance,
                 bottomBarClearance = topLevelBottomBarClearance,
                 activeTransferCount = activeTransferCount
             )
@@ -696,18 +711,23 @@ private fun ShareFlowNavHost(
         composable(route = ShareFlowRoutes.MEDIA_HUB) {
             MediaScreen(
                 onNavigateToRoute = navigateToRoute,
+                onNavigateToSend = { navigateToRoute(ShareFlowRoutes.SEND) },
+                onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
+                topBarClearance = topLevelStatusBarClearance,
                 bottomBarClearance = topLevelBottomBarClearance
             )
         }
         composable(route = ShareFlowRoutes.TOOLS_HUB) {
             ToolsScreen(
                 onNavigateToRoute = navigateToRoute,
+                topBarClearance = topLevelStatusBarClearance,
                 bottomBarClearance = topLevelBottomBarClearance
             )
         }
         composable(route = ShareFlowRoutes.SETTINGS) {
             SettingsScreen(
                 onOpenVault = { navigateToRoute(ShareFlowRoutes.PRIVATE_VAULT) },
+                topBarClearance = topLevelStatusBarClearance,
                 bottomBarClearance = topLevelBottomBarClearance
             )
         }

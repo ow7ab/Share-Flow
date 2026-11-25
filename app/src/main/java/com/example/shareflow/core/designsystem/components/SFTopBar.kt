@@ -38,7 +38,7 @@ fun SFTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onNavigateBack: (() -> Unit)? = null,
-    applyStatusBarPadding: Boolean = false,
+    applyStatusBarPadding: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val spacing = ShareFlowDesign.spacing
