@@ -36,7 +36,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install AndroidX SplashScreen BEFORE super.onCreate() so the system splash window
-        // seamlessly transitions into our resolved Deep Ruby Dark or Light theme with zero flash.
+        // seamlessly transitions into our resolved Deep Navy Dark or Light theme with zero flash.
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { !isLaunchThemeReady }
 
@@ -53,7 +53,7 @@ class MainActivity : FragmentActivity() {
         val targetWindowBg = if (initialIsDark) WINDOW_BG_DARK else WINDOW_BG_LIGHT
 
         // Apply exact system bar appearance and native window background BEFORE Frame 1 is rendered
-        // so Deep Ruby Dark (#171316) or Light (#FFF9F5) is active immediately with zero flash.
+        // so Deep Navy Dark (#0D1220) or Light (#FFF9F5) is active immediately with zero flash.
         val barStyle = if (initialIsDark) {
             SystemBarStyle.dark(Color.TRANSPARENT)
         } else {

@@ -18,7 +18,7 @@
 - **هوية التطبيق المحفوظة دون أي تعديل:**
   - `namespace`: `com.example`
   - `applicationId`: `com.aistudio.shareflow.kxrvnm`
-  - `versionName`: `1.0.12` | `versionCode`: `13`
+  - `versionName`: `1.0.18` | `versionCode`: `19`
   - `minSdk`: `24` | `targetSdk`: `36`
 
 > **قواعد حماية الشيفرة والبيانات:** لا يُنسخ أي ملف Kotlin أو Gradle أو XML أو `google-services.json` أو Keystore أو سر إلى `ow7ab/Share-Flow-Releases` أبداً. يتحقق السكربت `scripts/sync-public-docs.sh` بقائمة سماح صارمة (Allowlist) وفحص للأسرار قبل أي دفع إلى المستودع العام.
@@ -143,5 +143,5 @@
    - **نسخ الإنتاج الرسمية (`Release APK` عبر `release.yml` والموقع):** يوقّع `.github/workflows/release.yml` دائماً بالمفتاح الإنتاجي الدائم `ANDROID_KEYSTORE_BASE64` ويتحقق من مطابقة `EXPECTED_CERT_SHA256` وشهادة الإصدار السابق قبل النشر. لذلك يتحدّث أي `Release APK` جديد مباشرة فوق الإصدار السابق.
    - **ملاحظة انتقال لمرة واحدة فقط:** إذا كانت النسخة المثبّتة حالياً على هاتفك مبنية بمفتاح مختلف (مثلاً نسخة `Debug` قديمة قبل الإصلاح أو عند الانتقال الأول من `Debug` إلى `Release`)، فسيطلب Android حذفها **مرة واحدة فقط** عند الانتقال، وبعدها ستتحدّث جميع الإصدارات اللاحقة من نفس المسار مباشرة دون حذف التطبيق أبداً.
 2. **تطابق معرّف الحزمة (`applicationId`):** ثابت دائماً على `com.aistudio.shareflow.kxrvnm`.
-3. **زيادة رقم البناء (`versionCode`):** يجب زيادة `versionCode` و`versionName` في `app/build.gradle.kts` عند كل إصدار جديد (مثلاً `13 -> 14` و`1.0.12 -> 1.0.13`).
+3. **زيادة رقم البناء (`versionCode`):** يجب زيادة `versionCode` و`versionName` في `app/build.gradle.kts` عند كل إصدار جديد (مثلاً `19 -> 20` و`1.0.18 -> 1.0.19`).
 
