@@ -321,12 +321,13 @@ class FileManagerViewModel(
         allAccessibleEntries.value = combinedList
         updateCategoryAndVisibleCounts(combinedList)
 
+        val resolvedError = mediaError
         _uiState.update { state ->
-            val shouldShowError = combinedList.isEmpty() && mediaError != null
+            val shouldShowError = combinedList.isEmpty() && resolvedError != null
             state.copy(
                 isLoading = false,
-                errorMessage = if (shouldShowError) mediaError?.message else null,
-                isPermissionRevoked = shouldShowError && mediaError is AppError.PermissionDenied
+                errorMessage = if (shouldShowError) resolvedError.message else null,
+                isPermissionRevoked = shouldShowError && resolvedError is AppError.PermissionDenied
             )
         }
         bumpRefresh()
