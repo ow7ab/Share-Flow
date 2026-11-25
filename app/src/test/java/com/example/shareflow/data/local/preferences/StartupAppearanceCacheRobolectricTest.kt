@@ -122,11 +122,11 @@ class StartupAppearanceCacheRobolectricTest {
         try {
             val activity = controller.get()
             val preFrameBg = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFFFFF9F5.toInt(), preFrameBg)
+            assertEquals(0xFFF8F7F4.toInt(), preFrameBg)
 
             controller.start().resume().visible()
             val settledBg = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFFFFF9F5.toInt(), settledBg)
+            assertEquals(0xFFF8F7F4.toInt(), settledBg)
         } finally {
             controller.pause().stop().destroy()
         }
@@ -215,11 +215,11 @@ class StartupAppearanceCacheRobolectricTest {
         try {
             val activity = controller.get()
             val preFrameBg = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFF0D1220.toInt(), preFrameBg)
+            assertEquals(0xFF171717.toInt(), preFrameBg)
 
             controller.start().resume().visible()
             val settledBg = (activity.window.decorView.background as? ColorDrawable)?.color
-            assertEquals(0xFF0D1220.toInt(), settledBg)
+            assertEquals(0xFF171717.toInt(), settledBg)
         } finally {
             controller.pause().stop().destroy()
         }

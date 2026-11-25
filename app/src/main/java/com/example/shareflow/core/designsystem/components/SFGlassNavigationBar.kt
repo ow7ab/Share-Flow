@@ -107,14 +107,14 @@ fun SFGlassNavigationBar(
 
     val activeContentColor = if (isDark) ShareFlowMarpleColors.DarkPrimary else ShareFlowMarpleColors.Ruby
     val inactiveIconColor = if (isDark) {
-        ShareFlowMarpleColors.DarkTextPrimary.copy(alpha = 0.72f)
+        ShareFlowMarpleColors.DarkTextSecondary
     } else {
-        ShareFlowMarpleColors.LightTextPrimary.copy(alpha = 0.66f)
+        ShareFlowMarpleColors.LightTextSecondary
     }
     val inactiveLabelColor = if (isDark) {
-        ShareFlowMarpleColors.DarkTextSecondary.copy(alpha = 0.92f)
+        ShareFlowMarpleColors.DarkTextSecondary
     } else {
-        ShareFlowMarpleColors.LightTextSecondary.copy(alpha = 0.94f)
+        ShareFlowMarpleColors.LightTextSecondary
     }
 
     val specularBorderBrush = remember(glass) {
@@ -127,9 +127,9 @@ fun SFGlassNavigationBar(
         )
     }
 
-    // Dense iOS-style frosted tint overlay ensuring underlying scrolled content never bleeds sharply
+    // Frosted translucent glass overlay ensuring underlying scrolled content never bleeds sharply
     val frostedTintAlpha = when {
-        isDark && supportsRealBlur -> 0.86f
+        isDark && supportsRealBlur -> 0.88f
         isDark -> 0.94f
         supportsRealBlur -> 0.88f
         else -> 0.95f
@@ -140,7 +140,7 @@ fun SFGlassNavigationBar(
             colors = if (isDark) {
                 listOf(
                     glass.navGlazeTop,
-                    glass.navBase.copy(alpha = if (supportsRealBlur) 0.56f else 0.72f),
+                    glass.navBase.copy(alpha = if (supportsRealBlur) 0.54f else 0.72f),
                     glass.navGlazeBottom
                 )
             } else {
@@ -156,14 +156,12 @@ fun SFGlassNavigationBar(
     val bloomColors = remember(isDark) {
         if (isDark) {
             listOf(
-                ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f),
-                ShareFlowMarpleColors.Peach.copy(alpha = 0.08f),
+                ShareFlowMarpleColors.Ruby.copy(alpha = 0.14f),
                 Color.Transparent
             )
         } else {
             listOf(
-                ShareFlowMarpleColors.Ruby.copy(alpha = 0.10f),
-                ShareFlowMarpleColors.Cream.copy(alpha = 0.26f),
+                ShareFlowMarpleColors.Ruby.copy(alpha = 0.08f),
                 Color.Transparent
             )
         }

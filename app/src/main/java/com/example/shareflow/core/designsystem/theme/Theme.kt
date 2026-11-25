@@ -9,18 +9,13 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidedValue
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -155,11 +150,11 @@ fun resolveShareFlowLocale(appLanguage: AppLanguage, systemLocale: Locale): Loca
     }
 
 /**
- * Share Flow 2.0 Theme Provider:
- * - Independent Light Mode (bright neutral + soft cream) and Deep Navy Dark Mode treatments
+ * Share Flow Theme Provider:
+ * - Official Light Mode (Pearl White #F8F7F4) and Dark Mode (Deep Charcoal #171717) palettes
  * - Official brand identity (#CA2851, #FF6766, #FFB173, #FFE3B3) is always the primary color source
  *   (Android dynamic wallpaper color never replaces the brand identity)
- * - Liquid Glass tokens, smooth theme transitions, and reduced-motion accessibility awareness
+ * - Atomic single-frame theme switching without jank across ColorScheme, GlassTokens, SemanticColors, and System Bars
  * - Live English (LTR) and Arabic (RTL) localization & typography switching without Activity context loss
  */
 @Composable
@@ -243,7 +238,6 @@ fun ShareFlowTheme(
         }
     }
     val reducedMotion = rememberReducedMotionEnabled()
-    val animatedColorScheme = animateShareFlowColorScheme(targetColorScheme, reducedMotion = reducedMotion)
     val semanticColors = if (isDarkTheme) DarkShareFlowSemanticColors else LightShareFlowSemanticColors
     val glassTokens = if (isDarkTheme) DarkSFGlassTokens else LightSFGlassTokens
     val typography = if (activeLocale.language == "ar") {
@@ -310,44 +304,10 @@ fun ShareFlowTheme(
 
     CompositionLocalProvider(*providedValues) {
         MaterialTheme(
-            colorScheme = animatedColorScheme,
+            colorScheme = targetColorScheme,
             typography = typography,
             shapes = ShareFlowShapes,
             content = content
         )
     }
-}
-
-@Composable
-private fun animateShareFlowColorScheme(
-    target: ColorScheme,
-    reducedMotion: Boolean
-): ColorScheme {
-    if (reducedMotion) return target
-    val spec = tween<Color>(durationMillis = 220)
-    val primary by animateColorAsState(target.primary, spec, label = "primary")
-    val onPrimary by animateColorAsState(target.onPrimary, spec, label = "onPrimary")
-    val primaryContainer by animateColorAsState(target.primaryContainer, spec, label = "primaryContainer")
-    val onPrimaryContainer by animateColorAsState(target.onPrimaryContainer, spec, label = "onPrimaryContainer")
-    val secondary by animateColorAsState(target.secondary, spec, label = "secondary")
-    val tertiary by animateColorAsState(target.tertiary, spec, label = "tertiary")
-    val background by animateColorAsState(target.background, spec, label = "background")
-    val onBackground by animateColorAsState(target.onBackground, spec, label = "onBackground")
-    val surface by animateColorAsState(target.surface, spec, label = "surface")
-    val onSurface by animateColorAsState(target.onSurface, spec, label = "onSurface")
-    val surfaceContainerLow by animateColorAsState(target.surfaceContainerLow, spec, label = "surfaceContainerLow")
-
-    return target.copy(
-        primary = primary,
-        onPrimary = onPrimary,
-        primaryContainer = primaryContainer,
-        onPrimaryContainer = onPrimaryContainer,
-        secondary = secondary,
-        tertiary = tertiary,
-        background = background,
-        onBackground = onBackground,
-        surface = surface,
-        onSurface = onSurface,
-        surfaceContainerLow = surfaceContainerLow
-    )
 }

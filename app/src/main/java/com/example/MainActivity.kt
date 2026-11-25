@@ -53,7 +53,7 @@ class MainActivity : FragmentActivity() {
         val targetWindowBg = if (initialIsDark) WINDOW_BG_DARK else WINDOW_BG_LIGHT
 
         // Apply exact system bar appearance and native window background BEFORE Frame 1 is rendered
-        // so Deep Navy Dark (#0D1220) or Light (#FFF9F5) is active immediately with zero flash.
+        // so Deep Charcoal (#171717) or Pearl White (#F8F7F4) is active immediately with zero flash.
         val barStyle = if (initialIsDark) {
             SystemBarStyle.dark(Color.TRANSPARENT)
         } else {
@@ -168,8 +168,8 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
-        internal const val WINDOW_BG_LIGHT = 0xFFFFF9F5.toInt()
-        internal const val WINDOW_BG_DARK = 0xFF0D1220.toInt()
+        internal const val WINDOW_BG_LIGHT = 0xFFF8F7F4.toInt()
+        internal const val WINDOW_BG_DARK = 0xFF171717.toInt()
         private const val SPLASH_EXIT_FADE_MS = 140L
 
         internal fun resolveInitialDarkTheme(

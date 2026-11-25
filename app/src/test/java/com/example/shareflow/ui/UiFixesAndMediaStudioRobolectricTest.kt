@@ -679,8 +679,8 @@ class UiFixesAndMediaStudioRobolectricTest {
     }
 
     @Test
-    fun `application BuildConfig version is updated to 1_0_18`() {
-        assertEquals("1.0.18", BuildConfig.VERSION_NAME)
-        assertEquals(19, BuildConfig.VERSION_CODE)
+    fun `application BuildConfig version is updated to 1_0_19`() {
+        assertEquals("1.0.19", BuildConfig.VERSION_NAME)
+        assertEquals(20, BuildConfig.VERSION_CODE)
     }
 }

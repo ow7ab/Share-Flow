@@ -287,8 +287,15 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Rtl, capturedDirection)
-        assertEquals(Color(0xFFFFF9F5), capturedBackground)
-        assertEquals(Color(0xFF1D1A22), capturedOnBackground)
+        // Pearl White Light Mode Official Palette
+        assertEquals(Color(0xFFF8F7F4), capturedBackground)
+        assertEquals(Color(0xFF252525), capturedOnBackground)
+        assertEquals(Color(0xFFFFFFFF), LightColorScheme.surface)
+        assertEquals(Color(0xFFF1F0EC), LightColorScheme.surfaceContainer)
+        assertEquals(Color(0xFF777777), LightColorScheme.onSurfaceVariant)
+        assertEquals(Color(0xFFEAE8E3), LightColorScheme.outlineVariant)
+        assertEquals(Color(0xFFC9C7C2), LightColorScheme.outline)
+        // Immutable Official Brand Palette
         assertEquals(Color(0xFFCA2851), capturedPrimary)
         assertEquals(Color(0xFFFF6766), capturedSecondary)
         assertEquals(Color(0xFFFFB173), capturedTertiary)
@@ -298,9 +305,16 @@ class ShareFlowDesignSystemTest {
             ShareFlowBrandGradients.SignatureStops
         )
         assertEquals(Color(0xFFCA2851), LightColorScheme.primary)
+        // Deep Charcoal Dark Mode Official Palette
         assertEquals(Color(0xFFFF6D8C), DarkColorScheme.primary)
-        assertEquals(Color(0xFF0D1220), DarkColorScheme.background)
-        assertEquals(Color(0xFF141B2D), DarkColorScheme.surface)
+        assertEquals(Color(0xFF171717), DarkColorScheme.background)
+        assertEquals(Color(0xFF222222), DarkColorScheme.surface)
+        assertEquals(Color(0xFF292929), DarkColorScheme.surfaceContainer)
+        assertEquals(Color(0xFF303030), DarkColorScheme.surfaceContainerHigh)
+        assertEquals(Color(0xFFFAFAFA), DarkColorScheme.onBackground)
+        assertEquals(Color(0xFFAAAAAA), DarkColorScheme.onSurfaceVariant)
+        assertEquals(Color(0xFF383838), DarkColorScheme.outlineVariant)
+        assertEquals(Color(0xFF666666), DarkColorScheme.outline)
         composeTestRule.onNodeWithTag("rtl_settings_title").assertTextEquals("الإعدادات")
 
         val arabicSize = ShareFlowFormatters.formatBytes(2048L, Locale.forLanguageTag("ar"))
@@ -336,15 +350,17 @@ class ShareFlowDesignSystemTest {
 
         composeTestRule.waitForIdle()
         assertEquals(LayoutDirection.Ltr, capturedDirection)
-        assertEquals(Color(0xFF0D1220), capturedDarkBackground)
+        assertEquals(Color(0xFF171717), capturedDarkBackground)
         assertNotEquals(Color.Black, capturedDarkBackground)
         assertEquals(Color(0xFFFF6D8C), capturedDarkPrimary)
         assertEquals(Color(0xFFFF8281), capturedDarkSecondary)
         assertEquals(Color(0xFFFFB173), capturedDarkTertiary)
-        assertEquals(Color(0xFFF4F6FC), capturedDarkOnBackground)
-        assertEquals(Color(0xD9FFFFFF), ShareFlowBrandColors.GlassNavBackground)
-        assertEquals(Color(0xBFE9DCE0), ShareFlowBrandColors.GlassNavBorder)
-        assertEquals(Color(0xFFE9DCE0), ShareFlowBrandColors.GlassCardBorder)
+        assertEquals(Color(0xFFFAFAFA), capturedDarkOnBackground)
+        assertEquals(Color(0xEBFFFFFF), ShareFlowBrandColors.GlassNavBackground)
+        assertEquals(Color(0xCCEAE8E3), ShareFlowBrandColors.GlassNavBorder)
+        assertEquals(Color(0xFFEAE8E3), ShareFlowBrandColors.GlassCardBorder)
+        assertEquals(Color.Transparent, com.example.shareflow.core.designsystem.theme.LightSFGlassTokens.ambientGlowPrimary)
+        assertEquals(Color.Transparent, com.example.shareflow.core.designsystem.theme.DarkSFGlassTokens.ambientGlowPrimary)
         composeTestRule.onNodeWithTag("ltr_settings_title").assertTextEquals("Settings")
     }
 

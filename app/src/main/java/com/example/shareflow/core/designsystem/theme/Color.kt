@@ -10,18 +10,20 @@ import androidx.compose.ui.graphics.Color
 import com.example.shareflow.domain.model.AccentColor
 
 /**
- * SHARE FLOW 2.0 — OFFICIAL COLOR SYSTEM
- * Hybrid Design Direction: Apple Liquid Glass + Samsung One UI + Premium Minimal
+ * SHARE FLOW — OFFICIAL PEARL WHITE & DEEP CHARCOAL COLOR SYSTEM
  *
- * Immutable Official Brand Palette:
+ * Immutable Official Brand Palette (Preserved in both Light & Dark modes):
  * - Primary Ruby:    #CA2851 (Core actions, active navigation, brand anchor)
  * - Secondary Coral: #FF6766 (Receive / secondary actions, interactive focus, highlights)
- * - Accent Peach:    #FFB173 (Warm supporting highlights, active gradients, soft badges)
- * - Cream Accent:    #FFE3B3 (Light mode warm glass wash, specular accents, soft surfaces)
+ * - Accent Peach:    #FFB173 (Supporting brand accents, active gradients, soft badges)
+ * - Soft Highlight:  #FFE3B3 (Signature brand highlight & warm accents)
  *
- * Dual Independent Theme Treatments:
- * - Light Mode: Clean bright neutral & soft warm cream surfaces with crisp dark ink.
- * - Dark Mode:  Deep Navy & dark neutral surfaces (zero pure black #000000) with crisp light ink.
+ * Official Dual Theme Identities:
+ * - Light Mode (Pearl White): Warm, calm Pearl White (#F8F7F4) canvas with crisp white (#FFFFFF)
+ *   cards, soft neutral borders (#EAE8E3), and high-contrast ink (#252525 / #777777).
+ * - Dark Mode (Deep Charcoal): Rich Deep Charcoal (#171717) canvas (zero pure black #000000)
+ *   with distinct dark gray cards (#222222), secondary surfaces (#292929), elevated surfaces
+ *   (#303030), soft charcoal borders (#383838), and crisp ink (#FAFAFA / #AAAAAA).
  */
 object ShareFlowMarpleColors {
     // Exact 4 Official Brand Identity Colors (NEVER REPLACED)
@@ -30,52 +32,52 @@ object ShareFlowMarpleColors {
     val Peach: Color = Color(0xFFFFB173)
     val Cream: Color = Color(0xFFFFE3B3)
 
-    // Light Mode — Bright Clean Neutral + Subtle Warm Cream Surfaces
-    val LightBackground: Color = Color(0xFFFFF9F5)
-    val LightSurface: Color = Color(0xFFFFFFFF)
-    val LightSurfaceContainerLow: Color = Color(0xFFFCF5F0)
-    val LightSurfaceContainer: Color = Color(0xFFF7EEE8)
-    val LightSurfaceVariant: Color = Color(0xFFF5EAE3)
-    val LightSurfaceContainerHigh: Color = Color(0xFFEFE1D9)
-    val LightSurfaceContainerHighest: Color = Color(0xFFE6D5CC)
-    val LightTextPrimary: Color = Color(0xFF1D1A22)
-    val LightTextSecondary: Color = Color(0xFF615A68)
-    val LightBorder: Color = Color(0xFFE9DCE0)
-    val LightOutline: Color = Color(0xFFC5B4BC)
+    // Light Mode — Pearl White Official Palette
+    val LightBackground: Color = Color(0xFFF8F7F4)           // Main Background
+    val LightSurface: Color = Color(0xFFFFFFFF)              // Card Background & Elevated Surface
+    val LightSurfaceContainerLow: Color = Color(0xFFFFFFFF)  // Card Surface
+    val LightSurfaceContainer: Color = Color(0xFFF1F0EC)     // Secondary Surface
+    val LightSurfaceVariant: Color = Color(0xFFF1F0EC)       // Secondary Surface
+    val LightSurfaceContainerHigh: Color = Color(0xFFEBEAE5) // Subtle Hover / Chip Container
+    val LightSurfaceContainerHighest: Color = Color(0xFFE4E2DC)
+    val LightTextPrimary: Color = Color(0xFF252525)          // Primary Text
+    val LightTextSecondary: Color = Color(0xFF777777)        // Secondary Text
+    val LightBorder: Color = Color(0xFFEAE8E3)               // Divider / Border
+    val LightOutline: Color = Color(0xFFC9C7C2)              // Outline / Disabled
 
-    // Light Containers
-    val LightRubyContainer: Color = Color(0xFFFFDCE2)
+    // Light Containers (Harmonized with Pearl White)
+    val LightRubyContainer: Color = Color(0xFFFFE1E7)
     val LightOnRubyContainer: Color = Color(0xFF470016)
-    val LightCoralContainer: Color = Color(0xFFFFDFDD)
+    val LightCoralContainer: Color = Color(0xFFFFE4E2)
     val LightOnCoralContainer: Color = Color(0xFF470308)
-    val LightPeachContainer: Color = Color(0xFFFFE9D6)
+    val LightPeachContainer: Color = Color(0xFFFFECDC)
     val LightOnPeachContainer: Color = Color(0xFF351900)
 
-    // Dark Mode — Deep Navy & Dark Neutral Surfaces (Zero Pure Black)
-    val DarkBackground: Color = Color(0xFF0D1220)
-    val DarkSurfaceLowest: Color = Color(0xFF090D18)
-    val DarkSurface: Color = Color(0xFF141B2D)
-    val DarkSurfaceContainerLow: Color = Color(0xFF182136)
-    val DarkSurfaceContainer: Color = Color(0xFF1D2740)
-    val DarkSurfaceElevated: Color = Color(0xFF232F4D)
-    val DarkSurfaceHighest: Color = Color(0xFF2C3A5E)
-    val DarkPrimary: Color = Color(0xFFFF6D8C)
+    // Dark Mode — Deep Charcoal Official Palette (Zero Pure Black #000000)
+    val DarkBackground: Color = Color(0xFF171717)            // Main Background
+    val DarkSurfaceLowest: Color = Color(0xFF141414)         // Recessed Well
+    val DarkSurface: Color = Color(0xFF222222)               // Card Background
+    val DarkSurfaceContainerLow: Color = Color(0xFF222222)   // Card Surface
+    val DarkSurfaceContainer: Color = Color(0xFF292929)      // Secondary Surface
+    val DarkSurfaceElevated: Color = Color(0xFF303030)       // Elevated Surface
+    val DarkSurfaceHighest: Color = Color(0xFF383838)        // Highest Neutral Container
+    val DarkPrimary: Color = Color(0xFFFF6D8C)               // High-contrast Ruby accent on Charcoal
     val DarkOnPrimary: Color = Color(0xFF4B0016)
-    val DarkPrimaryContainer: Color = Color(0xFF6E1232)
+    val DarkPrimaryContainer: Color = Color(0xFF4D1A29)
     val DarkOnPrimaryContainer: Color = Color(0xFFFFDCE2)
-    val DarkSecondary: Color = Color(0xFFFF8281)
+    val DarkSecondary: Color = Color(0xFFFF8281)             // High-contrast Coral accent on Charcoal
     val DarkOnSecondary: Color = Color(0xFF4D080C)
-    val DarkSecondaryContainer: Color = Color(0xFF662028)
+    val DarkSecondaryContainer: Color = Color(0xFF4A2223)
     val DarkOnSecondaryContainer: Color = Color(0xFFFFDFDD)
     val DarkTertiary: Color = Color(0xFFFFB173)
     val DarkOnTertiary: Color = Color(0xFF3B1E00)
-    val DarkTertiaryContainer: Color = Color(0xFF563414)
+    val DarkTertiaryContainer: Color = Color(0xFF45301B)
     val DarkOnTertiaryContainer: Color = Color(0xFFFFE3C8)
     val DarkAccent: Color = Color(0xFFFFE3B3)
-    val DarkTextPrimary: Color = Color(0xFFF4F6FC)
-    val DarkTextSecondary: Color = Color(0xFFA6B2CB)
-    val DarkBorder: Color = Color(0xFF314063)
-    val DarkOutline: Color = Color(0xFF637499)
+    val DarkTextPrimary: Color = Color(0xFFFAFAFA)           // Primary Text
+    val DarkTextSecondary: Color = Color(0xFFAAAAAA)         // Secondary Text
+    val DarkBorder: Color = Color(0xFF383838)                // Divider / Border
+    val DarkOutline: Color = Color(0xFF666666)               // Outline / Disabled
 
     // Semantic Status Roles
     val LightError: Color = Color(0xFFC21E2C)
@@ -85,7 +87,7 @@ object ShareFlowMarpleColors {
 
     val DarkError: Color = Color(0xFFFFB3B0)
     val DarkOnError: Color = Color(0xFF68000A)
-    val DarkErrorContainer: Color = Color(0xFF8C141F)
+    val DarkErrorContainer: Color = Color(0xFF5C191F)
     val DarkOnErrorContainer: Color = Color(0xFFFFDAD9)
 
     val LightSuccess: Color = Color(0xFF18794E)
@@ -94,42 +96,41 @@ object ShareFlowMarpleColors {
 
     val DarkSuccess: Color = Color(0xFF5DD89F)
     val DarkOnSuccess: Color = Color(0xFF04341E)
-    val DarkSuccessContainer: Color = Color(0xFF133B2E)
+    val DarkSuccessContainer: Color = Color(0xFF1A3828)
 
     val LightWarning: Color = Color(0xFFB35812)
     val LightWarningContainer: Color = Color(0xFFFFE7C2)
     val DarkWarning: Color = Color(0xFFFFB173)
-    val DarkWarningContainer: Color = Color(0xFF4A2E14)
+    val DarkWarningContainer: Color = Color(0xFF452E16)
 
-    val LightDisabled: Color = Color(0xFFE0D5DA)
-    val LightOnDisabled: Color = Color(0xFF8F848C)
-    val DarkDisabled: Color = Color(0xFF26314A)
-    val DarkOnDisabled: Color = Color(0xFF6C7A99)
+    val LightDisabled: Color = Color(0xFFC9C7C2)             // Official Pearl White Disabled
+    val LightOnDisabled: Color = Color(0xFF777777)
+    val DarkDisabled: Color = Color(0xFF666666)              // Official Deep Charcoal Disabled
+    val DarkOnDisabled: Color = Color(0xFFAAAAAA)
 
-    val LightScrim: Color = Color(0x660D1220)
-    val DarkScrim: Color = Color(0xA6050811)
+    val LightScrim: Color = Color(0x52171717)
+    val DarkScrim: Color = Color(0xA60A0A0A)
     val Scrim: Color = DarkScrim
 
-    // Liquid Glass Navigation & Surface Tokens
-    val LightGlassNavSurface: Color = Color(0xD9FFFFFF)
-    val LightGlassNavOverlay: Color = Color(0x4DFFE3B3)
-    val LightGlassNavBorder: Color = Color(0xBFE9DCE0)
-    val LightGlassNavActiveIndicator: Color = Color(0x1DCA2851)
+    // Liquid Glass Bottom Navigation & Surface Tokens
+    val LightGlassNavSurface: Color = Color(0xEBFFFFFF)
+    val LightGlassNavOverlay: Color = Color(0x33F8F7F4)
+    val LightGlassNavBorder: Color = Color(0xCCEAE8E3)
+    val LightGlassNavActiveIndicator: Color = Color(0x1ACA2851)
 
-    val DarkGlassNavSurface: Color = Color(0xD4141B2D)
-    val DarkGlassNavOverlay: Color = Color(0x38232F4D)
-    val DarkGlassNavBorder: Color = Color(0x99384A73)
-    val DarkGlassNavActiveIndicator: Color = Color(0x33FF6D8C)
+    val DarkGlassNavSurface: Color = Color(0xE8222222)
+    val DarkGlassNavOverlay: Color = Color(0x2E303030)
+    val DarkGlassNavBorder: Color = Color(0xCC383838)
+    val DarkGlassNavActiveIndicator: Color = Color(0x2EFF6D8C)
 }
 
 /**
- * Share Flow 2.0 primary color token namespace alias.
+ * Share Flow primary color token namespace alias.
  */
 typealias SFColors = ShareFlowMarpleColors
 
 /**
- * Backward-compatible token alias object so every existing screen reference resolves cleanly
- * to the Share Flow 2.0 color tokens.
+ * Backward-compatible token alias object resolving cleanly to the Pearl White & Deep Charcoal palette.
  */
 object ShareFlowBrandColors {
     val Ruby: Color = ShareFlowMarpleColors.Ruby
@@ -177,7 +178,7 @@ object ShareFlowBrandColors {
 }
 
 /**
- * Official 4-Color Brand Gradients:
+ * Official 4-Color Brand Gradients (Unchanged):
  * Ruby (#CA2851) -> Coral (#FF6766) -> Peach (#FFB173) -> Cream (#FFE3B3)
  */
 object ShareFlowBrandGradients {
@@ -232,7 +233,7 @@ object ShareFlowBrandGradients {
 }
 
 /**
- * Liquid Glass Surface & Specular Highlight tokens for Light Mode & Deep Navy Dark Mode.
+ * Surface, Glass Navigation & Specular Highlight tokens for Pearl White (Light) & Deep Charcoal (Dark).
  */
 @Immutable
 data class SFGlassTokens(
@@ -264,64 +265,66 @@ data class SFGlassTokens(
 
 val LightSFGlassTokens = SFGlassTokens(
     isDark = false,
-    cardBackground = Color(0xE0FFFFFF),
-    cardElevatedBackground = Color(0xF0FFFFFF),
-    cardSubtleBackground = Color(0xB8FCF5F0),
-    topGlaze = Color(0x99FFFFFF),
-    bottomGlaze = Color(0x1FFFE3B3),
-    borderTop = Color(0xF2FFFFFF),
-    borderMiddle = Color(0x99E9DCE0),
-    borderBottom = Color(0xCCE5D5DA),
+    cardBackground = ShareFlowMarpleColors.LightSurface,          // Crisp #FFFFFF card on #F8F7F4
+    cardElevatedBackground = ShareFlowMarpleColors.LightSurface,  // Crisp #FFFFFF elevated surface
+    cardSubtleBackground = ShareFlowMarpleColors.LightSurfaceContainer, // #F1F0EC secondary surface
+    topGlaze = Color(0x33FFFFFF),
+    bottomGlaze = Color.Transparent,                              // Zero peach/pink wash
+    borderTop = ShareFlowMarpleColors.LightBorder,                // #EAE8E3
+    borderMiddle = ShareFlowMarpleColors.LightBorder,             // #EAE8E3
+    borderBottom = ShareFlowMarpleColors.LightBorder,             // #EAE8E3
     activeBorder = ShareFlowMarpleColors.Ruby.copy(alpha = 0.60f),
-    ambientShadow = Color(0x1A1D1A22),
-    spotShadow = ShareFlowMarpleColors.Ruby.copy(alpha = 0.12f),
-    // Dense iOS-style frosted warm-white glass (prevents noisy bleed-through)
-    navBase = Color(0xF0FFFBF8),
-    navGlazeTop = Color(0xB8FFFFFF),
-    navGlazeBottom = Color(0x40FFE3B3),
+    ambientShadow = Color(0x12252525),
+    spotShadow = Color(0x14252525),
+    // Frosted translucent white glass capsule for bottom navigation (zero peach/cream wash)
+    navBase = Color(0xEEFFFFFF),
+    navGlazeTop = Color(0xC2FFFFFF),
+    navGlazeBottom = Color(0x52F8F7F4),
     navBorderTop = Color(0xFFFFFFFF),
-    navBorderBottom = Color(0xD9DFCFD5),
-    navActivePill = ShareFlowMarpleColors.Ruby.copy(alpha = 0.13f),
-    overlayBackground = Color(0xF7FFFBF8),
-    snackbarBackground = Color(0xF21D2740),
-    snackbarContent = Color(0xFFF4F6FC),
-    ambientGlowPrimary = ShareFlowMarpleColors.Cream.copy(alpha = 0.56f),
-    ambientGlowSecondary = ShareFlowMarpleColors.Peach.copy(alpha = 0.18f),
-    ambientGlowTertiary = ShareFlowMarpleColors.Ruby.copy(alpha = 0.06f)
+    navBorderBottom = Color(0xD9EAE8E3),
+    navActivePill = ShareFlowMarpleColors.Ruby.copy(alpha = 0.11f),
+    overlayBackground = Color(0xFAFFFFFF),
+    snackbarBackground = Color(0xF5222222),
+    snackbarContent = Color(0xFFFAFAFA),
+    // Calm Pearl White background without pink or peach gradients
+    ambientGlowPrimary = Color.Transparent,
+    ambientGlowSecondary = Color.Transparent,
+    ambientGlowTertiary = Color.Transparent
 )
 
 val DarkSFGlassTokens = SFGlassTokens(
     isDark = true,
-    cardBackground = Color(0xCC182136),
-    cardElevatedBackground = Color(0xE01F2B47),
-    cardSubtleBackground = Color(0xA6141B2D),
-    topGlaze = Color(0x1CFFFFFF),
-    bottomGlaze = Color(0x14090D18),
-    borderTop = Color(0x36FFFFFF),
-    borderMiddle = Color(0x70314063),
-    borderBottom = Color(0x24FFFFFF),
+    cardBackground = ShareFlowMarpleColors.DarkSurface,           // #222222 card on #171717
+    cardElevatedBackground = ShareFlowMarpleColors.DarkSurfaceElevated, // #303030 elevated surface
+    cardSubtleBackground = ShareFlowMarpleColors.DarkSurfaceContainer,  // #292929 secondary surface
+    topGlaze = Color(0x0DFFFFFF),
+    bottomGlaze = Color.Transparent,                              // Zero colored haze
+    borderTop = ShareFlowMarpleColors.DarkBorder,                 // #383838
+    borderMiddle = ShareFlowMarpleColors.DarkBorder,              // #383838
+    borderBottom = ShareFlowMarpleColors.DarkBorder,              // #383838
     activeBorder = ShareFlowMarpleColors.DarkPrimary.copy(alpha = 0.65f),
-    ambientShadow = Color(0x8803060E),
-    spotShadow = ShareFlowMarpleColors.Ruby.copy(alpha = 0.22f),
-    // Dense iOS-style frosted deep-navy glass (calm, opaque-frosted readability)
-    navBase = Color(0xEB141C30),
-    navGlazeTop = Color(0x29FFFFFF),
-    navGlazeBottom = Color(0x700B101E),
-    navBorderTop = Color(0x4DFFFFFF),
-    navBorderBottom = Color(0x8C34466B),
-    navActivePill = ShareFlowMarpleColors.DarkPrimary.copy(alpha = 0.20f),
-    overlayBackground = Color(0xF5182136),
-    snackbarBackground = Color(0xF5232F4D),
-    snackbarContent = Color(0xFFF4F6FC),
-    ambientGlowPrimary = ShareFlowMarpleColors.Ruby.copy(alpha = 0.16f),
-    ambientGlowSecondary = Color(0xFF243B6B).copy(alpha = 0.34f),
-    ambientGlowTertiary = ShareFlowMarpleColors.Peach.copy(alpha = 0.09f)
+    ambientShadow = Color(0x66000000),
+    spotShadow = Color(0x4D000000),
+    // Frosted translucent charcoal glass capsule for bottom navigation (zero navy cast)
+    navBase = Color(0xE8222222),
+    navGlazeTop = Color(0x1CFFFFFF),
+    navGlazeBottom = Color(0x59171717),
+    navBorderTop = Color(0x38FFFFFF),
+    navBorderBottom = Color(0xCC383838),
+    navActivePill = ShareFlowMarpleColors.DarkPrimary.copy(alpha = 0.18f),
+    overlayBackground = Color(0xFA222222),
+    snackbarBackground = Color(0xF5303030),
+    snackbarContent = Color(0xFFFAFAFA),
+    // Clean Deep Charcoal background without exaggerated colored glows
+    ambientGlowPrimary = Color.Transparent,
+    ambientGlowSecondary = Color.Transparent,
+    ambientGlowTertiary = Color.Transparent
 )
 
 val LocalSFGlassTokens = staticCompositionLocalOf { LightSFGlassTokens }
 
 /**
- * Light Mode ColorScheme built on Share Flow 2.0 neutral + warm cream surfaces & official brand palette.
+ * Official Light Mode ColorScheme — Pearl White (#F8F7F4) with crisp white cards & official brand palette.
  */
 val LightColorScheme: ColorScheme = lightColorScheme(
     primary = ShareFlowMarpleColors.Ruby,
@@ -367,7 +370,7 @@ val LightColorScheme: ColorScheme = lightColorScheme(
 )
 
 /**
- * Deep Navy Dark Mode ColorScheme built on Share Flow 2.0 dark neutral surfaces & controlled brand accents.
+ * Official Dark Mode ColorScheme — Deep Charcoal (#171717) with layered charcoal cards & brand accents.
  */
 val DarkColorScheme: ColorScheme = darkColorScheme(
     primary = ShareFlowMarpleColors.DarkPrimary,
@@ -504,8 +507,8 @@ val LightShareFlowSemanticColors = ShareFlowSemanticColors(
     disabled = ShareFlowMarpleColors.LightDisabled,
     onDisabled = ShareFlowMarpleColors.LightOnDisabled,
     scrim = ShareFlowMarpleColors.LightScrim,
-    heroScrimStart = Color(0xE61D1A22),
-    heroScrimEnd = Color(0x99471329),
+    heroScrimStart = Color(0xE0252525),
+    heroScrimEnd = Color(0x88383838),
     glassNavBackground = ShareFlowMarpleColors.LightGlassNavSurface,
     glassNavOverlay = ShareFlowMarpleColors.LightGlassNavOverlay,
     glassNavBorder = ShareFlowMarpleColors.LightGlassNavBorder,
@@ -536,8 +539,8 @@ val DarkShareFlowSemanticColors = ShareFlowSemanticColors(
     disabled = ShareFlowMarpleColors.DarkDisabled,
     onDisabled = ShareFlowMarpleColors.DarkOnDisabled,
     scrim = ShareFlowMarpleColors.DarkScrim,
-    heroScrimStart = Color(0xF00D1220),
-    heroScrimEnd = Color(0xAA1D2740),
+    heroScrimStart = Color(0xF0171717),
+    heroScrimEnd = Color(0xB3292929),
     glassNavBackground = ShareFlowMarpleColors.DarkGlassNavSurface,
     glassNavOverlay = ShareFlowMarpleColors.DarkGlassNavOverlay,
     glassNavBorder = ShareFlowMarpleColors.DarkGlassNavBorder,
