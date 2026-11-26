@@ -236,7 +236,7 @@ class CloudUpdateManagerTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val manager = createManager(
             dispatcher = dispatcher,
-            httpClient = FakeCloudUpdateHttpClient(manifestResponse = AppResult.Success(validManifestJson(versionCode = 2, versionName = "1.0.1"))),
+            httpClient = FakeCloudUpdateHttpClient(manifestResponse = AppResult.Success(validManifestJson(versionCode = 2, versionName = "1.0.2"))),
             inspector = FakeApkSecurityInspector(AppResult.Success(Unit)),
             currentVersionCode = 2
         )

@@ -20,6 +20,8 @@ import com.example.shareflow.data.files.ReceivedMediaStorePublisher
 import com.example.shareflow.data.update.AndroidApkPackageSecurityInspector
 import com.example.shareflow.data.update.CloudUpdateManager
 import com.example.shareflow.data.update.DataStoreUpdatePreferencesStore
+import com.example.shareflow.data.update.InstalledAppVersionInfo
+import com.example.shareflow.data.update.InstalledAppVersionResolver
 import com.example.shareflow.data.update.OkHttpCloudUpdateHttpClient
 import com.example.shareflow.data.update.UpdateManager
 import com.example.shareflow.data.update.UpdatePreferencesStore
@@ -553,10 +555,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
             .build()
     }
 
+    private val installedAppVersion: InstalledAppVersionInfo by lazy {
+        InstalledAppVersionResolver.resolve(appContext)
+    }
+
     private val cloudUpdateManagerLazy = lazy {
         val downloadClient = sharedBaseOkHttpClient.newBuilder()
             .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
             .build()
+        val installed = installedAppVersion
         CloudUpdateManager(
             context = appContext,
             httpClient = OkHttpCloudUpdateHttpClient(
@@ -568,6 +575,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
             packageInspector = AndroidApkPackageSecurityInspector(context = appContext),
             permissionManager = permissionManager,
             dispatchers = dispatchers,
+            currentVersionCode = installed.versionCode,
+            currentVersionName = installed.versionName,
             enableGitHubReleasesPrimary = true,
             preferencesStore = updatePreferencesStore,
             clock = clock
@@ -580,9 +589,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
         get() = cloudUpdateManagerLazy.isInitialized()
 
     private val updateManagerLazy = lazy {
+        val installed = installedAppVersion
         UpdateManager(
             okHttpClient = sharedBaseOkHttpClient,
             dispatcher = dispatchers.io,
+            currentVersionCode = installed.versionCode,
+            currentVersionName = installed.versionName,
             enableGitHubReleasesApi = true,
             preferencesStore = updatePreferencesStore,
             clock = clock
@@ -602,12 +614,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val updateNotificationManager: ShareFlowUpdateNotificationManager by lazy {
+        val installed = installedAppVersion
         ShareFlowUpdateNotificationManager(
             context = appContext,
             preferencesStore = updatePreferencesStore,
             updateManager = updateManager,
             cloudUpdateManager = cloudUpdateManager,
-            isAppInForegroundProvider = { appForegroundTracker.isInForeground }
+            isAppInForegroundProvider = { appForegroundTracker.isInForeground },
+            currentVersionCode = installed.versionCode,
+            currentVersionName = installed.versionName
         )
     }
 }

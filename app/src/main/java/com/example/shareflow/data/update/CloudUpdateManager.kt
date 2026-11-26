@@ -111,9 +111,74 @@ enum class CloudUpdateErrorReason {
     PACKAGE_IDENTITY_MISMATCH,
     SIGNATURE_MISMATCH,
     DOWNGRADE_BLOCKED,
+    DUPLICATE_VERSION_CONFLICT,
+    VERSION_METADATA_MISMATCH,
+    INVALID_APK,
+    UNREADABLE_VERSION_METADATA,
     DOWNLOAD_INTERRUPTED,
     INSTALL_PERMISSION_REQUIRED,
     INSTALL_LAUNCH_FAILED
+}
+
+data class InstalledAppVersionInfo(
+    val versionCode: Int,
+    val versionName: String
+)
+
+/**
+ * Resolves the real installed ShareFlow `versionCode` (`longVersionCode` on API 28+) and
+ * `versionName` directly from Android's [PackageManager], falling back safely to [BuildConfig]
+ * only when package metadata is unavailable (e.g., stripped test harness).
+ */
+object InstalledAppVersionResolver {
+    @Suppress("DEPRECATION")
+    fun resolve(context: Context): InstalledAppVersionInfo {
+        val pm = context.packageManager
+        val pkgName = context.packageName
+        val pkgInfo: PackageInfo? = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(pkgName, PackageManager.PackageInfoFlags.of(0L))
+            } else {
+                pm.getPackageInfo(pkgName, 0)
+            }
+        }.getOrNull()
+
+        val resolvedCode = pkgInfo?.let { info ->
+            val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.longVersionCode
+            } else {
+                info.versionCode.toLong()
+            }
+            if (raw in 1L..Int.MAX_VALUE.toLong()) raw.toInt() else null
+        } ?: BuildConfig.VERSION_CODE
+
+        val resolvedName = pkgInfo?.versionName
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: BuildConfig.VERSION_NAME
+
+        return InstalledAppVersionInfo(
+            versionCode = resolvedCode,
+            versionName = resolvedName
+        )
+    }
+}
+
+data class InspectedApkMetadata(
+    val packageName: String,
+    val versionCode: Int,
+    val versionName: String,
+    val signingCertSha256Digests: Set<String>
+)
+
+sealed class ApkInspectionResult {
+    data class Valid(val metadata: InspectedApkMetadata) : ApkInspectionResult()
+    data class Rejected(
+        val reason: CloudUpdateErrorReason,
+        val detail: String,
+        val inspectedVersionCode: Int? = null,
+        val inspectedVersionName: String? = null
+    ) : ApkInspectionResult()
 }
 
 enum class UpdateInstallLaunchResult {
@@ -138,6 +203,56 @@ interface ApkPackageSecurityInspector {
         expectedMinVersionCode: Int,
         currentInstalledVersionCode: Int
     ): AppResult<Unit>
+
+    /**
+     * Full pre-installation inspection of the actual downloaded APK file:
+     * validates archive integrity, reads real APK `versionCode`/`versionName`, checks package ID,
+     * verifies consistency against GitHub Release metadata, enforces `versionCode` precedence
+     * against the installed app, and validates signing certificate continuity.
+     */
+    fun inspectUpdateApkDetailed(
+        apkFile: File,
+        expectedPackageName: String,
+        expectedVersionCode: Int,
+        expectedVersionName: String,
+        currentInstalledVersionCode: Int,
+        currentInstalledVersionName: String,
+        expectedSigningCertSha256: String? = null
+    ): ApkInspectionResult = when (
+        val legacy = inspectUpdateApk(
+            apkFile = apkFile,
+            expectedPackageName = expectedPackageName,
+            expectedMinVersionCode = expectedVersionCode,
+            currentInstalledVersionCode = currentInstalledVersionCode
+        )
+    ) {
+        is AppResult.Success -> ApkInspectionResult.Valid(
+            InspectedApkMetadata(
+                packageName = expectedPackageName,
+                versionCode = expectedVersionCode,
+                versionName = expectedVersionName,
+                signingCertSha256Digests = emptySet()
+            )
+        )
+        is AppResult.Failure -> {
+            val msg = legacy.error.message
+            val reason = when {
+                msg.contains("signature", ignoreCase = true) ||
+                    msg.contains("certificate", ignoreCase = true) -> CloudUpdateErrorReason.SIGNATURE_MISMATCH
+                msg.contains("package ID", ignoreCase = true) -> CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH
+                msg.contains("corrupt", ignoreCase = true) ||
+                    msg.contains("not a valid Android APK", ignoreCase = true) -> CloudUpdateErrorReason.INVALID_APK
+                msg.contains("metadata", ignoreCase = true) ||
+                    msg.contains("mismatch", ignoreCase = true) -> CloudUpdateErrorReason.VERSION_METADATA_MISMATCH
+                msg.contains("duplicate", ignoreCase = true) -> CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT
+                msg.contains("unreadable", ignoreCase = true) -> CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA
+                msg.contains("downgrade", ignoreCase = true) ||
+                    msg.contains("older", ignoreCase = true) -> CloudUpdateErrorReason.DOWNGRADE_BLOCKED
+                else -> CloudUpdateErrorReason.INVALID_MANIFEST
+            }
+            ApkInspectionResult.Rejected(reason = reason, detail = msg)
+        }
+    }
 
     /**
      * Checks before downloading the APK whether an advertised release signing certificate SHA-256
@@ -300,16 +415,47 @@ class HttpsCloudUpdateHttpClient(
 )
 
 class AndroidApkPackageSecurityInspector(
-    private val context: Context
+    private val context: Context,
+    private val archiveInfoProvider: ((apkFile: File, flags: Int) -> PackageInfo?)? = null,
+    private val installedInfoProvider: ((packageName: String, flags: Int) -> PackageInfo?)? = null
 ) : ApkPackageSecurityInspector {
 
-    @Suppress("DEPRECATION")
     override fun inspectUpdateApk(
         apkFile: File,
         expectedPackageName: String,
         expectedMinVersionCode: Int,
         currentInstalledVersionCode: Int
-    ): AppResult<Unit> {
+    ): AppResult<Unit> = when (
+        val detailed = inspectUpdateApkDetailed(
+            apkFile = apkFile,
+            expectedPackageName = expectedPackageName,
+            expectedVersionCode = expectedMinVersionCode,
+            expectedVersionName = "",
+            currentInstalledVersionCode = currentInstalledVersionCode,
+            currentInstalledVersionName = ""
+        )
+    ) {
+        is ApkInspectionResult.Valid -> AppResult.Success(Unit)
+        is ApkInspectionResult.Rejected -> AppResult.Failure(AppError.Security(detailed.detail))
+    }
+
+    @Suppress("DEPRECATION")
+    override fun inspectUpdateApkDetailed(
+        apkFile: File,
+        expectedPackageName: String,
+        expectedVersionCode: Int,
+        expectedVersionName: String,
+        currentInstalledVersionCode: Int,
+        currentInstalledVersionName: String,
+        expectedSigningCertSha256: String?
+    ): ApkInspectionResult {
+        if (!apkFile.exists() || !apkFile.isFile || apkFile.length() <= 0L) {
+            return ApkInspectionResult.Rejected(
+                reason = CloudUpdateErrorReason.INVALID_APK,
+                detail = "Downloaded update file is missing or empty."
+            )
+        }
+
         val pm = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_META_DATA
@@ -317,35 +463,116 @@ class AndroidApkPackageSecurityInspector(
             PackageManager.GET_SIGNATURES or PackageManager.GET_META_DATA
         }
 
-        val archiveInfo: PackageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
-        } else {
-            pm.getPackageArchiveInfo(apkFile.absolutePath, flags)
-        } ?: return AppResult.Failure(
-            AppError.Security("Downloaded file is not a valid Android APK package.")
+        val archiveInfo: PackageInfo = runCatching {
+            archiveInfoProvider?.invoke(apkFile, flags) ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            } else {
+                pm.getPackageArchiveInfo(apkFile.absolutePath, flags)
+            }
+        }.getOrNull() ?: return ApkInspectionResult.Rejected(
+            reason = CloudUpdateErrorReason.INVALID_APK,
+            detail = "Downloaded file is corrupted or not a valid Android APK package."
         )
 
-        if (archiveInfo.packageName != expectedPackageName) {
-            return AppResult.Failure(
-                AppError.Security("APK package ID (${archiveInfo.packageName}) does not match ShareFlow ($expectedPackageName).")
-            )
-        }
-
-        val archiveVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        // 1. Validate readable APK versionCode and versionName directly from the APK manifest
+        val archiveVersionCodeLong = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             archiveInfo.longVersionCode
         } else {
             archiveInfo.versionCode.toLong()
         }
-        if (archiveVersionCode <= currentInstalledVersionCode.toLong() ||
-            archiveVersionCode < expectedMinVersionCode.toLong()
-        ) {
-            return AppResult.Failure(
-                AppError.Security("APK version ($archiveVersionCode) is not newer than installed version ($currentInstalledVersionCode).")
+        val archiveVersionName = archiveInfo.versionName?.trim().orEmpty()
+        if (archiveVersionCodeLong <= 0L || archiveVersionCodeLong > Int.MAX_VALUE.toLong() || archiveVersionName.isBlank()) {
+            return ApkInspectionResult.Rejected(
+                reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
+                detail = "Could not read valid versionCode ($archiveVersionCodeLong) or versionName ('$archiveVersionName') from the downloaded APK."
+            )
+        }
+        val archiveVersionCode = archiveVersionCodeLong.toInt()
+
+        // 2. Validate applicationId / package identity
+        if (archiveInfo.packageName != expectedPackageName) {
+            return ApkInspectionResult.Rejected(
+                reason = CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH,
+                detail = "APK package ID (${archiveInfo.packageName}) does not match ShareFlow ($expectedPackageName).",
+                inspectedVersionCode = archiveVersionCode,
+                inspectedVersionName = archiveVersionName
             )
         }
 
+        // 3. Validate consistency between GitHub Release / version.json metadata and the ACTUAL APK
+        if (expectedVersionCode > 0 && archiveVersionCode != expectedVersionCode) {
+            return ApkInspectionResult.Rejected(
+                reason = CloudUpdateErrorReason.VERSION_METADATA_MISMATCH,
+                detail = "Release metadata conflict: release declared versionCode $expectedVersionCode" +
+                    (if (expectedVersionName.isNotBlank()) " (v$expectedVersionName)" else "") +
+                    ", but downloaded APK contains versionCode $archiveVersionCode (v$archiveVersionName). Installation stopped.",
+                inspectedVersionCode = archiveVersionCode,
+                inspectedVersionName = archiveVersionName
+            )
+        }
+        if (expectedVersionName.isNotBlank()) {
+            val normExpectedName = GitHubReleasesParser.normalizeVersionName(expectedVersionName)
+            val normArchiveName = GitHubReleasesParser.normalizeVersionName(archiveVersionName)
+            if (normExpectedName.isNotBlank() &&
+                normArchiveName.isNotBlank() &&
+                !normExpectedName.equals(normArchiveName, ignoreCase = true)
+            ) {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.VERSION_METADATA_MISMATCH,
+                    detail = "Release metadata conflict: release declared v$normExpectedName (versionCode $expectedVersionCode), but downloaded APK contains v$normArchiveName (versionCode $archiveVersionCode). Installation stopped.",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+        }
+
+        // 4. Strictly evaluate actual APK versionCode against installed ShareFlow versionCode
+        when (
+            GitHubReleasesParser.evaluateVersionPrecedence(
+                remoteVersionCode = archiveVersionCode,
+                remoteVersionName = archiveVersionName,
+                installedVersionCode = currentInstalledVersionCode,
+                installedVersionName = currentInstalledVersionName
+            )
+        ) {
+            VersionPrecedenceDecision.UPDATE_AVAILABLE -> Unit
+            VersionPrecedenceDecision.DOWNGRADE_BLOCKED -> {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.DOWNGRADE_BLOCKED,
+                    detail = "Downloaded APK versionCode ($archiveVersionCode, v$archiveVersionName) is older than installed versionCode ($currentInstalledVersionCode, v$currentInstalledVersionName). Downgrade blocked.",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+            VersionPrecedenceDecision.DUPLICATE_VERSION_CONFLICT -> {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
+                    detail = "Downloaded APK uses duplicate versionCode $archiveVersionCode (v$archiveVersionName) matching installed versionCode $currentInstalledVersionCode (v$currentInstalledVersionName). Update rejected.",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+            VersionPrecedenceDecision.ALREADY_INSTALLED -> {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
+                    detail = "Downloaded APK versionCode $archiveVersionCode (v$archiveVersionName) is already installed on this device.",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+            VersionPrecedenceDecision.UNREADABLE_VERSION_METADATA -> {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
+                    detail = "Could not compare APK versionCode ($archiveVersionCode) against installed versionCode ($currentInstalledVersionCode).",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+        }
+
+        // 5. Mandatory cryptographic signing certificate verification (NEVER bypassed)
         val installedInfo: PackageInfo? = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            installedInfoProvider?.invoke(expectedPackageName, flags) ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pm.getPackageInfo(expectedPackageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
             } else {
                 pm.getPackageInfo(expectedPackageName, flags)
@@ -359,12 +586,37 @@ class AndroidApkPackageSecurityInspector(
             archiveCertDigests.isEmpty() ||
             installedCertDigests.intersect(archiveCertDigests).isEmpty()
         ) {
-            return AppResult.Failure(
-                AppError.Security("Update APK signing certificate does not match the installed ShareFlow signature.")
+            return ApkInspectionResult.Rejected(
+                reason = CloudUpdateErrorReason.SIGNATURE_MISMATCH,
+                detail = "Update APK signing certificate does not match the installed ShareFlow signature.",
+                inspectedVersionCode = archiveVersionCode,
+                inspectedVersionName = archiveVersionName
             )
         }
 
-        return AppResult.Success(Unit)
+        val normalizedExpectedCert = expectedSigningCertSha256?.trim()?.replace(":", "")?.lowercase()
+        if (!normalizedExpectedCert.isNullOrBlank() && normalizedExpectedCert.length == 64) {
+            val matchesExpectedCert = archiveCertDigests.any {
+                CloudUpdateValidator.constantTimeHashEquals(normalizedExpectedCert, it)
+            }
+            if (!matchesExpectedCert) {
+                return ApkInspectionResult.Rejected(
+                    reason = CloudUpdateErrorReason.SIGNATURE_MISMATCH,
+                    detail = "Downloaded APK signing certificate does not match the release manifest signingCertSha256.",
+                    inspectedVersionCode = archiveVersionCode,
+                    inspectedVersionName = archiveVersionName
+                )
+            }
+        }
+
+        return ApkInspectionResult.Valid(
+            InspectedApkMetadata(
+                packageName = archiveInfo.packageName,
+                versionCode = archiveVersionCode,
+                versionName = archiveVersionName,
+                signingCertSha256Digests = archiveCertDigests
+            )
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -381,7 +633,7 @@ class AndroidApkPackageSecurityInspector(
             PackageManager.GET_SIGNATURES
         }
         val installedInfo: PackageInfo? = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            installedInfoProvider?.invoke(expectedPackageName, flags) ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pm.getPackageInfo(expectedPackageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
             } else {
                 pm.getPackageInfo(expectedPackageName, flags)
@@ -396,14 +648,18 @@ class AndroidApkPackageSecurityInspector(
     private fun extractSigningCertSha256Digests(pkgInfo: PackageInfo?): Set<String> {
         if (pkgInfo == null) return emptySet()
         val rawSignatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = pkgInfo.signingInfo ?: return emptySet()
-            val candidates = if (signingInfo.hasMultipleSigners()) {
-                signingInfo.apkContentsSigners
+            val signingInfo = pkgInfo.signingInfo
+            if (signingInfo != null) {
+                val candidates = if (signingInfo.hasMultipleSigners()) {
+                    signingInfo.apkContentsSigners
+                } else {
+                    signingInfo.signingCertificateHistory?.takeIf { it.isNotEmpty() }
+                        ?: signingInfo.apkContentsSigners
+                }
+                candidates?.toList().orEmpty()
             } else {
-                signingInfo.signingCertificateHistory?.takeIf { it.isNotEmpty() }
-                    ?: signingInfo.apkContentsSigners
+                pkgInfo.signatures?.toList().orEmpty()
             }
-            candidates?.toList().orEmpty()
         } else {
             pkgInfo.signatures?.toList().orEmpty()
         }
@@ -551,54 +807,82 @@ class CloudUpdateManager(
                 null
             }
 
-            val resolvedManifest = GitHubReleasesParser.toCloudUpdateManifest(
-                release = latestStable,
-                sidecarManifest = sidecarManifest,
-                sidecarSha256Text = sidecarShaText,
-                currentVersionCode = currentVersionCode,
-                currentVersionName = currentVersionName
-            )
+            when (
+                val resolution = GitHubReleasesParser.resolveCloudUpdateManifest(
+                    release = latestStable,
+                    sidecarManifest = sidecarManifest,
+                    sidecarSha256Text = sidecarShaText
+                )
+            ) {
+                is GitHubManifestResolution.Resolved -> {
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                        sourceLabel = GITHUB_SOURCE_LABEL
+                    )
+                    return evaluateResolvedManifest(resolution.manifest)
+                }
 
-            if (resolvedManifest != null) {
-                preferencesStore.recordCheckResult(
-                    epochMillis = clock.nowEpochMillis(),
-                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
-                    sourceLabel = GITHUB_SOURCE_LABEL
-                )
-                return evaluateResolvedManifest(resolvedManifest)
-            }
+                is GitHubManifestResolution.MissingVersionCode -> {
+                    val err = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
+                        detail = "Release ${latestStable.tagName} does not provide a readable numeric versionCode (version.json or Build number)."
+                    )
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        sourceLabel = GITHUB_SOURCE_LABEL,
+                        errorSummary = err.detail
+                    )
+                    _state.value = err
+                    return err
+                }
 
-            // Release exists on GitHub without a downloadable APK/SHA-256 — report clearly
-            val hasNewerTag = GitHubReleasesParser.compareSemanticVersions(
-                latestStable.versionName,
-                currentVersionName
-            ) > 0
-            if (!hasNewerTag) {
-                preferencesStore.recordCheckResult(
-                    epochMillis = clock.nowEpochMillis(),
-                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
-                    sourceLabel = GITHUB_SOURCE_LABEL
-                )
-                val upToDate = CloudUpdateState.UpToDate(
-                    currentVersionName = currentVersionName,
-                    currentVersionCode = currentVersionCode,
-                    portalUrl = latestStable.htmlUrl.ifBlank { OFFICIAL_RELEASES_PAGE_URL }
-                )
-                _state.value = upToDate
-                return upToDate
+                is GitHubManifestResolution.MetadataConflict -> {
+                    val err = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.VERSION_METADATA_MISMATCH,
+                        detail = resolution.detail
+                    )
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        sourceLabel = GITHUB_SOURCE_LABEL,
+                        errorSummary = err.detail
+                    )
+                    _state.value = err
+                    return err
+                }
+
+                is GitHubManifestResolution.MissingApkOrChecksum -> {
+                    val manifestErr = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.INVALID_MANIFEST,
+                        detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest."
+                    )
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        sourceLabel = GITHUB_SOURCE_LABEL,
+                        errorSummary = manifestErr.detail
+                    )
+                    _state.value = manifestErr
+                    return manifestErr
+                }
+
+                GitHubManifestResolution.SkippedNonStable -> {
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                        sourceLabel = GITHUB_SOURCE_LABEL
+                    )
+                    val upToDate = CloudUpdateState.UpToDate(
+                        currentVersionName = currentVersionName,
+                        currentVersionCode = currentVersionCode,
+                        portalUrl = latestStable.htmlUrl.ifBlank { OFFICIAL_RELEASES_PAGE_URL }
+                    )
+                    _state.value = upToDate
+                    return upToDate
+                }
             }
-            val manifestErr = CloudUpdateState.Error(
-                reason = CloudUpdateErrorReason.INVALID_MANIFEST,
-                detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest."
-            )
-            preferencesStore.recordCheckResult(
-                epochMillis = clock.nowEpochMillis(),
-                serverStatus = UpdateServerConnectionStatus.ERROR,
-                sourceLabel = GITHUB_SOURCE_LABEL,
-                errorSummary = manifestErr.detail
-            )
-            _state.value = manifestErr
-            return manifestErr
         }
 
         // GitHub API failed (e.g., rate-limited 403/429 or temporary 5xx) — try static fallback endpoints
@@ -692,23 +976,47 @@ class CloudUpdateManager(
             return err
         }
 
-        val isNewer = GitHubReleasesParser.isRemoteReleaseNewer(
-            remoteVersionCode = manifest.versionCode,
-            remoteVersionName = manifest.versionName,
-            installedVersionCode = currentVersionCode,
-            installedVersionName = currentVersionName
-        )
-
-        val nextState = if (isNewer) {
-            lastKnownManifest = manifest
-            preferencesStore.clearSnoozeIfNewer(manifest.versionCode)
-            CloudUpdateState.UpdateAvailable(manifest = manifest)
-        } else {
-            CloudUpdateState.UpToDate(
-                currentVersionName = currentVersionName,
-                currentVersionCode = currentVersionCode,
-                portalUrl = manifest.portalUrl
+        val nextState = when (
+            GitHubReleasesParser.evaluateVersionPrecedence(
+                remoteVersionCode = manifest.versionCode,
+                remoteVersionName = manifest.versionName,
+                installedVersionCode = currentVersionCode,
+                installedVersionName = currentVersionName
             )
+        ) {
+            VersionPrecedenceDecision.UPDATE_AVAILABLE -> {
+                lastKnownManifest = manifest
+                preferencesStore.clearSnoozeIfNewer(manifest.versionCode)
+                CloudUpdateState.UpdateAvailable(manifest = manifest)
+            }
+            VersionPrecedenceDecision.ALREADY_INSTALLED -> {
+                CloudUpdateState.UpToDate(
+                    currentVersionName = currentVersionName,
+                    currentVersionCode = currentVersionCode,
+                    portalUrl = manifest.portalUrl
+                )
+            }
+            VersionPrecedenceDecision.DUPLICATE_VERSION_CONFLICT -> {
+                CloudUpdateState.Error(
+                    reason = CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
+                    detail = "Release v${manifest.versionName} declares duplicate versionCode ${manifest.versionCode}, matching installed v$currentVersionName ($currentVersionCode). Update rejected.",
+                    manifest = manifest
+                )
+            }
+            VersionPrecedenceDecision.DOWNGRADE_BLOCKED -> {
+                CloudUpdateState.Error(
+                    reason = CloudUpdateErrorReason.DOWNGRADE_BLOCKED,
+                    detail = "Release v${manifest.versionName} (versionCode ${manifest.versionCode}) is older than installed v$currentVersionName (versionCode $currentVersionCode). Downgrade blocked.",
+                    manifest = manifest
+                )
+            }
+            VersionPrecedenceDecision.UNREADABLE_VERSION_METADATA -> {
+                CloudUpdateState.Error(
+                    reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
+                    detail = "Unable to read valid versionCode from release v${manifest.versionName} (${manifest.versionCode}) or installed build ($currentVersionCode).",
+                    manifest = manifest
+                )
+            }
         }
         _state.value = nextState
         return nextState
@@ -735,6 +1043,55 @@ class CloudUpdateManager(
     suspend fun downloadAndVerifyUpdate(manifest: CloudUpdateManifest): CloudUpdateState =
         withContext(dispatchers.io) {
             lastKnownManifest = manifest
+
+            // Pre-download strict versionCode precedence guard
+            when (
+                GitHubReleasesParser.evaluateVersionPrecedence(
+                    remoteVersionCode = manifest.versionCode,
+                    remoteVersionName = manifest.versionName,
+                    installedVersionCode = currentVersionCode,
+                    installedVersionName = currentVersionName
+                )
+            ) {
+                VersionPrecedenceDecision.UPDATE_AVAILABLE -> Unit
+                VersionPrecedenceDecision.ALREADY_INSTALLED -> {
+                    val upToDate = CloudUpdateState.UpToDate(
+                        currentVersionName = currentVersionName,
+                        currentVersionCode = currentVersionCode,
+                        portalUrl = manifest.portalUrl
+                    )
+                    _state.value = upToDate
+                    return@withContext upToDate
+                }
+                VersionPrecedenceDecision.DUPLICATE_VERSION_CONFLICT -> {
+                    val err = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
+                        detail = "Release v${manifest.versionName} declares duplicate versionCode ${manifest.versionCode}, matching installed v$currentVersionName ($currentVersionCode). Update rejected.",
+                        manifest = manifest
+                    )
+                    _state.value = err
+                    return@withContext err
+                }
+                VersionPrecedenceDecision.DOWNGRADE_BLOCKED -> {
+                    val err = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.DOWNGRADE_BLOCKED,
+                        detail = "Release v${manifest.versionName} (versionCode ${manifest.versionCode}) is older than installed v$currentVersionName (versionCode $currentVersionCode). Downgrade blocked.",
+                        manifest = manifest
+                    )
+                    _state.value = err
+                    return@withContext err
+                }
+                VersionPrecedenceDecision.UNREADABLE_VERSION_METADATA -> {
+                    val err = CloudUpdateState.Error(
+                        reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
+                        detail = "Unable to read valid versionCode from release v${manifest.versionName} (${manifest.versionCode}).",
+                        manifest = manifest
+                    )
+                    _state.value = err
+                    return@withContext err
+                }
+            }
+
             if (!CloudUpdateValidator.isValidPublicHttpsUrl(manifest.apkDownloadUrl)) {
                 val err = CloudUpdateState.Error(
                     reason = CloudUpdateErrorReason.INVALID_URL,
@@ -784,13 +1141,16 @@ class CloudUpdateManager(
                 }.getOrNull()
                 val cachedHashOk = cachedHashResult is AppResult.Success && cachedHashResult.data
                 if (cachedHashOk) {
-                    val cachedInspect = packageInspector.inspectUpdateApk(
+                    val cachedInspect = packageInspector.inspectUpdateApkDetailed(
                         apkFile = targetFile,
                         expectedPackageName = expectedPackageName,
-                        expectedMinVersionCode = manifest.versionCode,
-                        currentInstalledVersionCode = currentVersionCode
+                        expectedVersionCode = manifest.versionCode,
+                        expectedVersionName = manifest.versionName,
+                        currentInstalledVersionCode = currentVersionCode,
+                        currentInstalledVersionName = currentVersionName,
+                        expectedSigningCertSha256 = manifest.signingCertSha256
                     )
-                    if (cachedInspect is AppResult.Success) {
+                    if (cachedInspect is ApkInspectionResult.Valid) {
                         val ready = CloudUpdateState.ReadyToInstall(
                             manifest = manifest,
                             verifiedApkPath = targetFile.absolutePath
@@ -869,30 +1229,26 @@ class CloudUpdateManager(
                 return@withContext err
             }
 
-            // 2. Mandatory package identity, anti-downgrade, and signing certificate compatibility verification
+            // 2. Mandatory actual APK inspection: archive validity, package ID, GitHub-vs-APK
+            //    metadata match, strict versionCode precedence, and signing certificate continuity
             when (
-                val inspectRes = packageInspector.inspectUpdateApk(
+                val inspectRes = packageInspector.inspectUpdateApkDetailed(
                     apkFile = apkFile,
                     expectedPackageName = expectedPackageName,
-                    expectedMinVersionCode = manifest.versionCode,
-                    currentInstalledVersionCode = currentVersionCode
+                    expectedVersionCode = manifest.versionCode,
+                    expectedVersionName = manifest.versionName,
+                    currentInstalledVersionCode = currentVersionCode,
+                    currentInstalledVersionName = currentVersionName,
+                    expectedSigningCertSha256 = manifest.signingCertSha256
                 )
             ) {
-                is AppResult.Success -> Unit
-                is AppResult.Failure -> {
+                is ApkInspectionResult.Valid -> Unit
+                is ApkInspectionResult.Rejected -> {
                     apkFile.delete()
                     partFile.delete()
-                    val msg = inspectRes.error.message
-                    val reason = when {
-                        msg.contains("signature", ignoreCase = true) ||
-                            msg.contains("certificate", ignoreCase = true) -> CloudUpdateErrorReason.SIGNATURE_MISMATCH
-                        msg.contains("package ID", ignoreCase = true) -> CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH
-                        msg.contains("version", ignoreCase = true) -> CloudUpdateErrorReason.DOWNGRADE_BLOCKED
-                        else -> CloudUpdateErrorReason.INVALID_MANIFEST
-                    }
                     val err = CloudUpdateState.Error(
-                        reason = reason,
-                        detail = msg,
+                        reason = inspectRes.reason,
+                        detail = inspectRes.detail,
                         manifest = manifest
                     )
                     _state.value = err

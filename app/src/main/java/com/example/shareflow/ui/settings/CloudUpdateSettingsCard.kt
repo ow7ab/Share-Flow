@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VerifiedUser
 import com.example.shareflow.ui.update.cloudUpdateErrorReasonStringRes
+import com.example.shareflow.ui.update.shouldShowUpdateErrorDetail
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -677,6 +678,14 @@ fun CloudUpdateSettingsCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
+                            if (shouldShowUpdateErrorDetail(updateState.reason) && updateState.detail.isNotBlank()) {
+                                Text(
+                                    text = updateState.detail,
+                                    style = ShareFlowMonoStyle,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                                    modifier = Modifier.testTag("settings_update_error_detail")
+                                )
+                            }
                             SecondaryActionButton(
                                 text = stringResource(R.string.settings_update_retry_action),
                                 onClick = onCheckForUpdates,

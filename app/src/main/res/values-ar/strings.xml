@@ -1183,6 +1183,10 @@
     <string name="settings_update_err_package_id">هوية الحزمة في الملف المحمّل لا تطابق ShareFlow. تم منع التثبيت.</string>
     <string name="settings_update_err_signature">شهادة التوقيع لا تطابق النسخة المثبّتة من ShareFlow. تم منع التثبيت حفاظاً على بياناتك.</string>
     <string name="settings_update_err_downgrade">تم منع الرجوع إلى إصدار أقدم حفاظاً على سلامة بياناتك.</string>
+    <string name="settings_update_err_duplicate_version">يحمل هذا الإصدار نفس رقم البناء (versionCode) المثبّت حالياً رغم اختلاف اسم النسخة. تم إيقاف التحديث لتجنّب تعارض نسخة مكررة.</string>
+    <string name="settings_update_err_version_metadata_mismatch">توجد مخالفة بين بيانات الإصدار على GitHub وبيانات ملف APK الفعلي المحمّل. تم إيقاف التثبيت حفاظاً على سلامة التطبيق.</string>
+    <string name="settings_update_err_invalid_apk">ملف التحديث (APK) تالف أو غير صالح ولا يمكن التحقق منه. يرجى إعادة المحاولة.</string>
+    <string name="settings_update_err_unreadable_version">تعذّر قراءة بيانات الإصدار (versionCode / versionName) بشكل صحيح من بيانات الإصدار أو ملف APK.</string>
     <string name="settings_update_err_download">انقطع تحميل التحديث قبل اكتماله. يرجى المحاولة مجدداً.</string>
     <string name="settings_feedback_update_url_saved">تم حفظ رابط بوابة التحديث السحابي.</string>
     <string name="settings_feedback_update_install_perm">اسمح لـ ShareFlow بتثبيت التحديثات الموثّقة في إعدادات Android ثم اضغط تثبيت مجدداً.</string>

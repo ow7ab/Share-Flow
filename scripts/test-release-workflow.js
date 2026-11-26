@@ -210,17 +210,61 @@ test("release_helpers verify-postbuild enforces signing certificate continuity a
       "utf8"
     );
 
-    // Valid upgrade with identical certificate
+    // Valid upgrade with identical certificate and matching Gradle versionCode/versionName
     const okOut = runHelper([
       "verify-postbuild",
       "--version-code",
       "13",
+      "--expected-version-code",
+      "13",
+      "--version-name",
+      "1.0.12",
+      "--expected-version-name",
+      "1.0.12",
       "--cert-sha256",
       certA,
       "--prev-manifest",
       prevManifest,
     ]);
     assert.match(okOut, /Verified monotonic upgrade continuity/);
+
+    // Built APK versionCode disagreeing with Gradle versionCode must fail
+    assert.throws(() =>
+      runHelper([
+        "verify-postbuild",
+        "--version-code",
+        "13",
+        "--expected-version-code",
+        "14",
+        "--version-name",
+        "1.0.12",
+        "--expected-version-name",
+        "1.0.12",
+        "--cert-sha256",
+        certA,
+        "--prev-manifest",
+        prevManifest,
+      ])
+    );
+
+    // Built APK versionName disagreeing with Gradle versionName must fail
+    assert.throws(() =>
+      runHelper([
+        "verify-postbuild",
+        "--version-code",
+        "13",
+        "--expected-version-code",
+        "13",
+        "--version-name",
+        "1.0.11",
+        "--expected-version-name",
+        "1.0.12",
+        "--cert-sha256",
+        certA,
+        "--prev-manifest",
+        prevManifest,
+      ])
+    );
 
     // Changed certificate must fail
     assert.throws(() =>

@@ -44,8 +44,53 @@ data class ReleaseHistoryItem(
 )
 
 /**
+ * Strict, `versionCode`-driven version precedence outcome.
+ *
+ * - `versionCode` is ALWAYS the sole authoritative source for update precedence.
+ * - `versionName` is NEVER used to override an equal or lower `versionCode` into an update;
+ *   it is used only for user display and for detecting conflicting/duplicate release metadata.
+ */
+enum class VersionPrecedenceDecision {
+    /** `remoteVersionCode > installedVersionCode`: genuine newer build eligible for update. */
+    UPDATE_AVAILABLE,
+
+    /** `remoteVersionCode == installedVersionCode` and version names match: already up to date. */
+    ALREADY_INSTALLED,
+
+    /**
+     * `remoteVersionCode == installedVersionCode` while `remoteVersionName != installedVersionName`
+     * (e.g., installed `1.0.19 (20)` vs available `1.0.20 (20)`): duplicate build number conflict.
+     * MUST NOT be offered as an update and MUST NOT be misclassified as a downgrade.
+     */
+    DUPLICATE_VERSION_CONFLICT,
+
+    /** `remoteVersionCode < installedVersionCode`: true downgrade attempt — must be blocked. */
+    DOWNGRADE_BLOCKED,
+
+    /** Missing, zero, or negative `versionCode` in either installed or remote metadata. */
+    UNREADABLE_VERSION_METADATA
+}
+
+/**
+ * Detailed outcome when resolving a [GitHubReleaseRecord] into a [CloudUpdateManifest].
+ * Never fabricates a synthetic `versionCode` from a GitHub tag name.
+ */
+sealed class GitHubManifestResolution {
+    data class Resolved(val manifest: CloudUpdateManifest) : GitHubManifestResolution()
+    data class MissingVersionCode(val release: GitHubReleaseRecord) : GitHubManifestResolution()
+    data class MissingApkOrChecksum(val release: GitHubReleaseRecord) : GitHubManifestResolution()
+    data class MetadataConflict(
+        val release: GitHubReleaseRecord,
+        val detail: String
+    ) : GitHubManifestResolution()
+
+    data object SkippedNonStable : GitHubManifestResolution()
+}
+
+/**
  * Parses GitHub Releases API JSON responses (`/releases/latest` and `/releases`) into validated
- * Share Flow update models without trusting unvalidated URLs or draft/prerelease artifacts.
+ * Share Flow update models without trusting unvalidated URLs, synthetic version codes, or
+ * draft/prerelease artifacts.
  */
 object GitHubReleasesParser {
 
@@ -161,44 +206,56 @@ object GitHubReleasesParser {
     }
 
     /**
-     * Converts a validated stable [GitHubReleaseRecord] into a [CloudUpdateManifest].
-     * Uses [sidecarManifest] (`version.json`) when attached to the release for exact `versionCode`,
-     * `signingCertSha256`, bilingual notes, and `mandatory` flag; otherwise safely derives them
-     * from the GitHub Release JSON and native asset SHA-256 digest / `.sha256` sidecar.
+     * Resolves a validated stable [GitHubReleaseRecord] into a [CloudUpdateManifest] using ONLY
+     * authentic declared `versionCode` metadata (`version.json` sidecar, or explicit `versionCode`
+     * / `Build` number in release notes or title). Never fabricates a synthetic `versionCode`.
      */
-    fun toCloudUpdateManifest(
+    fun resolveCloudUpdateManifest(
         release: GitHubReleaseRecord,
         sidecarManifest: CloudUpdateManifest? = null,
-        sidecarSha256Text: String? = null,
-        currentVersionCode: Int,
-        currentVersionName: String
-    ): CloudUpdateManifest? {
-        if (release.isDraft || release.isPrerelease) return null
+        sidecarSha256Text: String? = null
+    ): GitHubManifestResolution {
+        if (release.isDraft || release.isPrerelease) {
+            return GitHubManifestResolution.SkippedNonStable
+        }
 
         val apkAsset = release.apkAsset
         val resolvedApkUrl = sidecarManifest?.apkDownloadUrl
             ?.takeIf { CloudUpdateValidator.isValidPublicHttpsUrl(it) }
             ?: apkAsset?.browserDownloadUrl
-            ?: return null
+            ?: return GitHubManifestResolution.MissingApkOrChecksum(release)
 
-        if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolvedApkUrl)) return null
+        if (!CloudUpdateValidator.isValidPublicHttpsUrl(resolvedApkUrl)) {
+            return GitHubManifestResolution.MissingApkOrChecksum(release)
+        }
 
         val resolvedSha256 = sidecarManifest?.sha256
             ?.takeIf { SHA256_HEX_REGEX.matches(it) }
             ?: apkAsset?.sha256Digest
             ?: extractSha256FromText(sidecarSha256Text.orEmpty())
             ?: extractSha256FromText(release.body)
-            ?: return null
+            ?: return GitHubManifestResolution.MissingApkOrChecksum(release)
 
-        val resolvedVersionName = sidecarManifest?.versionName?.ifBlank { release.versionName }
-            ?: release.versionName
-        val resolvedVersionCode = sidecarManifest?.versionCode
-            ?: extractVersionCodeFromBody(release.body)
-            ?: deriveSyntheticVersionCode(
-                remoteVersionName = resolvedVersionName,
-                currentVersionName = currentVersionName,
-                currentVersionCode = currentVersionCode
-            )
+        val sidecarVersionName = sidecarManifest?.versionName?.trim().orEmpty()
+        if (sidecarVersionName.isNotBlank() && release.versionName.isNotBlank()) {
+            val normalizedSidecar = normalizeVersionName(sidecarVersionName)
+            val normalizedRelease = normalizeVersionName(release.versionName)
+            if (normalizedSidecar.isNotBlank() &&
+                normalizedRelease.isNotBlank() &&
+                !normalizedSidecar.equals(normalizedRelease, ignoreCase = true)
+            ) {
+                return GitHubManifestResolution.MetadataConflict(
+                    release = release,
+                    detail = "GitHub release tag ${release.tagName} (v$normalizedRelease) conflicts with version.json versionName v$normalizedSidecar (versionCode ${sidecarManifest?.versionCode})."
+                )
+            }
+        }
+
+        val resolvedVersionName = sidecarVersionName.ifBlank { release.versionName }
+        val resolvedVersionCode = sidecarManifest?.versionCode?.takeIf { it > 0 }
+            ?: extractVersionCodeFromText(release.body)
+            ?: extractVersionCodeFromText(release.name)
+            ?: return GitHubManifestResolution.MissingVersionCode(release)
 
         val resolvedSize = sidecarManifest?.fileSizeBytes?.takeIf { it > 0L }
             ?: apkAsset?.sizeBytes
@@ -207,22 +264,45 @@ object GitHubReleasesParser {
         val notesAr = sidecarManifest?.releaseNotesAr?.ifBlank { release.body } ?: release.body
         val notesEn = sidecarManifest?.releaseNotesEn?.ifBlank { release.body } ?: release.body
 
-        return CloudUpdateManifest(
-            versionCode = resolvedVersionCode,
-            versionName = resolvedVersionName,
-            apkDownloadUrl = resolvedApkUrl,
-            sha256 = resolvedSha256.lowercase(),
-            fileSizeBytes = resolvedSize,
-            minSupportedAndroidSdk = sidecarManifest?.minSupportedAndroidSdk ?: 24,
-            mandatory = sidecarManifest?.mandatory ?: false,
-            releaseNotesAr = notesAr.take(2000),
-            releaseNotesEn = notesEn.take(2000),
-            portalUrl = sidecarManifest?.portalUrl
-                ?: release.htmlUrl.ifBlank { CloudUpdateManager.OFFICIAL_RELEASES_PAGE_URL },
-            publishedAt = sidecarManifest?.publishedAt?.ifBlank { release.publishedAt }
-                ?: release.publishedAt,
-            signingCertSha256 = sidecarManifest?.signingCertSha256
+        return GitHubManifestResolution.Resolved(
+            CloudUpdateManifest(
+                versionCode = resolvedVersionCode,
+                versionName = resolvedVersionName,
+                apkDownloadUrl = resolvedApkUrl,
+                sha256 = resolvedSha256.lowercase(),
+                fileSizeBytes = resolvedSize,
+                minSupportedAndroidSdk = sidecarManifest?.minSupportedAndroidSdk ?: 24,
+                mandatory = sidecarManifest?.mandatory ?: false,
+                releaseNotesAr = notesAr.take(2000),
+                releaseNotesEn = notesEn.take(2000),
+                portalUrl = sidecarManifest?.portalUrl
+                    ?: release.htmlUrl.ifBlank { CloudUpdateManager.OFFICIAL_RELEASES_PAGE_URL },
+                publishedAt = sidecarManifest?.publishedAt?.ifBlank { release.publishedAt }
+                    ?: release.publishedAt,
+                signingCertSha256 = sidecarManifest?.signingCertSha256
+            )
         )
+    }
+
+    /**
+     * Backwards-compatible convenience wrapper returning a [CloudUpdateManifest] when all
+     * authentic version and integrity fields are present and consistent, or `null` otherwise.
+     */
+    fun toCloudUpdateManifest(
+        release: GitHubReleaseRecord,
+        sidecarManifest: CloudUpdateManifest? = null,
+        sidecarSha256Text: String? = null,
+        @Suppress("UNUSED_PARAMETER") currentVersionCode: Int = 0,
+        @Suppress("UNUSED_PARAMETER") currentVersionName: String = ""
+    ): CloudUpdateManifest? = when (
+        val resolution = resolveCloudUpdateManifest(
+            release = release,
+            sidecarManifest = sidecarManifest,
+            sidecarSha256Text = sidecarSha256Text
+        )
+    ) {
+        is GitHubManifestResolution.Resolved -> resolution.manifest
+        else -> null
     }
 
     fun toHistoryItem(release: GitHubReleaseRecord): ReleaseHistoryItem = ReleaseHistoryItem(
@@ -252,8 +332,8 @@ object GitHubReleasesParser {
     }
 
     /**
-     * Compares two semantic version strings (e.g. "1.0.19" vs "1.0.18", "V1.0.12" vs "v1.0.11").
-     * Returns > 0 if [remote] is newer than [installed], 0 if equal, < 0 if older.
+     * Compares two semantic version strings (e.g. "1.0.19" vs "1.0.18", "V1.0.12" vs "v1.0.11")
+     * for display/sorting/metadata-consistency checks ONLY — never as a substitute for `versionCode`.
      */
     fun compareSemanticVersions(remote: String, installed: String): Int {
         val rParts = parseSemverParts(remote)
@@ -265,16 +345,50 @@ object GitHubReleasesParser {
         return 0
     }
 
+    /**
+     * Authoritative version precedence evaluation strictly anchored on integer `versionCode`.
+     */
+    fun evaluateVersionPrecedence(
+        remoteVersionCode: Int,
+        remoteVersionName: String,
+        installedVersionCode: Int,
+        installedVersionName: String
+    ): VersionPrecedenceDecision {
+        if (remoteVersionCode <= 0 || installedVersionCode <= 0) {
+            return VersionPrecedenceDecision.UNREADABLE_VERSION_METADATA
+        }
+        if (remoteVersionCode > installedVersionCode) {
+            return VersionPrecedenceDecision.UPDATE_AVAILABLE
+        }
+        if (remoteVersionCode < installedVersionCode) {
+            return VersionPrecedenceDecision.DOWNGRADE_BLOCKED
+        }
+        val normRemote = normalizeVersionName(remoteVersionName)
+        val normInstalled = normalizeVersionName(installedVersionName)
+        if (normRemote.isNotBlank() &&
+            normInstalled.isNotBlank() &&
+            !normRemote.equals(normInstalled, ignoreCase = true)
+        ) {
+            return VersionPrecedenceDecision.DUPLICATE_VERSION_CONFLICT
+        }
+        return VersionPrecedenceDecision.ALREADY_INSTALLED
+    }
+
+    /**
+     * Returns `true` ONLY when [remoteVersionCode] is strictly greater than [installedVersionCode]
+     * (and both are valid positive integers). Never falls back to `versionName` comparison.
+     */
     fun isRemoteReleaseNewer(
         remoteVersionCode: Int,
         remoteVersionName: String,
         installedVersionCode: Int,
         installedVersionName: String
-    ): Boolean {
-        if (remoteVersionCode > installedVersionCode) return true
-        if (remoteVersionCode < installedVersionCode) return false
-        return compareSemanticVersions(remoteVersionName, installedVersionName) > 0
-    }
+    ): Boolean = evaluateVersionPrecedence(
+        remoteVersionCode = remoteVersionCode,
+        remoteVersionName = remoteVersionName,
+        installedVersionCode = installedVersionCode,
+        installedVersionName = installedVersionName
+    ) == VersionPrecedenceDecision.UPDATE_AVAILABLE
 
     fun extractSha256FromText(text: String): String? {
         if (text.isBlank()) return null
@@ -283,29 +397,16 @@ object GitHubReleasesParser {
         return candidate.takeIf { SHA256_HEX_REGEX.matches(it) }
     }
 
+    fun extractVersionCodeFromText(text: String): Int? {
+        if (text.isBlank()) return null
+        val match = VERSION_CODE_INLINE_REGEX.find(text) ?: return null
+        return match.groupValues[1].toIntOrNull()?.takeIf { it > 0 }
+    }
+
     private fun extractDigestHex(digest: String): String? {
         if (digest.isBlank()) return null
         val cleaned = digest.removePrefix("sha256:").removePrefix("SHA256:").trim().lowercase()
         return cleaned.takeIf { SHA256_HEX_REGEX.matches(it) }
-    }
-
-    private fun extractVersionCodeFromBody(body: String): Int? {
-        if (body.isBlank()) return null
-        val match = VERSION_CODE_INLINE_REGEX.find(body) ?: return null
-        return match.groupValues[1].toIntOrNull()?.takeIf { it > 0 }
-    }
-
-    private fun deriveSyntheticVersionCode(
-        remoteVersionName: String,
-        currentVersionName: String,
-        currentVersionCode: Int
-    ): Int {
-        val cmp = compareSemanticVersions(remoteVersionName, currentVersionName)
-        return when {
-            cmp > 0 -> currentVersionCode + 1
-            cmp == 0 -> currentVersionCode
-            else -> (currentVersionCode - 1).coerceAtLeast(1)
-        }
     }
 
     private fun parseSemverParts(raw: String): IntArray {

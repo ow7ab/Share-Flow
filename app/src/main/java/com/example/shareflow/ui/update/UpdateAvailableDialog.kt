@@ -390,6 +390,14 @@ fun UpdateAvailableDialog(
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
+                            if (shouldShowUpdateErrorDetail(downloadState.reason) && downloadState.detail.isNotBlank()) {
+                                Text(
+                                    text = downloadState.detail,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.testTag("update_dialog_error_detail")
+                                )
+                            }
                             PrimaryActionButton(
                                 text = stringResource(R.string.updates_dialog_update_now_action),
                                 onClick = { onDownloadNow(update) },

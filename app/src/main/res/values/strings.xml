@@ -1183,6 +1183,10 @@
     <string name="settings_update_err_package_id">Downloaded APK package ID does not match ShareFlow. Installation blocked.</string>
     <string name="settings_update_err_signature">Signing certificate does not match the installed ShareFlow app. Installation blocked to protect your data.</string>
     <string name="settings_update_err_downgrade">Downgrading to an older version is blocked for data safety.</string>
+    <string name="settings_update_err_duplicate_version">This release uses the same build number (versionCode) as your installed app despite a different version name. Installation was stopped to avoid a duplicate build conflict.</string>
+    <string name="settings_update_err_version_metadata_mismatch">GitHub release metadata conflicts with the actual downloaded APK version. Installation was stopped for safety.</string>
+    <string name="settings_update_err_invalid_apk">The downloaded APK file is corrupted or invalid and could not be verified. Please try again.</string>
+    <string name="settings_update_err_unreadable_version">Unable to read valid version metadata (versionCode / versionName) from the release or APK file.</string>
     <string name="settings_update_err_download">Update download was interrupted. Please try again.</string>
     <string name="settings_feedback_update_url_saved">Cloud update portal URL saved.</string>
     <string name="settings_feedback_update_install_perm">Allow ShareFlow to install verified updates in Android Settings, then tap Install again.</string>

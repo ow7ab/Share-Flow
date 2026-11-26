@@ -120,7 +120,26 @@ def verify_postbuild_continuity(
     new_version_code: int,
     new_cert_sha256: str,
     prev_manifest_path: str | None = None,
+    expected_version_code: int | None = None,
+    actual_version_name: str | None = None,
+    expected_version_name: str | None = None,
 ) -> dict[str, Any]:
+    if new_version_code <= 0:
+        raise ValueError(f"Built APK versionCode must be a positive integer (got {new_version_code}).")
+
+    if expected_version_code is not None and new_version_code != expected_version_code:
+        raise ValueError(
+            f"Built APK versionCode ({new_version_code}) does not match Gradle versionCode "
+            f"({expected_version_code}). Aborting release to prevent version metadata mismatch."
+        )
+
+    if expected_version_name and actual_version_name:
+        if actual_version_name.strip() != expected_version_name.strip():
+            raise ValueError(
+                f"Built APK versionName ('{actual_version_name.strip()}') does not match Gradle "
+                f"versionName ('{expected_version_name.strip()}'). Aborting release."
+            )
+
     norm_cert = re.sub(r"[:\s]", "", new_cert_sha256).lower()
     if not SHA256_RE.match(norm_cert):
         raise ValueError("Invalid 64-char hex signing certificate SHA-256.")
@@ -281,6 +300,9 @@ def main() -> int:
     p_post.add_argument("--version-code", type=int, required=True)
     p_post.add_argument("--cert-sha256", required=True)
     p_post.add_argument("--prev-manifest", default="")
+    p_post.add_argument("--expected-version-code", type=int, default=None)
+    p_post.add_argument("--version-name", default="")
+    p_post.add_argument("--expected-version-name", default="")
 
     p_man = sub.add_parser("build-manifest")
     p_man.add_argument("--version-code", type=int, required=True)
@@ -325,6 +347,9 @@ def main() -> int:
                 new_version_code=args.version_code,
                 new_cert_sha256=args.cert_sha256,
                 prev_manifest_path=args.prev_manifest or None,
+                expected_version_code=args.expected_version_code,
+                actual_version_name=args.version_name or None,
+                expected_version_name=args.expected_version_name or None,
             )
             if info["initialRelease"]:
                 print(f"No prior version.json found; treating build {args.version_code} as initial release.")

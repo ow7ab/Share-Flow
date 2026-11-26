@@ -981,6 +981,14 @@ private fun ActiveUpdateStateCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
+                    if (shouldShowUpdateErrorDetail(updateState.reason) && updateState.detail.isNotBlank()) {
+                        Text(
+                            text = updateState.detail,
+                            style = ShareFlowMonoStyle,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                            modifier = Modifier.testTag("updates_error_detail_text")
+                        )
+                    }
                     val retryableDownloadErrors = setOf(
                         com.example.shareflow.data.update.CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED,
                         com.example.shareflow.data.update.CloudUpdateErrorReason.TIMEOUT,

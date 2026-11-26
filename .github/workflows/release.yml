@@ -492,6 +492,8 @@ jobs:
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
           PORTAL_URL: ${{ steps.validate_config.outputs.portal_url }}
           PREV_MANIFEST: ${{ steps.prebuild_version_check.outputs.prev_manifest_path }}
+          GRADLE_VERSION_CODE: ${{ steps.prebuild_version_check.outputs.gradle_version_code }}
+          GRADLE_VERSION_NAME: ${{ steps.prebuild_version_check.outputs.gradle_version_name }}
           INPUT_NOTES_AR: ${{ github.event.inputs.release_notes_ar || '' }}
           INPUT_NOTES_EN: ${{ github.event.inputs.release_notes_en || '' }}
           INPUT_MANDATORY: ${{ github.event.inputs.mandatory_update || false }}
@@ -579,8 +581,14 @@ jobs:
           AAB_ABS=$(realpath "$RELEASE_AAB")
           jarsigner -verify -strict "$AAB_ABS" >/dev/null
 
-          # 5. Double-check monotonic versionCode & unchanged signing cert against previous release
-          POSTBUILD_ARGS=(--version-code "$VERSION_CODE" --cert-sha256 "$CERT_SHA256")
+          # 5. Double-check built APK versionCode/versionName parity with Gradle, monotonic increase, & signing cert continuity
+          POSTBUILD_ARGS=(
+            --version-code "$VERSION_CODE"
+            --cert-sha256 "$CERT_SHA256"
+            --expected-version-code "$GRADLE_VERSION_CODE"
+            --version-name "$VERSION_NAME"
+            --expected-version-name "$GRADLE_VERSION_NAME"
+          )
           if [ -n "${PREV_MANIFEST:-}" ] && [ -s "$PREV_MANIFEST" ]; then
             POSTBUILD_ARGS+=(--prev-manifest "$PREV_MANIFEST")
           fi

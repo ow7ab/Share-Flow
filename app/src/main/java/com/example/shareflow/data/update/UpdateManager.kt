@@ -210,13 +210,16 @@ class UpdateManager(
             null
         }
 
-        val manifest = GitHubReleasesParser.toCloudUpdateManifest(
-            release = latestStable,
-            sidecarManifest = sidecarManifest,
-            sidecarSha256Text = sidecarShaText,
-            currentVersionCode = currentVersionCode,
-            currentVersionName = currentVersionName
-        ) ?: return null
+        val manifest = when (
+            val resolved = GitHubReleasesParser.resolveCloudUpdateManifest(
+                release = latestStable,
+                sidecarManifest = sidecarManifest,
+                sidecarSha256Text = sidecarShaText
+            )
+        ) {
+            is GitHubManifestResolution.Resolved -> resolved.manifest
+            else -> return null
+        }
 
         preferencesStore.recordCheckResult(
             epochMillis = clock.nowEpochMillis(),

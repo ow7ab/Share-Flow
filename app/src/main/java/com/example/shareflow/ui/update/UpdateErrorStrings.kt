@@ -20,7 +20,23 @@ fun cloudUpdateErrorReasonStringRes(reason: CloudUpdateErrorReason): Int = when 
     CloudUpdateErrorReason.PACKAGE_IDENTITY_MISMATCH -> R.string.settings_update_err_package_id
     CloudUpdateErrorReason.SIGNATURE_MISMATCH -> R.string.settings_update_err_signature
     CloudUpdateErrorReason.DOWNGRADE_BLOCKED -> R.string.settings_update_err_downgrade
+    CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT -> R.string.settings_update_err_duplicate_version
+    CloudUpdateErrorReason.VERSION_METADATA_MISMATCH -> R.string.settings_update_err_version_metadata_mismatch
+    CloudUpdateErrorReason.INVALID_APK -> R.string.settings_update_err_invalid_apk
+    CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA -> R.string.settings_update_err_unreadable_version
     CloudUpdateErrorReason.DOWNLOAD_INTERRUPTED -> R.string.settings_update_err_download
     CloudUpdateErrorReason.INSTALL_PERMISSION_REQUIRED -> R.string.settings_feedback_update_install_perm
     CloudUpdateErrorReason.INSTALL_LAUNCH_FAILED -> R.string.settings_feedback_update_install_failed
 }
+
+/**
+ * Returns `true` when displaying the technical diagnostic detail line (containing actual vs expected
+ * `versionCode` / `versionName` values) helps users and maintainers immediately identify a version
+ * or metadata conflict.
+ */
+fun shouldShowUpdateErrorDetail(reason: CloudUpdateErrorReason): Boolean = reason in setOf(
+    CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
+    CloudUpdateErrorReason.VERSION_METADATA_MISMATCH,
+    CloudUpdateErrorReason.DOWNGRADE_BLOCKED,
+    CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA
+)
