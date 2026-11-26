@@ -25,15 +25,20 @@ function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "shareflow-release-test-"));
 }
 
-test("release.yml preserves name, triggers, concurrency, atomic draft->promote, dry_run, and summary", () => {
+test("release.yml preserves name, unified triggers, concurrency, atomic draft->promote, dry_run, and summary", () => {
   const yml = fs.readFileSync(WORKFLOW_PATH, "utf8");
 
   assert.match(yml, /^name:\s*ShareFlow Production Release & Public APK Distribution$/m);
+  assert.match(yml, /branches:\s*\n\s*-\s*main/);
   assert.match(yml, /tags:\s*\n\s*-\s*"v\[0-9\]\+\.\[0-9\]\+\.\[0-9\]\+"/);
   assert.match(yml, /workflow_dispatch:/);
   assert.match(yml, /\bdry_run:/);
   assert.match(yml, /concurrency:\s*\n\s*group:\s*shareflow-production-release\s*\n\s*cancel-in-progress:\s*false/);
-  assert.match(yml, /permissions:\s*\n\s*contents:\s*read/);
+  assert.match(yml, /permissions:\s*\n\s*contents:\s*write/);
+
+  // Unified single-repo architecture: uses built-in github.token, never legacy PAT or Share-Flow-Releases
+  assert.doesNotMatch(yml, /PUBLIC_RELEASES_TOKEN/, "Unified release.yml must not require legacy PUBLIC_RELEASES_TOKEN");
+  assert.doesNotMatch(yml, /Share-Flow-Releases/, "Unified release.yml must not target legacy Share-Flow-Releases");
 
   // Pre-build version check must execute BEFORE Gradle build
   const prebuildIdx = yml.indexOf("validate-prebuild");
@@ -46,14 +51,14 @@ test("release.yml preserves name, triggers, concurrency, atomic draft->promote, 
   const trapIdx = yml.indexOf("trap cleanup_failed_draft ERR");
   const promoteIdx = yml.indexOf("--draft=false");
   const syncStepIdx = yml.indexOf("id: sync_website");
-  const liveSyncIdx = yml.lastIndexOf("bash ./scripts/sync-public-docs.sh");
+  const liveSyncIdx = yml.lastIndexOf("bash ./scripts/sync-public-docs.sh --local-update");
   assert.ok(trapIdx > 0 && draftIdx > trapIdx, "Rollback trap must be registered before creating draft release");
   assert.ok(promoteIdx > draftIdx, "Draft release must be promoted only after verification");
-  assert.ok(syncStepIdx > promoteIdx && liveSyncIdx > syncStepIdx, "Live website sync must run only after public release succeeds");
+  assert.ok(syncStepIdx > promoteIdx && liveSyncIdx > syncStepIdx, "Local docs/version.json update must run only after release succeeds");
 
   // Dry-run gating on all public mutation steps
   const dryRunGuards = yml.match(/steps\.validate_config\.outputs\.dry_run != 'true'/g) || [];
-  assert.ok(dryRunGuards.length >= 3, "Publish, public probe, and website sync must all be gated by dry_run");
+  assert.ok(dryRunGuards.length >= 3, "Publish, public probe, and website manifest update must all be gated by dry_run");
 
   // Final summary step
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
@@ -65,7 +70,13 @@ test("release.yml preserves name, triggers, concurrency, atomic draft->promote, 
   assert.match(yml, /tr -d '\\r\\n'/, "Expected CR/LF sanitization for secrets/tokens");
 
   // Sibling workflows must remain intact
-  for (const wf of ["blank.yml", "sync-website.yml", "generate-release-keystore.yml"]) {
+  for (const wf of [
+    "blank.yml",
+    "sync-website.yml",
+    "generate-release-keystore.yml",
+    "notify-release-update.yml",
+    "migrate-releases-from-legacy.yml",
+  ]) {
     assert.ok(fs.existsSync(path.join(ROOT_DIR, ".github/workflows", wf)), `Missing sibling workflow: ${wf}`);
   }
 });
@@ -302,8 +313,8 @@ test("release_helpers build-manifest generates valid version.json accepted by do
     const manifestOut = path.join(tmp, "version.json");
     const apkSha = "1".repeat(64);
     const certSha = "2".repeat(64);
-    const latestUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk";
-    const directUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.12/Share-Flow.apk";
+    const latestUrl = "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk";
+    const directUrl = "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.12/Share-Flow.apk";
 
     runHelper([
       "build-manifest",
@@ -418,3 +429,74 @@ test("generate-release-keystore.yml DN validator accepts 'Share Flow' and reject
     );
   }
 });
+
+test("migrate_releases.py plans idempotent chronological migration, SHA-256 conflict verification, and orphan tag preservation", () => {
+  const pyCheck = `
+import json, sys
+sys.path.insert(0, "scripts")
+import migrate_releases as m
+
+sha_13 = "f227a700740aa0ec420452e251866552bbde7d9c5786d25e39353eae061bb8bc"
+sha_21 = "b20170132b6de6b4efef62ea5587dca213b86760c4a581d3975633960dcf23e9"
+
+source_releases = [
+    {
+        "tag_name": "V1.0.21",
+        "name": "Share Flow v1.0.21",
+        "draft": False,
+        "prerelease": False,
+        "published_at": "2026-11-26T00:00:00Z",
+        "body": "Latest stable",
+        "assets": [{"name": "ShareFlow.apk", "size": 29440817, "digest": f"sha256:{sha_21}"}],
+    },
+    {
+        "tag_name": "V1.0.13",
+        "name": "Share Flow v1.0.13",
+        "draft": False,
+        "prerelease": True,
+        "published_at": "2026-10-01T00:00:00Z",
+        "body": "Existing release",
+        "assets": [{"name": "ShareFlow.1.0.13.apk", "size": 51785405, "digest": f"sha256:{sha_13}"}],
+    },
+    {
+        "tag_name": "V1.0.19",
+        "name": "Share Flow v1.0.19",
+        "draft": False,
+        "prerelease": False,
+        "published_at": "2026-11-10T00:00:00Z",
+        "body": "Previous stable",
+        "assets": [{"name": "ShareFlow.V1.0.19.apk", "size": 29424433, "digest": "sha256:" + "a" * 64}],
+    },
+]
+target_releases = [
+    {
+        "tag_name": "V1.0.13",
+        "name": "Share Flow v1.0.13",
+        "draft": False,
+        "prerelease": True,
+        "assets": [{"name": "ShareFlow.1.0.13.apk", "size": 51785405, "digest": f"sha256:{sha_13}"}],
+    },
+]
+source_tags = [{"name": "V1.0.21"}, {"name": "V1.0.20"}, {"name": "V1.0.19"}, {"name": "V1.0.13"}]
+target_tags = [{"name": "V1.0.13"}]
+
+plan = m.plan_migration(source_releases, target_releases, source_tags, target_tags)
+assert plan["latest_stable_tag"] == "V1.0.21"
+assert [a["tag"] for a in plan["release_actions"]] == ["V1.0.13", "V1.0.19", "V1.0.21"]
+assert plan["release_actions"][0]["action"] == "verify_existing"
+assert plan["release_actions"][0]["assets_verified_existing"] == ["ShareFlow.1.0.13.apk"]
+assert plan["release_actions"][1]["action"] == "create"
+assert plan["release_actions"][1]["make_latest"] is False
+assert plan["release_actions"][2]["action"] == "create"
+assert plan["release_actions"][2]["make_latest"] is True
+assert plan["orphan_tags_to_create"] == ["V1.0.20"]
+
+body1 = m.build_preserved_body(source_releases[0], "ow7ab/Share-Flow-Releases")
+body2 = m.build_preserved_body({"tag_name": "V1.0.21", "body": body1, "published_at": "2026-11-26T00:00:00Z"}, "ow7ab/Share-Flow-Releases")
+assert body1 == body2, "build_preserved_body must be idempotent"
+print("migrate_releases_unit_tests_ok")
+`;
+  const out = execFileSync("python3", ["-c", pyCheck], { cwd: ROOT_DIR, encoding: "utf8" });
+  assert.match(out, /migrate_releases_unit_tests_ok/);
+});
+

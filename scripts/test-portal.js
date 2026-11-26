@@ -5,10 +5,10 @@ const path = require("node:path");
 const vm = require("node:vm");
 const portal = require("../docs/app.js");
 
-const PUBLIC_REPO = "ow7ab/Share-Flow-Releases";
+const PUBLIC_REPO = "ow7ab/Share-Flow";
 const DIRECT_LATEST_APK = `https://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk`;
 
-test("docs/config.js targets public ow7ab/Share-Flow-Releases and GitHub Pages without tokens", () => {
+test("docs/config.js targets unified ow7ab/Share-Flow and GitHub Pages without tokens", () => {
   const configPath = path.join(__dirname, "..", "docs", "config.js");
   const source = fs.readFileSync(configPath, "utf8");
   const sandbox = { window: {} };
@@ -20,10 +20,10 @@ test("docs/config.js targets public ow7ab/Share-Flow-Releases and GitHub Pages w
   assert.equal(cfg.assetFileName, "Share-Flow.apk");
   assert.equal(cfg.manifestFileName, "version.json");
   assert.equal(cfg.directLatestApkUrl, DIRECT_LATEST_APK);
-  assert.equal(cfg.portalUrl, "https://ow7ab.github.io/Share-Flow-Releases/");
+  assert.equal(cfg.portalUrl, "https://ow7ab.github.io/Share-Flow/");
   assert.equal(
     cfg.officialVersionManifestUrl,
-    "https://ow7ab.github.io/Share-Flow-Releases/version.json"
+    "https://ow7ab.github.io/Share-Flow/version.json"
   );
   assert.equal(cfg.customManifestUrl, "");
   assert.equal(portal.isSafeDirectApkUrl(cfg.directLatestApkUrl), true);
@@ -125,7 +125,7 @@ test("gallery implements lazy loading, safe asset validation, and theme-aware sk
   assert.ok(js.includes('img.loading = "lazy"') && js.includes('img.decoding = "async"'), "Expected native lazy loading and async decoding");
 });
 
-test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or private repo release URLs", () => {
+test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or legacy Share-Flow-Releases URLs", () => {
   const docsDir = path.join(__dirname, "..", "docs");
   const files = fs.readdirSync(docsDir).filter((f) => /\.(html|css|js|json)$/i.test(f));
   assert.ok(files.includes("index.html"));
@@ -141,7 +141,7 @@ test("static docs/ files contain zero secrets, tokens, unsafe innerHTML, or priv
     /BEGIN (RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY/,
     /Authorization\s*:/i,
     /\.innerHTML\s*=/,
-    /https:\/\/(api\.)?github\.com\/(repos\/)?ow7ab\/Share-Flow(\/|["'`])/
+    /Share-Flow-Releases/i
   ];
 
   for (const file of files) {

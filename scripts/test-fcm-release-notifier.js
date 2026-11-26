@@ -38,7 +38,7 @@ function makeSampleGitHubRelease(overrides = {}) {
         size: 18450000,
         digest: `sha256:${VALID_SHA}`,
         browser_download_url:
-          "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+          "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
       },
     ],
     ...overrides,
@@ -167,7 +167,7 @@ test("resolves valid GitHub Release using native asset sha256 digest and rejects
             {
               name: "Share-Flow.apk",
               size: 1000,
-              browser_download_url: "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+              browser_download_url: "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
             },
           ],
         }),

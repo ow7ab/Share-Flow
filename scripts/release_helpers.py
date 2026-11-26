@@ -315,7 +315,7 @@ def main() -> int:
     p_man.add_argument("--published-at", required=True)
     p_man.add_argument("--release-tag", required=True)
     p_man.add_argument("--cert-sha256", required=True)
-    p_man.add_argument("--portal-url", default="https://ow7ab.github.io/Share-Flow-Releases/")
+    p_man.add_argument("--portal-url", default="https://ow7ab.github.io/Share-Flow/")
     p_man.add_argument("--notes-ar", default="")
     p_man.add_argument("--notes-en", default="")
     p_man.add_argument("--mandatory", action="store_true")

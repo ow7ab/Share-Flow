@@ -119,7 +119,7 @@ class SmartUpdateAndFcmSystemTest {
                 "prerelease": false,
                 "published_at": "2026-11-25T10:00:00Z",
                 "body": "Draft notes",
-                "html_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/v1.0.21-draft",
+                "html_url": "https://github.com/ow7ab/Share-Flow/releases/tag/v1.0.21-draft",
                 "assets": []
               },
               {
@@ -130,18 +130,18 @@ class SmartUpdateAndFcmSystemTest {
                 "prerelease": false,
                 "published_at": "2026-11-25T09:00:00Z",
                 "body": "تحسينات شاملة لنظام التحديثات والإشعارات.",
-                "html_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/V1.0.20",
+                "html_url": "https://github.com/ow7ab/Share-Flow/releases/tag/V1.0.20",
                 "assets": [
                   {
                     "name": "Share-Flow.apk",
                     "size": ${sampleApkBytes.size},
                     "digest": "sha256:$sampleApkSha256",
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.20/Share-Flow.apk"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/V1.0.20/Share-Flow.apk"
                   },
                   {
                     "name": "version.json",
                     "size": 512,
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.20/version.json"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/V1.0.20/version.json"
                   }
                 ]
               },
@@ -153,13 +153,13 @@ class SmartUpdateAndFcmSystemTest {
                 "prerelease": true,
                 "published_at": "2026-11-20T09:00:00Z",
                 "body": "Prerelease notes",
-                "html_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/V1.0.12",
+                "html_url": "https://github.com/ow7ab/Share-Flow/releases/tag/V1.0.12",
                 "assets": [
                   {
                     "name": "Share-Flow.apk",
                     "size": 1000,
                     "digest": "sha256:$sampleApkSha256",
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.12/Share-Flow.apk"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/V1.0.12/Share-Flow.apk"
                   }
                 ]
               }
@@ -316,7 +316,7 @@ class SmartUpdateAndFcmSystemTest {
 
         // 1. Failing download must NOT delete previously verified destFile
         val failed = resumeClient.downloadApkResumable(
-            apkUrl = "https://github.com/ow7ab/Share-Flow-Releases/fail.apk",
+            apkUrl = "https://github.com/ow7ab/Share-Flow/fail.apk",
             destinationFile = destFile,
             resumeFromExistingPart = true,
             onProgress = { _, _ -> }
@@ -327,7 +327,7 @@ class SmartUpdateAndFcmSystemTest {
 
         // 2. Resuming from .part sends Range header and reconstructs exact full APK bytes
         val resumed = resumeClient.downloadApkResumable(
-            apkUrl = "https://github.com/ow7ab/Share-Flow-Releases/Share-Flow.apk",
+            apkUrl = "https://github.com/ow7ab/Share-Flow/Share-Flow.apk",
             destinationFile = destFile,
             resumeFromExistingPart = true,
             onProgress = { _, _ -> }
@@ -353,13 +353,13 @@ class SmartUpdateAndFcmSystemTest {
                 "prerelease": true,
                 "published_at": "2026-11-22T09:00:00Z",
                 "body": "Beta test release",
-                "html_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/V1.0.12",
+                "html_url": "https://github.com/ow7ab/Share-Flow/releases/tag/V1.0.12",
                 "assets": [
                   {
                     "name": "Share-Flow.apk",
                     "size": ${sampleApkBytes.size},
                     "digest": "sha256:$sampleApkSha256",
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.12/Share-Flow.apk"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/V1.0.12/Share-Flow.apk"
                   }
                 ]
               }
@@ -429,7 +429,7 @@ class SmartUpdateAndFcmSystemTest {
                     {
                       "versionCode": $servedVersionCode,
                       "versionName": "$servedVersionName",
-                      "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v$servedVersionName/Share-Flow.apk",
+                      "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v$servedVersionName/Share-Flow.apk",
                       "sha256": "$sampleApkSha256",
                       "fileSizeBytes": ${sampleApkBytes.size},
                       "mandatory": false,
@@ -444,7 +444,7 @@ class SmartUpdateAndFcmSystemTest {
         val manager = UpdateManager(
             okHttpClient = okHttp,
             dispatcher = dispatcher,
-            manifestUrl = "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            manifestUrl = "https://ow7ab.github.io/Share-Flow/version.json",
             fallbackManifestUrl = "",
             currentVersionCode = 19,
             currentVersionName = "1.0.18",
@@ -494,7 +494,7 @@ class SmartUpdateAndFcmSystemTest {
                 "type" to "app_update",
                 "versionCode" to "20",
                 "versionName" to "v1.0.19",
-                "apkUrl" to "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+                "apkUrl" to "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
                 "sha256" to sampleApkSha256,
                 "fileSizeBytes" to "18000000",
                 "publishedAt" to "2026-11-25T10:00:00Z",
@@ -527,7 +527,7 @@ class SmartUpdateAndFcmSystemTest {
                     "type" to "app_update",
                     "versionCode" to "20",
                     "versionName" to "1.0.19",
-                    "apkUrl" to "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+                    "apkUrl" to "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
                     "sha256" to "short"
                 )
             )
@@ -540,7 +540,7 @@ class SmartUpdateAndFcmSystemTest {
                     "type" to "promo",
                     "versionCode" to "20",
                     "versionName" to "1.0.19",
-                    "apkUrl" to "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+                    "apkUrl" to "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
                     "sha256" to sampleApkSha256
                 )
             )
@@ -635,7 +635,7 @@ class SmartUpdateAndFcmSystemTest {
         fun payloadFor(code: Int, name: String) = FcmUpdatePayload(
             versionCode = code,
             versionName = name,
-            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v$name/Share-Flow.apk",
+            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow/releases/download/v$name/Share-Flow.apk",
             sha256 = sampleApkSha256,
             fileSizeBytes = sampleApkBytes.size.toLong(),
             publishedAt = "2026-11-25T10:00:00Z",
@@ -696,14 +696,14 @@ class SmartUpdateAndFcmSystemTest {
         val manifest = CloudUpdateManifest(
             versionCode = 20,
             versionName = "1.0.19",
-            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
             sha256 = sampleApkSha256,
             fileSizeBytes = 18_450_000L,
             minSupportedAndroidSdk = 24,
             mandatory = false,
             releaseNotesAr = "نظام تحديث فوري عبر FCM",
             releaseNotesEn = "Instant FCM update system",
-            portalUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases",
+            portalUrl = "https://github.com/ow7ab/Share-Flow/releases",
             publishedAt = "2026-11-25"
         )
         val history = listOf(
@@ -714,7 +714,7 @@ class SmartUpdateAndFcmSystemTest {
                 publishedAt = "2026-11-22",
                 releaseNotes = "Previous build notes",
                 fileSizeBytes = 15_000_000L,
-                htmlUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/V1.0.12",
+                htmlUrl = "https://github.com/ow7ab/Share-Flow/releases/tag/V1.0.12",
                 isPrerelease = true,
                 hasApkAsset = true
             )
@@ -768,14 +768,14 @@ class SmartUpdateAndFcmSystemTest {
         val update = UpdateDetails(
             versionCode = 20,
             versionName = "1.0.19",
-            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.19/Share-Flow.apk",
+            apkDownloadUrl = "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.19/Share-Flow.apk",
             sha256 = sampleApkSha256,
             fileSizeBytes = 18_450_000L,
             mandatory = false,
             releaseNotes = "Instant FCM notifications and resumable downloads",
             releaseNotesAr = "إشعارات تحديث فورية وتنزيل قابل للاستئناف",
             releaseNotesEn = "Instant FCM notifications and resumable downloads",
-            portalUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases",
+            portalUrl = "https://github.com/ow7ab/Share-Flow/releases",
             publishedAt = "2026-11-25",
             isUpdateAvailable = true
         )
@@ -872,7 +872,7 @@ class SmartUpdateAndFcmSystemTest {
         val destFile = File(tempDir, "Share-Flow-v1.0.19.apk")
         try {
             val downloadResult = httpClient.downloadApkResumable(
-                apkUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/download/V1.0.19/Share-Flow.apk",
+                apkUrl = "https://github.com/ow7ab/Share-Flow/releases/download/V1.0.19/Share-Flow.apk",
                 destinationFile = destFile,
                 resumeFromExistingPart = true,
                 onProgress = { _, _ -> }

@@ -1401,11 +1401,11 @@ class CloudUpdateManager(
 
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"
-        const val GITHUB_SOURCE_LABEL = "GitHub Releases (ow7ab/Share-Flow-Releases)"
-        const val OFFICIAL_RELEASES_PAGE_URL = "https://github.com/ow7ab/Share-Flow-Releases/releases"
-        const val OFFICIAL_PORTAL_URL = "https://ow7ab.github.io/Share-Flow-Releases/"
-        const val OFFICIAL_PORTAL_HOST = "github.com/ow7ab/Share-Flow-Releases"
+        const val GITHUB_SOURCE_LABEL = "GitHub Releases (ow7ab/Share-Flow)"
+        const val OFFICIAL_RELEASES_PAGE_URL = "https://github.com/ow7ab/Share-Flow/releases"
+        const val OFFICIAL_PORTAL_URL = "https://ow7ab.github.io/Share-Flow/"
+        const val OFFICIAL_PORTAL_HOST = "github.com/ow7ab/Share-Flow"
         const val DEFAULT_FALLBACK_MANIFEST_URL =
-            "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json"
+            "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json"
     }
 }

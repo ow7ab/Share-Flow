@@ -49,14 +49,14 @@ class UpdateManagerTest {
         {
           "versionCode": $versionCode,
           "versionName": "$versionName",
-          "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+          "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
           "sha256": "${"a".repeat(64)}",
           "fileSizeBytes": 24500000,
           "minSupportedAndroidSdk": 24,
           "mandatory": $mandatory,
           "releaseNotesEn": "Faster Wi-Fi Direct transfers and unified glass navigation.",
           "releaseNotesAr": "نقل أسرع عبر Wi-Fi Direct وشريط تنقل زجاجي موحد.",
-          "portalUrl": "https://ow7ab.github.io/Share-Flow-Releases/"
+          "portalUrl": "https://ow7ab.github.io/Share-Flow/"
         }
     """.trimIndent()
 
@@ -155,7 +155,7 @@ class UpdateManagerTest {
         val manager = UpdateManager(
             okHttpClient = redirectingClient,
             dispatcher = dispatcher,
-            manifestUrl = "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            manifestUrl = "https://ow7ab.github.io/Share-Flow/version.json",
             fallbackManifestUrl = "",
             currentVersionCode = 12,
             currentSdkInt = 34
@@ -164,13 +164,13 @@ class UpdateManagerTest {
         val result = manager.checkForUpdate()
         assertTrue(result is AppResult.Failure && result.error is AppError.Security)
         // Must never issue a network call to 127.0.0.1
-        assertEquals(listOf("https://ow7ab.github.io/Share-Flow-Releases/version.json"), requestedUrls)
+        assertEquals(listOf("https://ow7ab.github.io/Share-Flow/version.json"), requestedUrls)
     }
 
     @Test
     fun `follows validated public HTTPS redirect cleanly to final manifest`() = runTest {
         val requestedUrls = mutableListOf<String>()
-        val targetUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/version.json"
+        val targetUrl = "https://github.com/ow7ab/Share-Flow/releases/latest/download/version.json"
         val redirectingClient = OkHttpClient.Builder()
             .followRedirects(false)
             .followSslRedirects(false)
@@ -178,7 +178,7 @@ class UpdateManagerTest {
                 val request = chain.request()
                 val url = request.url.toString()
                 requestedUrls.add(url)
-                if (url == "https://ow7ab.github.io/Share-Flow-Releases/version.json") {
+                if (url == "https://ow7ab.github.io/Share-Flow/version.json") {
                     Response.Builder()
                         .request(request)
                         .protocol(Protocol.HTTP_1_1)
@@ -203,7 +203,7 @@ class UpdateManagerTest {
         val manager = UpdateManager(
             okHttpClient = redirectingClient,
             dispatcher = dispatcher,
-            manifestUrl = "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            manifestUrl = "https://ow7ab.github.io/Share-Flow/version.json",
             fallbackManifestUrl = "",
             currentVersionCode = 12,
             currentSdkInt = 34
@@ -213,7 +213,7 @@ class UpdateManagerTest {
         assertTrue(result is AppResult.Success)
         assertEquals(50, (result as AppResult.Success).data.versionCode)
         assertEquals(
-            listOf("https://ow7ab.github.io/Share-Flow-Releases/version.json", targetUrl),
+            listOf("https://ow7ab.github.io/Share-Flow/version.json", targetUrl),
             requestedUrls
         )
     }

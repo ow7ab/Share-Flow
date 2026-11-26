@@ -1155,7 +1155,7 @@
     <string name="settings_update_current_version_label">النسخة المثبّتة حالياً</string>
     <string name="settings_update_official_source_label">موقع التحديث الرسمي</string>
     <string name="settings_update_portal_url_label">رابط ملف التحديث السحابي للموقع (HTTPS)</string>
-    <string name="settings_update_portal_url_placeholder">https://ow7ab.github.io/Share-Flow-Releases/version.json</string>
+    <string name="settings_update_portal_url_placeholder">https://ow7ab.github.io/Share-Flow/version.json</string>
     <string name="settings_update_portal_url_error">أدخل رابط HTTPS عاماً وصالحاً.</string>
     <string name="settings_update_check_action">فحص التحديثات الآن</string>
     <string name="settings_update_checking_status">جارٍ فحص موقع التحديث الرسمي…</string>

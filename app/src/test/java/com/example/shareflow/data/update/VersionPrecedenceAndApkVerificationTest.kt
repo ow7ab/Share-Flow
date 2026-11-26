@@ -90,7 +90,7 @@ class VersionPrecedenceAndApkVerificationTest {
                   {
                     "name": "version.json",
                     "size": 420,
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/$tag/version.json"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/$tag/version.json"
                   }"""
         } else {
             ""
@@ -105,13 +105,13 @@ class VersionPrecedenceAndApkVerificationTest {
                 "prerelease": false,
                 "published_at": "2026-11-26T00:00:00Z",
                 "body": "$body",
-                "html_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/tag/$tag",
+                "html_url": "https://github.com/ow7ab/Share-Flow/releases/tag/$tag",
                 "assets": [
                   {
                     "name": "Share-Flow.apk",
                     "size": ${sampleApkBytes.size},
                     "digest": "sha256:$sampleApkSha256",
-                    "browser_download_url": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/$tag/Share-Flow.apk"
+                    "browser_download_url": "https://github.com/ow7ab/Share-Flow/releases/download/$tag/Share-Flow.apk"
                   }$versionJsonAsset
                 ]
               }
@@ -127,14 +127,14 @@ class VersionPrecedenceAndApkVerificationTest {
         {
           "versionCode": $versionCode,
           "versionName": "$versionName",
-          "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v$versionName/Share-Flow.apk",
+          "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v$versionName/Share-Flow.apk",
           "sha256": "$sampleApkSha256",
           "fileSizeBytes": ${sampleApkBytes.size},
           "minSupportedAndroidSdk": 24,
           "mandatory": false,
           "releaseNotesAr": "تحديث رسمي موثّق",
           "releaseNotesEn": "Verified official release",
-          "portalUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases",
+          "portalUrl": "https://github.com/ow7ab/Share-Flow/releases",
           "publishedAt": "2026-11-26T00:00:00Z"
           ${if (signingCertSha256 != null) """, "signingCertSha256": "$signingCertSha256"""" else ""}
         }

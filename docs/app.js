@@ -2,12 +2,12 @@
   "use strict";
 
   const CONFIG = (typeof window !== "undefined" && window.SHAREFLOW_PORTAL_CONFIG) || {
-    releasesRepo: "ow7ab/Share-Flow-Releases",
+    releasesRepo: "ow7ab/Share-Flow",
     assetFileName: "Share-Flow.apk",
     manifestFileName: "version.json",
-    directLatestApkUrl: "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
-    officialVersionManifestUrl: "https://ow7ab.github.io/Share-Flow-Releases/version.json",
-    portalUrl: "https://ow7ab.github.io/Share-Flow-Releases/",
+    directLatestApkUrl: "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
+    officialVersionManifestUrl: "https://ow7ab.github.io/Share-Flow/version.json",
+    portalUrl: "https://ow7ab.github.io/Share-Flow/",
     customManifestUrl: "",
     galleryItems: []
   };
@@ -45,7 +45,7 @@
       unavailableStatus:
         "لا يوجد إصدار APK منشور للعامة حالياً. فور نشر أول إصدار رسمي في مستودع التوزيع العام سيظهر زر التحميل المباشر تلقائياً هنا.",
       privateHint:
-        "تُوزَّع ملفات APK وملف version.json عبر المستودع العام (ow7ab/Share-Flow-Releases) بينما تبقى الشيفرة المصدرية خاصة ومحمية بالكامل.",
+        "تُوزَّع ملفات APK وملف version.json والموقع الرسمي مباشرة عبر المستودع الرسمي الموحّد (ow7ab/Share-Flow).",
       rateLimitStatus:
         "تم بلوغ حد الطلبات المؤقت لخادم الإصدارات من هذه الشبكة. أعد المحاولة بعد قليل.",
       errorStatus:
@@ -186,7 +186,7 @@
       unavailableStatus:
         "No public APK release is published yet. Once the first official release is published, the direct APK download button activates automatically here.",
       privateHint:
-        "Signed APKs and version.json are distributed publicly via ow7ab/Share-Flow-Releases while source code remains private.",
+        "Signed APKs, version.json, and the official portal are distributed directly from the unified Share Flow repository (ow7ab/Share-Flow).",
       rateLimitStatus:
         "Temporary release server rate limit reached from this network. Please retry shortly.",
       errorStatus:
@@ -1362,7 +1362,7 @@
         return;
       }
 
-      const repo = CONFIG.releasesRepo || "ow7ab/Share-Flow-Releases";
+      const repo = CONFIG.releasesRepo || "ow7ab/Share-Flow";
       const latestUrl = `https://api.github.com/repos/${repo}/releases/latest`;
       const listUrl = `https://api.github.com/repos/${repo}/releases?per_page=10`;
       const headers = { Accept: "application/vnd.github+json" };

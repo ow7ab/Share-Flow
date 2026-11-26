@@ -36,7 +36,7 @@ class AutoUpdateSettingsAndBannerTest {
     private fun sampleOptionalUpdate() = UpdateDetails(
         versionCode = 28,
         versionName = "2.2.0",
-        apkDownloadUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+        apkDownloadUrl = "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
         sha256 = "b".repeat(64),
         fileSizeBytes = 24_000_000L,
         mandatory = false,

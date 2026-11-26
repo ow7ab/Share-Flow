@@ -1,0 +1,49 @@
+name: Migrate Historical Releases from Legacy Repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: "Legacy archive repository to migrate releases from (read-only; never deleted)"
+        required: true
+        default: "ow7ab/Share-Flow-Releases"
+        type: string
+      dry_run:
+        description: "Dry run: inspect releases and generate migration plan without modifying this repository"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: shareflow-legacy-release-migration
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-releases:
+    name: Migrate & SHA-256 Verify Historical Releases into ow7ab/Share-Flow
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout unified primary repository
+        uses: actions/checkout@v4
+
+      - name: Run idempotent SHA-256-verified release migration
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPO: ${{ github.event.inputs.source_repo || 'ow7ab/Share-Flow-Releases' }}
+          TARGET_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || false }}
+        run: |
+          set -euo pipefail
+          ARGS=(
+            "--source-repo" "$SOURCE_REPO"
+            "--target-repo" "$TARGET_REPO"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS+=("--dry-run")
+          fi
+          python3 ./scripts/migrate_releases.py "${ARGS[@]}"

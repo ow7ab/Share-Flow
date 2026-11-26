@@ -68,7 +68,7 @@ class CloudUpdateManagerTest {
         )
         assertEquals("com.shareflow", BuildConfig.APPLICATION_ID)
         assertEquals(
-            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            "https://ow7ab.github.io/Share-Flow/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
         )
         assertTrue(CloudUpdateValidator.isValidPublicHttpsUrl(BuildConfig.CLOUD_UPDATE_MANIFEST_URL))
@@ -81,14 +81,14 @@ class CloudUpdateManagerTest {
             {
               "versionCode": 12,
               "versionName": "1.0.11",
-              "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.11/Share-Flow.apk",
+              "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.11/Share-Flow.apk",
               "sha256": "$sampleApkSha256",
               "fileSizeBytes": ${sampleApkBytes.size},
               "minSupportedAndroidSdk": 24,
               "mandatory": false,
               "releaseNotesAr": "إصدار رسمي موقّع وموثّق من تطبيق Share Flow جاهز للتثبيت المباشر.",
               "releaseNotesEn": "Verified signed Share Flow Android release ready for direct APK installation.",
-              "portalUrl": "https://ow7ab.github.io/Share-Flow-Releases/",
+              "portalUrl": "https://ow7ab.github.io/Share-Flow/",
               "publishedAt": "2026-11-22T09:00:00Z",
               "releaseTag": "v1.0.11",
               "signingCertSha256": "$sampleApkSha256"
@@ -101,7 +101,7 @@ class CloudUpdateManagerTest {
         assertEquals(12, data.versionCode)
         assertEquals("1.0.11", data.versionName)
         assertTrue(data.apkDownloadUrl.endsWith("/Share-Flow.apk"))
-        assertEquals("https://ow7ab.github.io/Share-Flow-Releases/", data.portalUrl)
+        assertEquals("https://ow7ab.github.io/Share-Flow/", data.portalUrl)
         assertEquals(sampleApkSha256, data.signingCertSha256)
     }
 
@@ -111,7 +111,7 @@ class CloudUpdateManagerTest {
             {
               "versionCode": 13,
               "versionName": "1.0.12",
-              "apkUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+              "apkUrl": "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
               "sha256": "$sampleApkSha256",
               "fileSizeBytes": ${sampleApkBytes.size},
               "releaseNotes": [
@@ -126,7 +126,7 @@ class CloudUpdateManagerTest {
         val data = (parsed as AppResult.Success).data
         assertEquals(13, data.versionCode)
         assertEquals("1.0.12", data.versionName)
-        assertEquals("https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk", data.apkDownloadUrl)
+        assertEquals("https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk", data.apkDownloadUrl)
         assertTrue(data.releaseNotesAr.contains("تحسين سرعة الاتصال المباشر"))
         assertTrue(data.releaseNotesEn.contains("واجهة تحديث تلقائي أكثر استقراراً"))
     }
@@ -190,7 +190,7 @@ class CloudUpdateManagerTest {
         )
 
         assertEquals(
-            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            "https://ow7ab.github.io/Share-Flow/version.json",
             manager.resolveEffectiveManifestUrl("")
         )
         assertEquals(
@@ -224,7 +224,7 @@ class CloudUpdateManagerTest {
         assertTrue("Expected UpdateAvailable via fallback but got $state", state is CloudUpdateState.UpdateAvailable)
         assertEquals(
             listOf(
-                "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+                "https://ow7ab.github.io/Share-Flow/version.json",
                 CloudUpdateManager.DEFAULT_FALLBACK_MANIFEST_URL
             ),
             requestedUrls
@@ -361,7 +361,7 @@ class CloudUpdateManagerTest {
                 {
                   "versionCode": 12,
                   "versionName": "1.0.11",
-                  "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow-Releases/releases/download/v1.0.11/Share-Flow.apk",
+                  "apkDownloadUrl": "https://github.com/ow7ab/Share-Flow/releases/download/v1.0.11/Share-Flow.apk",
                   "sha256": "$sampleApkSha256",
                   "fileSizeBytes": ${sampleApkBytes.size},
                   "signingCertSha256": "$sampleApkSha256"

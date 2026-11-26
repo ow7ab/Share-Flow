@@ -1,20 +1,20 @@
 /**
  * Share Flow Official Public Website & Download Portal Configuration
  *
- * Source repository (PRIVATE): ow7ab/Share-Flow
- * Public distribution & GitHub Pages repository (PUBLIC): ow7ab/Share-Flow-Releases
+ * Unified official repository (Source Code, GitHub Releases, GitHub Actions & GitHub Pages):
+ * ow7ab/Share-Flow
  *
  * Security guarantee:
  * - Browser-side JavaScript NEVER contains tokens, API keys, or keystore secrets.
  * - All APK downloads and version.json manifests are served publicly over HTTPS.
  */
 window.SHAREFLOW_PORTAL_CONFIG = Object.freeze({
-  releasesRepo: "ow7ab/Share-Flow-Releases",
+  releasesRepo: "ow7ab/Share-Flow",
   assetFileName: "Share-Flow.apk",
   manifestFileName: "version.json",
-  directLatestApkUrl: "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
-  officialVersionManifestUrl: "https://ow7ab.github.io/Share-Flow-Releases/version.json",
-  portalUrl: "https://ow7ab.github.io/Share-Flow-Releases/",
+  directLatestApkUrl: "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
+  officialVersionManifestUrl: "https://ow7ab.github.io/Share-Flow/version.json",
+  portalUrl: "https://ow7ab.github.io/Share-Flow/",
   customManifestUrl: "",
   // Real bundled project visuals; add real phone captures under docs/screenshots/ to extend the gallery automatically.
   galleryItems: Object.freeze([

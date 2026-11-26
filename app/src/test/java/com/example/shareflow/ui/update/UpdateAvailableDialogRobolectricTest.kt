@@ -27,7 +27,7 @@ class UpdateAvailableDialogRobolectricTest {
     private fun sampleUpdate(mandatory: Boolean) = UpdateDetails(
         versionCode = 25,
         versionName = "2.1.0",
-        apkDownloadUrl = "https://github.com/ow7ab/Share-Flow-Releases/releases/latest/download/Share-Flow.apk",
+        apkDownloadUrl = "https://github.com/ow7ab/Share-Flow/releases/latest/download/Share-Flow.apk",
         sha256 = "a".repeat(64),
         fileSizeBytes = 25_000_000L,
         mandatory = mandatory,

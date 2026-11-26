@@ -1,48 +1,50 @@
-name: Sync ShareFlow Public Website to GitHub Pages Repo
+name: Validate & Deploy ShareFlow Website (Unified Repo)
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "scripts/sync-public-docs.sh"
+      - "scripts/test-portal.js"
   workflow_dispatch:
     inputs:
       reason:
-        description: "Optional sync commit description"
+        description: "Optional manual verification note"
         required: false
-        default: "Sync static download portal docs"
+        default: "Validate unified Share Flow website"
 
 concurrency:
-  group: shareflow-public-website-sync
+  group: shareflow-unified-website-validation
   cancel-in-progress: false
 
-# Read-only on the private source repository; cross-repo push uses PUBLIC_RELEASES_TOKEN exclusively.
+# Least privilege: read-only checkout; GitHub Pages deploys directly from ow7ab/Share-Flow (main -> /docs).
 permissions:
   contents: read
 
 jobs:
-  sync-static-website:
-    name: Validate & Sync Static docs/ to ow7ab/Share-Flow-Releases
+  validate-unified-website:
+    name: Validate Unified Website in ow7ab/Share-Flow (/docs)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout private source repository
+      - name: Checkout unified repository
         uses: actions/checkout@v4
 
-      - name: Run portal verification tests and dry-run allowlist check
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run portal unit tests & security allowlist check
         shell: bash
         run: |
           set -euo pipefail
           node --test ./scripts/test-portal.js
           bash ./scripts/sync-public-docs.sh --dry-run
 
-      - name: Sync verified static docs/ directory to public repository
-        shell: bash
-        env:
-          PUBLIC_RELEASES_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUBLIC_RELEASES_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
-          SYNC_COMMIT_REASON: ${{ github.event.inputs.reason || 'Sync static download portal docs' }}
-        run: |
-          set -euo pipefail
-          bash ./scripts/sync-public-docs.sh
-
-      - name: Clean temporary sync workspace
+      - name: Clean temporary staging directory
         if: always()
         shell: bash
         run: rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"

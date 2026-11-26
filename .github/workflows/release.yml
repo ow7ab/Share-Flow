@@ -2,12 +2,14 @@ name: ShareFlow Production Release & Public APK Distribution
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Optional version tag (leave empty to auto-read versionName from app/build.gradle.kts, e.g. v1.0.12)"
+        description: "Optional version tag (leave empty to auto-read versionName from app/build.gradle.kts, e.g. v1.0.22)"
         required: false
         default: ""
         type: string
@@ -25,12 +27,12 @@ on:
         default: false
         type: boolean
       sync_public_website:
-        description: "Synchronize static docs/ website and version.json to public repository after release"
+        description: "Update docs/version.json and GitHub Pages manifest in ow7ab/Share-Flow after release"
         required: false
         default: true
         type: boolean
       dry_run:
-        description: "Safe test mode: validate, test, build & sign locally WITHOUT publishing a public GitHub Release or updating the website"
+        description: "Safe test mode: validate, test, build & sign locally WITHOUT publishing a GitHub Release or updating docs/version.json"
         required: false
         default: false
         type: boolean
@@ -41,47 +43,132 @@ concurrency:
   group: shareflow-production-release
   cancel-in-progress: false
 
-# Least privilege on the private source repository: read-only checkout.
-# Cross-repository publishing to ow7ab/Share-Flow-Releases uses PUBLIC_RELEASES_TOKEN exclusively.
+# Unified single-repository permissions on ow7ab/Share-Flow:
+# uses GitHub's built-in GITHUB_TOKEN (contents: write) to publish Releases, tags, and docs/version.json directly.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-sign-and-publish-public-release:
-    name: Build, Sign, Verify & Publish Share-Flow.apk to Public Releases
+    name: Build, Sign, Verify & Publish Share-Flow.apk to ow7ab/Share-Flow
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout private source repository
+      - name: Checkout unified Share Flow repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate required signing secrets, publishing token, and target repository
+      - name: Validate release trigger, signing secrets, and target repository
         id: validate_config
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PW: ${{ secrets.ANDROID_STORE_PASSWORD }}
           KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
           EXPECTED_CERT: ${{ secrets.EXPECTED_CERT_SHA256 }}
           SETUP_TOKEN: ${{ secrets.KEYSTORE_SETUP_TOKEN }}
-          PUB_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUB_REPO: ${{ vars.PUBLIC_RELEASES_REPO || 'ow7ab/Share-Flow-Releases' }}
-          PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
+          TARGET_REPO: ${{ vars.PUBLIC_RELEASES_REPO || github.repository }}
+          PORTAL_URL: ${{ vars.SHAREFLOW_PORTAL_URL || 'https://ow7ab.github.io/Share-Flow/' }}
           SOURCE_REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          BEFORE_SHA: ${{ github.event.before || '' }}
+          HEAD_SHA: ${{ github.sha }}
+          HEAD_COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
           INPUT_TAG: ${{ github.event.inputs.release_tag || '' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || false }}
         run: |
           set -euo pipefail
 
+          # Strip accidental leading/trailing whitespace or CR/LF
+          GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          export GH_TOKEN
+
           DRY_RUN="false"
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_DRY_RUN" = "true" ]; then
             DRY_RUN="true"
-            echo "Running in SAFE DRY-RUN mode: no public GitHub Release or website changes will be published."
+            echo "Running in SAFE DRY-RUN mode: no GitHub Release or website manifest changes will be published."
+          fi
+
+          # When triggered by a branch push to main (e.g. from Google AI Studio), only cut a release
+          # if app/build.gradle.kts changed AND the resulting versionName is not already published.
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
+            if [ "$ACTOR" = "shareflow-release-bot" ] || printf '%s' "$HEAD_COMMIT_MSG" | grep -Eqi '\[skip (ci|release)\]'; then
+              echo "Skipping automatic release for bot or [skip release] commit."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "skip_reason=Automated docs/bot commit ([skip release])" >> "$GITHUB_OUTPUT"
+              echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
+              echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
+              echo "dry_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            GRADLE_CHANGED="false"
+            if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+              if git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" | grep -Fxq "app/build.gradle.kts"; then
+                GRADLE_CHANGED="true"
+              fi
+            else
+              GRADLE_CHANGED="true"
+            fi
+
+            if [ "$GRADLE_CHANGED" != "true" ]; then
+              echo "app/build.gradle.kts was not modified in this push to main; skipping automatic release."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "skip_reason=No version bump in app/build.gradle.kts on main push" >> "$GITHUB_OUTPUT"
+              echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
+              echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
+              echo "dry_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            GRADLE_VER=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' ./app/build.gradle.kts | head -n 1)
+            RELEASE_TAG="v${GRADLE_VER}"
+
+            # Check case-insensitively if this version (vX.Y.Z or VX.Y.Z) is already published
+            EXISTING_RELEASES_JSON="${RUNNER_TEMP}/existing-releases-check.json"
+            if gh api "repos/${TARGET_REPO}/releases?per_page=100" > "$EXISTING_RELEASES_JSON" 2>/dev/null; then
+              ALREADY_PUBLISHED=$(EXISTING_RELEASES_JSON="$EXISTING_RELEASES_JSON" RELEASE_TAG="$RELEASE_TAG" python3 - <<'PYEOF'
+          import json, os
+          target = os.environ["RELEASE_TAG"].lower()
+          with open(os.environ["EXISTING_RELEASES_JSON"], "r", encoding="utf-8") as fh:
+              releases = json.load(fh)
+          exists = any(
+              not r.get("draft", False) and str(r.get("tag_name") or "").strip().lower() == target
+              for r in releases
+          )
+          print("true" if exists else "false")
+          PYEOF
+              )
+              rm -f "$EXISTING_RELEASES_JSON"
+              if [ "$ALREADY_PUBLISHED" = "true" ]; then
+                echo "Release '${RELEASE_TAG}' (case-insensitive) is already published in '${TARGET_REPO}'; skipping automatic branch release."
+                echo "should_release=false" >> "$GITHUB_OUTPUT"
+                echo "skip_reason=Release ${RELEASE_TAG} already published in ${TARGET_REPO}" >> "$GITHUB_OUTPUT"
+                echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+                echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
+                echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
+                echo "dry_run=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            echo "Detected new version '${RELEASE_TAG}' in app/build.gradle.kts on main push — proceeding with automated release."
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RELEASE_TAG=$(printf '%s' "$INPUT_TAG" | tr -d '[:space:]')
+            if [ -z "$RELEASE_TAG" ]; then
+              GRADLE_VER=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' ./app/build.gradle.kts | head -n 1)
+              if [ -n "$GRADLE_VER" ]; then
+                RELEASE_TAG="v${GRADLE_VER}"
+                echo "Auto-detected release tag from app/build.gradle.kts: ${RELEASE_TAG}"
+              fi
+            fi
+          else
+            RELEASE_TAG="$REF_NAME"
           fi
 
           # Safe first-time keystore bootstrap is allowed ONLY when ALL signing secrets & cert pin are absent AND KEYSTORE_SETUP_TOKEN is provided.
@@ -97,51 +184,31 @@ jobs:
             [ -z "$STORE_PW" ] && MISSING+=("Secret: ANDROID_STORE_PASSWORD")
             [ -z "$KEY_PW" ] && MISSING+=("Secret: ANDROID_KEY_PASSWORD")
           fi
-          if [ "$DRY_RUN" != "true" ]; then
-            [ -z "$PUB_TOKEN" ] && MISSING+=("Secret: PUBLIC_RELEASES_TOKEN")
-          fi
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "::error::Missing required production release secrets in ${SOURCE_REPO} (Settings -> Secrets and variables -> Actions -> Repository secrets):"
             for item in "${MISSING[@]}"; do
               echo "::error::  - $item"
             done
-            echo "::error::A replacement release signing keystore is NEVER generated automatically to preserve in-place Android upgrades. For first-time setup, add a temporary Fine-grained PAT (Secrets: Read and write on ${SOURCE_REPO}) as KEYSTORE_SETUP_TOKEN, or add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD manually."
+            echo "::error::A replacement release signing keystore is NEVER generated automatically to preserve in-place Android upgrades. Add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD (or temporary KEYSTORE_SETUP_TOKEN for first-time setup)."
             exit 1
           fi
 
           RESOLVED_ALIAS="${KEY_ALIAS_SECRET:-upload}"
 
-          if [ "$PUB_REPO" = "$SOURCE_REPO" ]; then
-            echo "::error::PUBLIC_RELEASES_REPO ($PUB_REPO) must be a separate public distribution repository (ow7ab/Share-Flow-Releases), never the private source repository ($SOURCE_REPO)."
+          if ! printf '%s' "$TARGET_REPO" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
+            echo "::error::Invalid target repository format: '$TARGET_REPO'. Expected owner/repo."
             exit 1
-          fi
-
-          if ! printf '%s' "$PUB_REPO" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
-            echo "::error::Invalid PUBLIC_RELEASES_REPO format: '$PUB_REPO'. Expected owner/repo."
-            exit 1
-          fi
-
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            RELEASE_TAG=$(printf '%s' "$INPUT_TAG" | tr -d '[:space:]')
-            if [ -z "$RELEASE_TAG" ]; then
-              GRADLE_VER=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' ./app/build.gradle.kts | head -n 1)
-              if [ -n "$GRADLE_VER" ]; then
-                RELEASE_TAG="v${GRADLE_VER}"
-                echo "Auto-detected release tag from app/build.gradle.kts: ${RELEASE_TAG}"
-              fi
-            fi
-          else
-            RELEASE_TAG="$REF_NAME"
           fi
 
           if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.12)."
+            echo "::error::Release tag '$RELEASE_TAG' must follow semantic versioning format vMAJOR.MINOR.PATCH (e.g. v1.0.22)."
             exit 1
           fi
 
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "public_repo=${PUB_REPO}" >> "$GITHUB_OUTPUT"
+          echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
           echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
           echo "key_alias=${RESOLVED_ALIAS}" >> "$GITHUB_OUTPUT"
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
@@ -149,6 +216,7 @@ jobs:
 
       - name: Locate Android Gradle project root and verify wrapper
         id: locate_project
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -173,12 +241,13 @@ jobs:
 
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Verify public destination repository, non-duplicate tag, and pre-build versionCode/versionName
+      - name: Verify unified public repository, non-duplicate tag, and pre-build versionCode/versionName
         id: prebuild_version_check
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
           PORTAL_URL: ${{ steps.validate_config.outputs.portal_url }}
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
@@ -189,71 +258,57 @@ jobs:
           PREV_MANIFEST="${RUNNER_TEMP}/prev-published-version.json"
           rm -f "$PREV_MANIFEST"
 
-          # Strip accidental leading/trailing whitespace or CR/LF copied into the secret
+          # Strip accidental leading/trailing whitespace or CR/LF
           GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
           export GH_TOKEN
 
-          TOKEN_VALID="false"
-          if [ -n "${GH_TOKEN:-}" ]; then
-            REPO_API_OUT="${RUNNER_TEMP}/public-repo-api.json"
-            REPO_API_ERR="${RUNNER_TEMP}/public-repo-api.err"
-            rm -f "$REPO_API_OUT" "$REPO_API_ERR"
+          REPO_API_OUT="${RUNNER_TEMP}/public-repo-api.json"
+          REPO_API_ERR="${RUNNER_TEMP}/public-repo-api.err"
+          ALL_RELEASES_OUT="${RUNNER_TEMP}/public-repo-releases.json"
+          rm -f "$REPO_API_OUT" "$REPO_API_ERR" "$ALL_RELEASES_OUT"
 
-            if gh api "repos/${PUBLIC_REPO}" >"$REPO_API_OUT" 2>"$REPO_API_ERR"; then
-              TOKEN_VALID="true"
-              IS_PRIVATE=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("private", True)).lower())' "$REPO_API_OUT")
-              if [ "$IS_PRIVATE" != "false" ]; then
-                echo "::error::Destination repository '${PUBLIC_REPO}' is not public (private=${IS_PRIVATE}). Public APK distribution requires a public releases repository."
-                exit 1
-              fi
+          if gh api "repos/${PUBLIC_REPO}" >"$REPO_API_OUT" 2>"$REPO_API_ERR"; then
+            IS_PRIVATE=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("private", True)).lower())' "$REPO_API_OUT")
+            if [ "$IS_PRIVATE" != "false" ]; then
+              echo "::error::Destination repository '${PUBLIC_REPO}' is not public (private=${IS_PRIVATE}). Public APK distribution requires a public repository."
+              exit 1
+            fi
 
-              if gh api "repos/${PUBLIC_REPO}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-                if [ "$DRY_RUN" = "true" ]; then
-                  echo "::warning::[DRY-RUN] Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'."
-                else
-                  echo "::error::Release '${RELEASE_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and tag a new release."
-                  exit 1
-                fi
-              fi
-
-              gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1 || true
-            else
-              ERR_MSG=$(tr '\n' ' ' < "$REPO_API_ERR" | sed -E 's/[[:space:]]+/ /g')
+            # Case-insensitive duplicate release check (guards against both vX.Y.Z and legacy VX.Y.Z)
+            gh api "repos/${PUBLIC_REPO}/releases?per_page=100" >"$ALL_RELEASES_OUT" 2>/dev/null || echo "[]" >"$ALL_RELEASES_OUT"
+            DUP_TAG=$(ALL_RELEASES_OUT="$ALL_RELEASES_OUT" RELEASE_TAG="$RELEASE_TAG" python3 - <<'PYEOF'
+          import json, os
+          target = os.environ["RELEASE_TAG"].lower()
+          with open(os.environ["ALL_RELEASES_OUT"], "r", encoding="utf-8") as fh:
+              releases = json.load(fh)
+          for r in releases:
+              if not r.get("draft", False) and str(r.get("tag_name") or "").strip().lower() == target:
+                  print(str(r.get("tag_name") or ""))
+                  break
+          PYEOF
+            )
+            if [ -n "$DUP_TAG" ]; then
               if [ "$DRY_RUN" = "true" ]; then
-                echo "::warning::[DRY-RUN] PUBLIC_RELEASES_TOKEN failed authentication against '${PUBLIC_REPO}' (${ERR_MSG}). Falling back to unauthenticated public read-only checks for dry-run; refresh PUBLIC_RELEASES_TOKEN before running a live production release."
+                echo "::warning::[DRY-RUN] Release '${DUP_TAG}' already exists in '${PUBLIC_REPO}'."
               else
-                if printf '%s' "$ERR_MSG" | grep -Eqi '401|Bad credentials'; then
-                  echo "::error::PUBLIC_RELEASES_TOKEN was rejected by GitHub (HTTP 401: Bad credentials)."
-                  echo "::error::Fix: Create a new Fine-grained Personal Access Token in GitHub (Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens) scoped ONLY to '${PUBLIC_REPO}' with Repository permission 'Contents: Read and write', then update secret PUBLIC_RELEASES_TOKEN in '${GITHUB_REPOSITORY}' without extra spaces or line breaks."
-                elif printf '%s' "$ERR_MSG" | grep -Eqi '403|404|Not Found|Resource not accessible'; then
-                  echo "::error::PUBLIC_RELEASES_TOKEN cannot access '${PUBLIC_REPO}' (${ERR_MSG})."
-                  echo "::error::Fix: Verify the token is not expired, grants repository access to '${PUBLIC_REPO}', and includes permission 'Contents: Read and write' (and 'Metadata: Read-only')."
-                else
-                  echo "::error::Failed to verify destination repository '${PUBLIC_REPO}': ${ERR_MSG}"
-                fi
+                echo "::error::Release '${DUP_TAG}' already exists in '${PUBLIC_REPO}'. Existing production releases are never overwritten. Increment versionName and versionCode and push a new version."
                 exit 1
               fi
             fi
-            rm -f "$REPO_API_OUT" "$REPO_API_ERR"
-          fi
 
-          # In DRY-RUN mode without a valid token, verify public destination repo via unauthenticated REST API
-          if [ "$DRY_RUN" = "true" ] && [ "$TOKEN_VALID" != "true" ]; then
-            PUB_API_OUT="${RUNNER_TEMP}/public-repo-unauth.json"
-            if curl -fsSL --max-time 10 -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${PUBLIC_REPO}" -o "$PUB_API_OUT" 2>/dev/null; then
-              IS_PRIVATE=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("private", True)).lower())' "$PUB_API_OUT")
-              rm -f "$PUB_API_OUT"
-              if [ "$IS_PRIVATE" != "false" ]; then
-                echo "::error::Destination repository '${PUBLIC_REPO}' is not public (private=${IS_PRIVATE})."
-                exit 1
-              fi
+            gh release download --repo "$PUBLIC_REPO" --pattern "version.json" --output "$PREV_MANIFEST" >/dev/null 2>&1 || true
+          else
+            ERR_MSG=$(tr '\n' ' ' < "$REPO_API_ERR" | sed -E 's/[[:space:]]+/ /g')
+            if printf '%s' "$ERR_MSG" | grep -Eqi '401|Bad credentials'; then
+              echo "::error::GitHub API token was rejected (HTTP 401: Bad credentials) while verifying '${PUBLIC_REPO}'."
             else
-              rm -f "$PUB_API_OUT"
-              echo "::warning::[DRY-RUN] Could not query unauthenticated GitHub REST API for '${PUBLIC_REPO}'; continuing local build & verification."
+              echo "::error::Failed to verify destination repository '${PUBLIC_REPO}': ${ERR_MSG}"
             fi
+            exit 1
           fi
+          rm -f "$REPO_API_OUT" "$REPO_API_ERR" "$ALL_RELEASES_OUT"
 
-          # Fallback to public HTTPS version.json if gh token is absent/invalid (dry-run) or release asset wasn't found yet
+          # Fallback to public HTTPS version.json on GitHub Pages if latest release did not carry version.json
           if [ ! -s "$PREV_MANIFEST" ]; then
             curl -fsSL --max-time 10 "${PORTAL_URL%/}/version.json" -o "$PREV_MANIFEST" >/dev/null 2>&1 || rm -f "$PREV_MANIFEST"
           fi
@@ -280,20 +335,24 @@ jobs:
           python3 ./scripts/release_helpers.py validate-prebuild "${PREBUILD_ARGS[@]}"
 
       - name: Set up JDK 21 (Temurin)
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Configure Gradle caching
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make Gradle Wrapper executable
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: chmod +x ./gradlew
 
       - name: Decode and validate permanent release keystore outside tracked workspace (with guarded first-time bootstrap)
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -428,7 +487,8 @@ jobs:
             fi
           fi
 
-      - name: Run download portal, release pipeline, and public sync safety tests
+      - name: Run download portal, release pipeline, and unified website safety tests
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         run: |
@@ -440,6 +500,7 @@ jobs:
           bash ./scripts/sync-public-docs.sh --dry-run
 
       - name: Run full Android unit and Robolectric test suite
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
@@ -468,6 +529,7 @@ jobs:
           ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build signed Release APK and Play App Bundle (AAB)
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
@@ -484,6 +546,7 @@ jobs:
 
       - name: Verify APK signature, certificate pin, alignment, version sync, and generate version.json
         id: verify_outputs
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
@@ -656,12 +719,12 @@ jobs:
             echo "mapping_path=$(realpath "$MAPPING_TXT")" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Atomically publish verified Share-Flow.apk to public repository (Draft -> Verify -> Promote)
+      - name: Atomically publish verified Share-Flow.apk to ow7ab/Share-Flow (Draft -> Verify -> Promote)
         id: publish_public_release
-        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag }}
           VERSION_NAME: ${{ steps.verify_outputs.outputs.version_name }}
@@ -676,7 +739,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Strip accidental leading/trailing whitespace or CR/LF copied into the secret
+          # Strip accidental leading/trailing whitespace or CR/LF
           GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
           export GH_TOKEN
 
@@ -727,7 +790,7 @@ jobs:
               body += f"\n**English Notes:**\n{notes_en}\n"
 
           body += (
-              "\n> Built and cryptographically signed from the private Share Flow source repository. "
+              f"\n> Built and cryptographically signed from the official Share Flow repository (`{os.environ['PUBLIC_REPO']}`). "
               "Verified automatically via `apksigner`, `zipalign`, `aapt2`, and unit tests prior to publication.\n"
           )
 
@@ -751,6 +814,7 @@ jobs:
             "$SHA_PATH#Share-Flow.apk.sha256" \
             "$MANIFEST_PATH#version.json" \
             --repo "$PUBLIC_REPO" \
+            --target "${GITHUB_SHA}" \
             --title "Share Flow v${VERSION_NAME} (Build ${VERSION_CODE})" \
             --notes-file "$NOTES_FILE" \
             --draft
@@ -783,7 +847,7 @@ jobs:
           echo "Promoted verified public GitHub Release: ${RELEASE_URL}"
 
       - name: Verify unauthenticated public direct APK download
-        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' }}
         shell: bash
         env:
           PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo }}
@@ -815,22 +879,21 @@ jobs:
             exit 1
           fi
 
-      - name: Sync static docs/ website and version.json to public repository (GitHub Pages)
+      - name: Update docs/version.json in unified repository (GitHub Pages)
         id: sync_website
-        if: ${{ steps.validate_config.outputs.dry_run != 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.sync_public_website != false) }}
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.sync_public_website != false) }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
-          PUBLIC_RELEASES_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          PUBLIC_RELEASES_REPO: ${{ steps.validate_config.outputs.public_repo }}
           LATEST_MANIFEST_FILE: ${{ steps.verify_outputs.outputs.manifest_path }}
-          SYNC_COMMIT_REASON: "Release ${{ steps.validate_config.outputs.release_tag }} (Build ${{ steps.verify_outputs.outputs.version_code }}): update version.json and official website"
+          TARGET_BRANCH: main
+          SYNC_COMMIT_REASON: "Release ${{ steps.validate_config.outputs.release_tag }} (Build ${{ steps.verify_outputs.outputs.version_code }}): update docs/version.json"
         run: |
           set -euo pipefail
-          bash ./scripts/sync-public-docs.sh
+          bash ./scripts/sync-public-docs.sh --local-update
 
       - name: Restore FCM release notification dedupe cache
-        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' }}
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/shareflow-fcm-dedupe
@@ -839,7 +902,7 @@ jobs:
       - name: Send instant FCM update notification to Share Flow users (non-fatal)
         id: fcm_notify
         continue-on-error: true
-        if: ${{ steps.validate_config.outputs.dry_run != 'true' }}
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' }}
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:
@@ -866,7 +929,8 @@ jobs:
             --published-at "$PUBLISHED_AT" \
             --dedupe-marker-file "$DEDUPE_MARKER"
 
-      - name: Upload Release APK private workflow artifact
+      - name: Upload Release APK workflow artifact
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: shareflow-release-apk
@@ -874,7 +938,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Google Play AAB private workflow artifact
+      - name: Upload Google Play AAB workflow artifact
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: shareflow-release-aab
@@ -883,7 +948,7 @@ jobs:
           retention-days: 30
 
       - name: Upload R8 ProGuard mapping file
-        if: steps.verify_outputs.outputs.mapping_path != ''
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.verify_outputs.outputs.mapping_path != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: shareflow-release-r8-mapping
@@ -896,10 +961,12 @@ jobs:
         shell: bash
         env:
           JOB_STATUS: ${{ job.status }}
+          SHOULD_RELEASE: ${{ steps.validate_config.outputs.should_release || 'false' }}
+          SKIP_REASON: ${{ steps.validate_config.outputs.skip_reason || '' }}
           DRY_RUN: ${{ steps.validate_config.outputs.dry_run || 'false' }}
           RELEASE_TAG: ${{ steps.validate_config.outputs.release_tag || github.ref_name }}
-          PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo || 'ow7ab/Share-Flow-Releases' }}
-          PORTAL_URL: ${{ steps.validate_config.outputs.portal_url || 'https://ow7ab.github.io/Share-Flow-Releases/' }}
+          PUBLIC_REPO: ${{ steps.validate_config.outputs.public_repo || github.repository }}
+          PORTAL_URL: ${{ steps.validate_config.outputs.portal_url || 'https://ow7ab.github.io/Share-Flow/' }}
           VERSION_NAME: ${{ steps.verify_outputs.outputs.version_name || steps.prebuild_version_check.outputs.gradle_version_name || 'N/A' }}
           VERSION_CODE: ${{ steps.verify_outputs.outputs.version_code || steps.prebuild_version_check.outputs.gradle_version_code || 'N/A' }}
           APK_SHA256: ${{ steps.verify_outputs.outputs.apk_sha256 || 'Not generated' }}
@@ -914,8 +981,10 @@ jobs:
           {
             echo "## Share Flow Automated Release Summary"
             echo ""
-            if [ "$DRY_RUN" = "true" ] && [ "$JOB_STATUS" = "success" ]; then
-              echo "> **SAFE DRY-RUN SUCCEEDED** — Build, signing, verification, and \`version.json\` validation all passed. No public GitHub Release or website update was published."
+            if [ "$SHOULD_RELEASE" != "true" ] && [ "$JOB_STATUS" = "success" ]; then
+              echo "> **SKIPPED (NO NEW RELEASE REQUIRED)** — ${SKIP_REASON:-No version bump detected}."
+            elif [ "$DRY_RUN" = "true" ] && [ "$JOB_STATUS" = "success" ]; then
+              echo "> **SAFE DRY-RUN SUCCEEDED** — Build, signing, verification, and \`version.json\` validation all passed. No GitHub Release or website update was published."
             elif [ "$JOB_STATUS" = "success" ]; then
               echo "> **PRODUCTION RELEASE PUBLISHED SUCCESSFULLY**"
             else
@@ -927,7 +996,7 @@ jobs:
             echo "| **Version** | \`v${VERSION_NAME}\` (Build \`${VERSION_CODE}\`) |"
             echo "| **Release Tag** | \`${RELEASE_TAG}\` |"
             echo "| **Application ID** | \`com.shareflow\` |"
-            echo "| **Public Releases Repo** | \`${PUBLIC_REPO}\` |"
+            echo "| **Unified Primary Repo** | \`${PUBLIC_REPO}\` |"
             echo "| **Official Website** | ${PORTAL_URL} |"
             echo "| **Update Manifest (\`version.json\`)** | ${PORTAL_URL%/}/version.json |"
             if [ -n "$LATEST_APK_URL" ]; then
@@ -939,7 +1008,7 @@ jobs:
             if [ -n "$RELEASE_URL" ]; then
               echo "| **GitHub Release** | ${RELEASE_URL} |"
             fi
-            echo "| **Website & History Sync** | \`${WEBSITE_OUTCOME}\` |"
+            echo "| **Website & Manifest Update** | \`${WEBSITE_OUTCOME}\` |"
             echo "| **FCM Push Notification** | \`${FCM_OUTCOME}\` |"
             echo "| **APK Size (bytes)** | \`${APK_SIZE}\` |"
             echo "| **APK SHA-256** | \`${APK_SHA256}\` |"

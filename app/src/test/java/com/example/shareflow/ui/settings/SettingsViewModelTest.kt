@@ -73,11 +73,11 @@ class SettingsViewModelTest {
     @Test
     fun `build config exposes official ShareFlow update manifest and website HTTPS URLs`() {
         assertEquals(
-            "https://ow7ab.github.io/Share-Flow-Releases/version.json",
+            "https://ow7ab.github.io/Share-Flow/version.json",
             BuildConfig.CLOUD_UPDATE_MANIFEST_URL
         )
         assertEquals(
-            "https://ow7ab.github.io/Share-Flow-Releases/",
+            "https://ow7ab.github.io/Share-Flow/",
             BuildConfig.CLOUD_UPDATE_PORTAL_URL
         )
     }
