@@ -21,7 +21,7 @@
 - **هوية التطبيق المحفوظة دون أي تعديل:**
   - `namespace`: `com.example`
   - `applicationId`: `com.shareflow`
-  - `versionName`: `1.0.21` | `versionCode`: `21`
+  - `versionName`: `1.0.22` | `versionCode`: `22`
   - `minSdk`: `24` | `targetSdk`: `36`
 
 ---
