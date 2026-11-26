@@ -10,6 +10,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiManager
+import androidx.compose.runtime.Immutable
 import androidx.core.content.ContextCompat
 import com.example.shareflow.core.common.AppError
 import com.example.shareflow.core.common.AppResult
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
+@Immutable
 data class PairingSessionInfo(
     val deviceName: String,
     val hostAddress: String?,
@@ -36,6 +38,7 @@ data class PairingSessionInfo(
     val pairingUri: String
 )
 
+@Immutable
 data class DeviceNetworkStatus(
     val isWifiConnected: Boolean,
     val localIpv4Address: String?,

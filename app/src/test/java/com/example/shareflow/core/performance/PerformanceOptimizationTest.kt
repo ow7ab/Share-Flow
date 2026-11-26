@@ -134,4 +134,20 @@ class PerformanceOptimizationTest {
         assertFalse("SmartConnectionCoordinator must remain lazy during cold start", container.isSmartCoordinatorInitialized)
         assertNotNull("DevicePerformanceProfile must resolve safely", container.devicePerformanceProfile)
     }
+
+    @Test
+    fun `application memory trim callbacks safely clear or trim caches under RAM pressure`() {
+        val app = context as com.example.ShareFlowApplication
+        // Must not crash or eagerly instantiate Coil when called before any image load
+        app.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+        app.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+        app.onLowMemory()
+
+        // After creating an ImageLoader, trim/clear paths must remain safe and non-throwing
+        val loader = app.newImageLoader()
+        assertNotNull("Adaptive Coil ImageLoader must initialize cleanly", loader)
+        app.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
+        app.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
+        app.onLowMemory()
+    }
 }

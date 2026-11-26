@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.example.shareflow.core.common.ShareFlowCoilImageLoaderFactory
@@ -21,6 +22,9 @@ class ShareFlowApplication : Application(), ImageLoaderFactory {
     lateinit var container: AppContainer
         private set
 
+    @Volatile
+    private var initializedImageLoader: ImageLoader? = null
+
     override fun onCreate() {
         super.onCreate()
         StartupAppearanceCache(this).syncSavedNightModeOnLaunch()
@@ -33,5 +37,28 @@ class ShareFlowApplication : Application(), ImageLoaderFactory {
         ShareFlowCoilImageLoaderFactory.create(
             context = this,
             performanceProfile = container.devicePerformanceProfile
-        )
+        ).also { loader ->
+            initializedImageLoader = loader
+        }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        val loader = initializedImageLoader ?: return
+        when {
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND ||
+                level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                runCatching { loader.memoryCache?.clear() }
+            }
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+                level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                runCatching { loader.memoryCache?.trimMemory(level) }
+            }
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        runCatching { initializedImageLoader?.memoryCache?.clear() }
+    }
 }

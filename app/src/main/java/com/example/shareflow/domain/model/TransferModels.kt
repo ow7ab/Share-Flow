@@ -1,5 +1,7 @@
 package com.example.shareflow.domain.model
 
+import androidx.compose.runtime.Immutable
+
 enum class TransferDirection {
     SENT,
     RECEIVED
@@ -75,6 +77,7 @@ enum class TransferFileType {
  * Immutable domain model for a persisted transfer history entry.
  * Records are only marked COMPLETED_VERIFIED after real byte verification.
  */
+@Immutable
 data class TransferRecord(
     val id: String,
     val sessionId: String,
@@ -137,6 +140,7 @@ data class TransferSourceItem(
 /**
  * Individual file transfer unit within a [TransferSession], persisted in Room for recovery.
  */
+@Immutable
 data class TransferItem(
     val itemId: String,
     val sessionId: String,
@@ -177,6 +181,7 @@ data class TransferItem(
 /**
  * Pending incoming file transfer offer from a connected, authenticated peer.
  */
+@Immutable
 data class IncomingTransferOffer(
     val sessionId: String,
     val peer: PeerDevice,
@@ -202,6 +207,7 @@ data class RecoveryVerificationReport(
  * Active or persisted transfer session managed by the ShareFlow File Transfer Engine.
  * All progress, speed, and ETA metrics reflect strictly real transferred bytes.
  */
+@Immutable
 data class TransferSession(
     val sessionId: String,
     val peer: PeerDevice,

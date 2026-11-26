@@ -4,12 +4,15 @@ import com.example.shareflow.core.common.AppResult
 import com.example.shareflow.domain.model.TransferDirection
 import com.example.shareflow.domain.model.TransferRecord
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Contract for persistent Room-backed transfer history records.
  */
 interface TransferHistoryRepository {
     fun observeAllRecords(): Flow<List<TransferRecord>>
+    fun observeRecentRecords(limit: Int): Flow<List<TransferRecord>> =
+        observeAllRecords().map { records -> records.take(limit.coerceAtLeast(0)) }
     fun observeRecordsByDirection(direction: TransferDirection): Flow<List<TransferRecord>>
     fun observeTotalCount(): Flow<Int>
     suspend fun upsertRecord(record: TransferRecord): AppResult<Unit>

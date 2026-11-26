@@ -14,6 +14,9 @@ interface TransferHistoryDao {
     @Query("SELECT * FROM transfer_history ORDER BY started_at_epoch_millis DESC")
     fun observeAll(): Flow<List<TransferHistoryEntity>>
 
+    @Query("SELECT * FROM transfer_history ORDER BY started_at_epoch_millis DESC LIMIT :limit")
+    fun observeRecent(limit: Int): Flow<List<TransferHistoryEntity>>
+
     @Query("SELECT * FROM transfer_history WHERE direction = :direction ORDER BY started_at_epoch_millis DESC")
     fun observeByDirection(direction: String): Flow<List<TransferHistoryEntity>>
 

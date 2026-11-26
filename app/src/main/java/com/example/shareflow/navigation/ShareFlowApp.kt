@@ -349,6 +349,20 @@ fun ShareFlowApp(
                                 fallbackNavClearance
                             }
 
+                            val navigateTopLevelWithShow = remember(autoHideNavState, navigateTopLevel) {
+                                { route: String ->
+                                    autoHideNavState.showImmediately()
+                                    navigateTopLevel(route)
+                                }
+                            }
+                            val onMeasuredNavBarHeightPx = remember {
+                                { heightPx: Int ->
+                                    if (heightPx > 0 && heightPx != measuredNavBarHeightPx) {
+                                        measuredNavBarHeightPx = heightPx
+                                    }
+                                }
+                            }
+
                             Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                                 Scaffold(
                                     modifier = Modifier.fillMaxSize(),
@@ -386,10 +400,7 @@ fun ShareFlowApp(
                                     ) {
                                         ShareFlowNavHost(
                                             navController = navController,
-                                            onNavigateTopLevel = { route ->
-                                                autoHideNavState.showImmediately()
-                                                navigateTopLevel(route)
-                                            },
+                                            onNavigateTopLevel = navigateTopLevelWithShow,
                                             topLevelStatusBarClearance = statusBarTopInset,
                                             topLevelBottomBarClearance = contentBottomClearance,
                                             activeTransferCount = activeTransferCount,
@@ -407,15 +418,8 @@ fun ShareFlowApp(
                                         currentRoute = currentRoute,
                                         measuredNavBarHeightPx = measuredNavBarHeightPx,
                                         fallbackNavClearance = fallbackNavClearance,
-                                        onMeasuredHeightPx = { heightPx ->
-                                            if (heightPx > 0 && heightPx != measuredNavBarHeightPx) {
-                                                measuredNavBarHeightPx = heightPx
-                                            }
-                                        },
-                                        onNavigateTopLevel = { route ->
-                                            autoHideNavState.showImmediately()
-                                            navigateTopLevel(route)
-                                        },
+                                        onMeasuredHeightPx = onMeasuredNavBarHeightPx,
+                                        onNavigateTopLevel = navigateTopLevelWithShow,
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             .zIndex(5f)
@@ -456,23 +460,22 @@ private fun ShareFlowActiveSessionBridge(
     onActiveTransferCountChanged: (Int) -> Unit,
     onOpenUpdatesScreen: () -> Unit = {}
 ) {
-    val container = LocalAppContainer.current
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
-    val pendingIncoming by container.connectionRepository.pendingIncomingRequest
-        .collectAsStateWithLifecycle()
-    val pendingTransferOffer by container.unifiedConnectionManager.pendingIncomingOffer
-        .collectAsStateWithLifecycle()
-    val activeTransferSessions by container.transferManager.activeSessions
-        .collectAsStateWithLifecycle()
-    val detectedUpdate by container.updateManager.detectedUpdate
-        .collectAsStateWithLifecycle()
-    val cloudUpdateState by container.cloudUpdateManager.state
-        .collectAsStateWithLifecycle()
-    var activeUpdateDownloadJob by remember(container) {
-        mutableStateOf<kotlinx.coroutines.Job?>(null)
-    }
+    // Isolate each reactive bridge in its own restart scope so high-frequency transfer progress
+    // or update download byte ticks NEVER trigger cross-bridge recompositions.
+    NetworkAutoDiscoveryBridge()
+    TransferSessionMonitorBridge(onActiveTransferCountChanged = onActiveTransferCountChanged)
+    IncomingApprovalAndOfferBridge()
+    UpdateCoordinatorBridge(
+        expandedUpdateVersionCode = expandedUpdateVersionCode,
+        onExpandedUpdateVersionCodeChange = onExpandedUpdateVersionCodeChange,
+        onOptionalBannerUpdateChanged = onOptionalBannerUpdateChanged,
+        onOpenUpdatesScreen = onOpenUpdatesScreen
+    )
+}
 
+@Composable
+private fun NetworkAutoDiscoveryBridge() {
+    val container = LocalAppContainer.current
     val networkStatus by container.localSessionController.networkStatus
         .collectAsStateWithLifecycle()
     var lastAutoDiscoveryWifiReady by remember(container) { mutableStateOf(false) }
@@ -497,96 +500,38 @@ private fun ShareFlowActiveSessionBridge(
             lastAutoDiscoveryWifiReady = false
         }
     }
+}
 
-    val foregroundPushVersion by container.updateManager.foregroundPushVersionCode
+@Composable
+private fun TransferSessionMonitorBridge(
+    onActiveTransferCountChanged: (Int) -> Unit
+) {
+    val container = LocalAppContainer.current
+    val activeTransferSessions by container.transferManager.activeSessions
         .collectAsStateWithLifecycle()
+    val activeCount = activeTransferSessions.size
+    val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
 
-    LaunchedEffect(foregroundPushVersion) {
-        val versionCode = foregroundPushVersion ?: return@LaunchedEffect
-        onExpandedUpdateVersionCodeChange(versionCode)
-        container.updateManager.consumeForegroundPushTrigger()
+    LaunchedEffect(activeCount) {
+        onActiveTransferCountChanged(activeCount)
     }
 
-    // Automatic login-free FCM topic subscription (`share_flow_updates`) + periodic/launch update check
-    LaunchedEffect(container) {
-        withContext(container.dispatchers.io) {
-            runCatching { container.fcmUpdateTopicCoordinator.ensureSubscribed() }
-                .onFailure { if (it is CancellationException) throw it }
-        }
-        val autoCheckEnabled = runCatching {
-            container.settingsRepository.settings.first().autoCheckUpdatesOnLaunch
-        }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            true
-        }
-        if (autoCheckEnabled) {
-            runCatching { container.updateManager.checkForUpdateIfDue() }
-                .onFailure { if (it is CancellationException) throw it }
-        }
-    }
-
-    LaunchedEffect(detectedUpdate, expandedUpdateVersionCode) {
-        val current = detectedUpdate
-        val showBanner = current != null &&
-            !current.mandatory &&
-            expandedUpdateVersionCode != current.versionCode
-        onOptionalBannerUpdateChanged(if (showBanner) current else null)
-    }
-
-    LaunchedEffect(activeTransferSessions) {
-        onActiveTransferCountChanged(activeTransferSessions.size)
-        val isTransferring = activeTransferSessions.any { it.state == TransferState.TRANSFERRING }
+    LaunchedEffect(isTransferring) {
         if (isTransferring || container.isSmartCoordinatorInitialized) {
             runCatching { container.smartConnectionCoordinator.notifyTransferActivity(isTransferring) }
                 .onFailure { if (it is CancellationException) throw it }
         }
     }
+}
 
-    detectedUpdate?.let { update ->
-        val shouldShowDialog = update.mandatory || expandedUpdateVersionCode == update.versionCode
-        if (shouldShowDialog) {
-            com.example.shareflow.ui.update.UpdateAvailableDialog(
-                update = update,
-                downloadState = cloudUpdateState,
-                onDownloadNow = { targetUpdate ->
-                    activeUpdateDownloadJob?.cancel()
-                    activeUpdateDownloadJob = approvalScope.launch {
-                        runCatching {
-                            container.cloudUpdateManager.downloadAndVerifyUpdate(
-                                targetUpdate.toCloudUpdateManifest()
-                            )
-                        }.onFailure { if (it is CancellationException) throw it }
-                    }
-                },
-                onPauseDownload = {
-                    container.cloudUpdateManager.markDownloadPaused()
-                    activeUpdateDownloadJob?.cancel()
-                    activeUpdateDownloadJob = null
-                },
-                onCancelDownload = {
-                    activeUpdateDownloadJob?.cancel()
-                    activeUpdateDownloadJob = null
-                    container.cloudUpdateManager.cancelActiveDownload()
-                },
-                onViewDetails = onOpenUpdatesScreen,
-                onInstallVerifiedApk = { apkPath ->
-                    when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
-                        com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
-                            val intent = container.permissionManager.createManageUnknownSourcesIntent()
-                            runCatching { context.startActivity(intent) }
-                        }
-                        else -> Unit
-                    }
-                },
-                onDismiss = {
-                    onExpandedUpdateVersionCodeChange(null)
-                    approvalScope.launch {
-                        container.updateManager.snoozeOptionalUpdate()
-                    }
-                }
-            )
-        }
-    }
+@Composable
+private fun IncomingApprovalAndOfferBridge() {
+    val container = LocalAppContainer.current
+    val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
+    val pendingIncoming by container.connectionRepository.pendingIncomingRequest
+        .collectAsStateWithLifecycle()
+    val pendingTransferOffer by container.unifiedConnectionManager.pendingIncomingOffer
+        .collectAsStateWithLifecycle()
 
     pendingIncoming?.let { request ->
         com.example.shareflow.ui.discovery.IncomingConnectionApprovalDialog(
@@ -626,6 +571,120 @@ private fun ShareFlowActiveSessionBridge(
             }
         )
     }
+}
+
+@Composable
+private fun UpdateCoordinatorBridge(
+    expandedUpdateVersionCode: Int?,
+    onExpandedUpdateVersionCodeChange: (Int?) -> Unit,
+    onOptionalBannerUpdateChanged: (com.example.shareflow.data.update.UpdateDetails?) -> Unit,
+    onOpenUpdatesScreen: () -> Unit
+) {
+    val container = LocalAppContainer.current
+    val detectedUpdate by container.updateManager.detectedUpdate
+        .collectAsStateWithLifecycle()
+    val foregroundPushVersion by container.updateManager.foregroundPushVersionCode
+        .collectAsStateWithLifecycle()
+
+    LaunchedEffect(foregroundPushVersion) {
+        val versionCode = foregroundPushVersion ?: return@LaunchedEffect
+        onExpandedUpdateVersionCodeChange(versionCode)
+        container.updateManager.consumeForegroundPushTrigger()
+    }
+
+    // Automatic login-free FCM topic subscription (`share_flow_updates`) + periodic/launch update check
+    LaunchedEffect(container) {
+        withContext(container.dispatchers.io) {
+            runCatching { container.fcmUpdateTopicCoordinator.ensureSubscribed() }
+                .onFailure { if (it is CancellationException) throw it }
+        }
+        val autoCheckEnabled = runCatching {
+            container.settingsRepository.settings.first().autoCheckUpdatesOnLaunch
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            true
+        }
+        if (autoCheckEnabled) {
+            runCatching { container.updateManager.checkForUpdateIfDue() }
+                .onFailure { if (it is CancellationException) throw it }
+        }
+    }
+
+    LaunchedEffect(detectedUpdate, expandedUpdateVersionCode) {
+        val current = detectedUpdate
+        val showBanner = current != null &&
+            !current.mandatory &&
+            expandedUpdateVersionCode != current.versionCode
+        onOptionalBannerUpdateChanged(if (showBanner) current else null)
+    }
+
+    detectedUpdate?.let { update ->
+        val shouldShowDialog = update.mandatory || expandedUpdateVersionCode == update.versionCode
+        if (shouldShowDialog) {
+            UpdateAvailableDialogContainer(
+                update = update,
+                onExpandedUpdateVersionCodeChange = onExpandedUpdateVersionCodeChange,
+                onOpenUpdatesScreen = onOpenUpdatesScreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateAvailableDialogContainer(
+    update: com.example.shareflow.data.update.UpdateDetails,
+    onExpandedUpdateVersionCodeChange: (Int?) -> Unit,
+    onOpenUpdatesScreen: () -> Unit
+) {
+    val container = LocalAppContainer.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val approvalScope = androidx.compose.runtime.rememberCoroutineScope()
+    val cloudUpdateState by container.cloudUpdateManager.state
+        .collectAsStateWithLifecycle()
+    var activeUpdateDownloadJob by remember(container) {
+        mutableStateOf<kotlinx.coroutines.Job?>(null)
+    }
+
+    com.example.shareflow.ui.update.UpdateAvailableDialog(
+        update = update,
+        downloadState = cloudUpdateState,
+        onDownloadNow = { targetUpdate ->
+            activeUpdateDownloadJob?.cancel()
+            activeUpdateDownloadJob = approvalScope.launch {
+                runCatching {
+                    container.cloudUpdateManager.downloadAndVerifyUpdate(
+                        targetUpdate.toCloudUpdateManifest()
+                    )
+                }.onFailure { if (it is CancellationException) throw it }
+            }
+        },
+        onPauseDownload = {
+            container.cloudUpdateManager.markDownloadPaused()
+            activeUpdateDownloadJob?.cancel()
+            activeUpdateDownloadJob = null
+        },
+        onCancelDownload = {
+            activeUpdateDownloadJob?.cancel()
+            activeUpdateDownloadJob = null
+            container.cloudUpdateManager.cancelActiveDownload()
+        },
+        onViewDetails = onOpenUpdatesScreen,
+        onInstallVerifiedApk = { apkPath ->
+            when (container.cloudUpdateManager.launchVerifiedUpdateInstaller(apkPath)) {
+                com.example.shareflow.data.update.UpdateInstallLaunchResult.PERMISSION_REQUIRED -> {
+                    val intent = container.permissionManager.createManageUnknownSourcesIntent()
+                    runCatching { context.startActivity(intent) }
+                }
+                else -> Unit
+            }
+        },
+        onDismiss = {
+            onExpandedUpdateVersionCodeChange(null)
+            approvalScope.launch {
+                container.updateManager.snoozeOptionalUpdate()
+            }
+        }
+    )
 }
 
 /**

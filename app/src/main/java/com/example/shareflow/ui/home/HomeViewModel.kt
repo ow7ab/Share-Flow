@@ -43,8 +43,9 @@ sealed interface HomeUiState {
 
 private data class HomePersistentSnapshot(
     val settings: AppSettings,
-    val records: List<TransferRecord>,
-    val trustedDevices: List<PeerDevice>,
+    val recentRecords: List<TransferRecord>,
+    val totalTransferCount: Int,
+    val trustedDeviceCount: Int,
     val storageResult: AppResult<StorageSummary>?
 )
 
@@ -76,15 +77,17 @@ class HomeViewModel(
 
     private val persistentFlow = combine(
         settingsRepository.settings.onStart { emit(initialSettings) },
-        transferHistoryRepository.observeAllRecords().onStart { emit(emptyList()) },
-        trustedDeviceRepository.observeTrustedDevices().onStart { emit(emptyList()) },
+        transferHistoryRepository.observeRecentRecords(RECENT_TRANSFER_LIMIT).onStart { emit(emptyList()) },
+        transferHistoryRepository.observeTotalCount().onStart { emit(0) },
+        trustedDeviceRepository.observeTrustedCount().onStart { emit(0) },
         storageAnalyzerRepository.observeStorageSummary()
             .onStart<AppResult<StorageSummary>?> { emit(null) }
-    ) { settings, records, trustedDevices, storageResult ->
+    ) { settings, recentRecords, totalTransferCount, trustedDeviceCount, storageResult ->
         HomePersistentSnapshot(
             settings = settings,
-            records = records,
-            trustedDevices = trustedDevices,
+            recentRecords = recentRecords,
+            totalTransferCount = totalTransferCount,
+            trustedDeviceCount = trustedDeviceCount,
             storageResult = storageResult
         )
     }
@@ -122,9 +125,9 @@ class HomeViewModel(
         val summary = (persistent.storageResult as? AppResult.Success)?.data
         HomeUiState.Ready(
             settings = persistent.settings,
-            totalTransferCount = persistent.records.size,
-            trustedDeviceCount = persistent.trustedDevices.size,
-            recentTransfers = persistent.records.take(3),
+            totalTransferCount = persistent.totalTransferCount,
+            trustedDeviceCount = persistent.trustedDeviceCount,
+            recentTransfers = persistent.recentRecords,
             nearbyDevices = live.discoveredPeers,
             recentFiles = live.recentFiles.take(3),
             storageSummary = summary,
@@ -141,5 +144,9 @@ class HomeViewModel(
 
     fun selectFileForSend(file: LocalFileEntry) {
         sessionController.addSelectedFiles(listOf(file))
+    }
+
+    companion object {
+        internal const val RECENT_TRANSFER_LIMIT = 3
     }
 }

@@ -21,6 +21,9 @@ class TransferHistoryRepositoryImpl(
     override fun observeAllRecords(): Flow<List<TransferRecord>> =
         dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
+    override fun observeRecentRecords(limit: Int): Flow<List<TransferRecord>> =
+        dao.observeRecent(limit.coerceAtLeast(0)).map { entities -> entities.map { it.toDomain() } }
+
     override fun observeRecordsByDirection(direction: TransferDirection): Flow<List<TransferRecord>> =
         dao.observeByDirection(direction.name).map { entities -> entities.map { it.toDomain() } }
 

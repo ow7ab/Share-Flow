@@ -113,21 +113,28 @@ fun HomeDashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    HomeDashboardContent(
-        uiState = uiState,
-        onNavigateToRoute = onNavigateToRoute,
-        onSelectRecentFile = { file ->
+    val onSelectRecentFile = remember(viewModel, onNavigateToRoute) {
+        { file: LocalFileEntry ->
             viewModel.selectFileForSend(file)
             onNavigateToRoute(ShareFlowRoutes.SEND)
-        },
-        onOpenWifiPanel = {
+        }
+    }
+    val onOpenWifiPanel = remember(container, context) {
+        {
             val panelIntent = container.permissionManager.createWifiPanelIntent()
             runCatching { context.startActivity(panelIntent) }
                 .onFailure {
                     runCatching { context.startActivity(container.permissionManager.createWifiSettingsIntent()) }
                 }
-        },
+            Unit
+        }
+    }
+
+    HomeDashboardContent(
+        uiState = uiState,
+        onNavigateToRoute = onNavigateToRoute,
+        onSelectRecentFile = onSelectRecentFile,
+        onOpenWifiPanel = onOpenWifiPanel,
         activeTransferCount = activeTransferCount,
         topBarClearance = topBarClearance,
         bottomBarClearance = bottomBarClearance,
@@ -188,7 +195,7 @@ fun HomeDashboardContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // 1. Minimal One UI + Liquid Glass Brand Header + Live Status Pill
-                    item(key = "compact_header") {
+                    item(key = "compact_header", contentType = "header") {
                         CompactHomeHeaderRow(
                             connectionState = uiState.connectionState,
                             networkStatus = uiState.networkStatus
@@ -197,7 +204,7 @@ fun HomeDashboardContent(
 
                     // 1b. Smart Wi-Fi Off Prompt (Android 10+ official Settings Panel / API < 29 fallback)
                     if (showWifiOffPrompt) {
-                        item(key = "wifi_off_prompt_banner") {
+                        item(key = "wifi_off_prompt_banner", contentType = "wifi_prompt") {
                             WifiOffStartupPromptCard(
                                 onEnableWifi = onOpenWifiPanel,
                                 onDismiss = { wifiPromptDismissed = true }
@@ -206,7 +213,7 @@ fun HomeDashboardContent(
                     }
 
                     // 2. Signature Liquid Glass Hero Action Tiles: Send (Ruby) & Receive (Coral)
-                    item(key = "primary_actions") {
+                    item(key = "primary_actions", contentType = "hero_actions") {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -249,7 +256,7 @@ fun HomeDashboardContent(
 
                     // 3. Active Transfers Live Glass Banner (real active transfer count only)
                     if (activeTransferCount > 0) {
-                        item(key = "active_transfers_banner") {
+                        item(key = "active_transfers_banner", contentType = "active_transfer_banner") {
                             SFGlassCard(
                                 onClick = { onNavigateToRoute(ShareFlowRoutes.TRANSFER_PROGRESS) },
                                 selected = true,
@@ -301,7 +308,7 @@ fun HomeDashboardContent(
                     }
 
                     // 4. Recent Transfers Section
-                    item(key = "recent_transfers_header") {
+                    item(key = "recent_transfers_header", contentType = "section_header") {
                         SFSectionHeader(
                             title = stringResource(R.string.home_section_recent_transfers),
                             actionLabel = stringResource(R.string.home_view_all),
@@ -312,7 +319,7 @@ fun HomeDashboardContent(
                     }
 
                     if (uiState.recentTransfers.isEmpty()) {
-                        item(key = "recent_transfers_empty") {
+                        item(key = "recent_transfers_empty", contentType = "empty_state") {
                             EmptyState(
                                 icon = Icons.Outlined.History,
                                 title = stringResource(R.string.history_empty_title),
@@ -323,7 +330,8 @@ fun HomeDashboardContent(
                     } else {
                         items(
                             items = uiState.recentTransfers,
-                            key = { "transfer_${it.id}" }
+                            key = { "transfer_${it.id}" },
+                            contentType = { "transfer_card" }
                         ) { record ->
                             SFTransferCard(
                                 record = record,
@@ -334,7 +342,7 @@ fun HomeDashboardContent(
                     }
 
                     // 5. Storage Overview Section
-                    item(key = "storage_overview") {
+                    item(key = "storage_overview", contentType = "storage_overview") {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(spacing.xs),
                             modifier = Modifier.testTag("home_section_storage")
@@ -360,7 +368,7 @@ fun HomeDashboardContent(
                     }
 
                     // 7. Quick Tools Section
-                    item(key = "quick_tools") {
+                    item(key = "quick_tools", contentType = "quick_tools") {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
                             modifier = Modifier.testTag("home_section_quick_tools")
@@ -413,7 +421,7 @@ fun HomeDashboardContent(
                         }
                     }
 
-                    item(key = "bottom_spacer") {
+                    item(key = "bottom_spacer", contentType = "spacer") {
                         Spacer(modifier = Modifier.height(spacing.sm))
                     }
                 }
@@ -480,6 +488,10 @@ private fun CompactHomeHeaderRow(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    val headerBorderBrush = remember(glass) {
+        Brush.verticalGradient(listOf(glass.borderTop, glass.borderBottom))
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -500,7 +512,7 @@ private fun CompactHomeHeaderRow(
                     .background(glass.cardElevatedBackground)
                     .border(
                         width = 1.dp,
-                        brush = Brush.verticalGradient(listOf(glass.borderTop, glass.borderBottom)),
+                        brush = headerBorderBrush,
                         shape = RoundedCornerShape(14.dp)
                     )
             ) {
@@ -532,7 +544,7 @@ private fun CompactHomeHeaderRow(
                 .background(pillBgColor)
                 .border(
                     width = 1.dp,
-                    brush = Brush.verticalGradient(listOf(glass.borderTop, glass.borderBottom)),
+                    brush = headerBorderBrush,
                     shape = CircleShape
                 )
                 .semantics { contentDescription = statusDescription }
@@ -578,30 +590,49 @@ private fun PrimaryActionTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val tileShape = RoundedCornerShape(28.dp)
+    val tileShape = remember { RoundedCornerShape(28.dp) }
     val motion = ShareFlowDesign.motion
     val reducedMotion = ShareFlowDesign.reducedMotion
+    val performanceProfile = ShareFlowDesign.performanceProfile
     val glass = ShareFlowDesign.glass
+    val allowPressScale = !reducedMotion && performanceProfile.allowPressScaleMicroAnimations
 
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed && !reducedMotion) motion.pressScale else 1f,
-        animationSpec = motion.buttonSpring(),
-        label = "home_hero_tile_scale_$testTag"
-    )
+    val scaleModifier = if (allowPressScale) {
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val scaleState = animateFloatAsState(
+            targetValue = if (isPressed) motion.pressScale else 1f,
+            animationSpec = motion.buttonSpring(),
+            label = "home_hero_tile_scale_$testTag"
+        )
+        Modifier.graphicsLayer {
+            val scale = scaleState.value
+            scaleX = scale
+            scaleY = scale
+        }
+    } else {
+        Modifier
+    }
 
     val tileBrush = remember(gradientStops) {
         Brush.linearGradient(colors = gradientStops)
+    }
+    val tileBorder = remember {
+        BorderStroke(
+            width = 1.dp,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.45f),
+                    ShareFlowMarpleColors.Cream.copy(alpha = 0.16f)
+                )
+            )
+        )
     }
 
     Box(
         modifier = modifier
             .height(144.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+            .then(scaleModifier)
             .shadow(
                 elevation = 10.dp,
                 shape = tileShape,
@@ -612,15 +643,7 @@ private fun PrimaryActionTile(
             .clip(tileShape)
             .background(brush = tileBrush)
             .border(
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.45f),
-                            ShareFlowMarpleColors.Cream.copy(alpha = 0.16f)
-                        )
-                    )
-                ),
+                border = tileBorder,
                 shape = tileShape
             )
             .clickable(

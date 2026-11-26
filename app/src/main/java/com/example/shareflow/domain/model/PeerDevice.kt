@@ -1,5 +1,7 @@
 package com.example.shareflow.domain.model
 
+import androidx.compose.runtime.Immutable
+
 enum class DeviceType {
     PHONE,
     TABLET,
@@ -25,6 +27,7 @@ enum class PeerConnectionStatus {
 /**
  * Pure domain representation of a discovered or paired peer device.
  */
+@Immutable
 data class PeerDevice(
     val deviceId: String,
     val displayName: String,
@@ -57,6 +60,7 @@ data class PeerDevice(
 /**
  * Cryptographic identity summary for the local ShareFlow device (never contains private keys).
  */
+@Immutable
 data class LocalDeviceIdentity(
     val deviceId: String,
     val publicKeyFingerprint: String,
@@ -78,6 +82,7 @@ data class LocalDeviceIdentity(
 /**
  * Structured short-lived pairing session payload encoded into ShareFlow QR codes.
  */
+@Immutable
 data class PairingPayload(
     val protocolVersion: Int,
     val sessionId: String,
@@ -99,6 +104,7 @@ data class PairingPayload(
 /**
  * Pending incoming peer connection request requiring explicit user approval.
  */
+@Immutable
 data class IncomingConnectionRequest(
     val requestId: String,
     val sessionId: String,
@@ -126,6 +132,7 @@ data class IncomingConnectionRequest(
 /**
  * Details of an active Android Local-Only Hotspot reservation created by ShareFlow.
  */
+@Immutable
 data class LocalHotspotInfo(
     val ssid: String,
     val passphrase: String,
@@ -136,15 +143,20 @@ data class LocalHotspotInfo(
 /**
  * Hardware/permission readiness of an individual discovery/connection transport strategy.
  */
+@Immutable
 sealed interface StrategyAvailability {
     data object Available : StrategyAvailability
+    @Immutable
     data class PermissionRequired(val missingPermissions: List<String>) : StrategyAvailability
     data object WifiDisabled : StrategyAvailability
     data object LocationServicesDisabled : StrategyAvailability
+    @Immutable
     data class Unsupported(val reason: String) : StrategyAvailability
+    @Immutable
     data class Error(val reason: String) : StrategyAvailability
 }
 
+@Immutable
 data class StrategyStatus(
     val connectionType: ConnectionType,
     val availability: StrategyAvailability,
@@ -153,13 +165,17 @@ data class StrategyStatus(
     val statusDetail: String? = null
 )
 
+@Immutable
 sealed interface DiscoveryStatus {
     data object Idle : DiscoveryStatus
+    @Immutable
     data class Discovering(val startedAtEpochMillis: Long, val timeoutMillis: Long) : DiscoveryStatus
     data object TimedOut : DiscoveryStatus
+    @Immutable
     data class Failed(val reason: String) : DiscoveryStatus
 }
 
+@Immutable
 data class DiscoverySnapshot(
     val peers: List<PeerDevice> = emptyList(),
     val status: DiscoveryStatus = DiscoveryStatus.Idle,
@@ -172,15 +188,20 @@ data class DiscoverySnapshot(
 /**
  * Sealed state machine representing the independent networking engine connection lifecycle.
  */
+@Immutable
 sealed interface ConnectionState {
     data object Idle : ConnectionState
     data object Discovering : ConnectionState
+    @Immutable
     data class Advertising(val localDeviceName: String, val port: Int) : ConnectionState
+    @Immutable
     data class Connecting(val peer: PeerDevice) : ConnectionState
+    @Immutable
     data class AwaitingApproval(
         val peer: PeerDevice,
         val sasVerificationCode: String
     ) : ConnectionState
+    @Immutable
     data class Connected(
         val peer: PeerDevice,
         val sessionId: String,
@@ -189,5 +210,6 @@ sealed interface ConnectionState {
         val transport: ConnectionType = peer.connectionType,
         val isInitiator: Boolean = true
     ) : ConnectionState
+    @Immutable
     data class Error(val reason: String, val recoverable: Boolean = true) : ConnectionState
 }
