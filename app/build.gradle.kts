@@ -103,6 +103,8 @@ android {
     unitTests {
       isIncludeAndroidResources = true
       all { test ->
+        test.maxHeapSize = "2048m"
+        test.forkEvery = 10L
         listOf(
           "robolectric.offline",
           "robolectric.dependency.dir",

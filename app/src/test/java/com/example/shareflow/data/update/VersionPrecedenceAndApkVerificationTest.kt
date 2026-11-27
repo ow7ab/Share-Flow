@@ -41,7 +41,7 @@ import org.robolectric.annotation.Config
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class VersionPrecedenceAndApkVerificationTest {
 
     private val context: Context
@@ -450,6 +450,71 @@ class VersionPrecedenceAndApkVerificationTest {
         val state = manager.checkForUpdates("")
         assertTrue("Missing versionCode must surface UNREADABLE_VERSION_METADATA, got $state", state is CloudUpdateState.Error)
         assertEquals(CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA, (state as CloudUpdateState.Error).reason)
+    }
+
+    @Test
+    fun `legacy GitHub release V1_0_21 without versionCode resolves as UpToDate when user already runs 1_0_21`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val legacyReleaseWithoutCode = githubReleaseJson(
+            tag = "V1.0.21",
+            releaseName = "ShareFlow V1.0.21",
+            body = "Manual release without version.json or Build number",
+            includeVersionJsonAsset = false
+        )
+
+        val manager = CloudUpdateManager(
+            context = context,
+            httpClient = createMockHttpClient(releasesJson = legacyReleaseWithoutCode, versionJson = null),
+            checksumVerifier = Sha256ChecksumVerifier(),
+            packageInspector = AndroidApkPackageSecurityInspector(context),
+            permissionManager = PermissionManager(context),
+            dispatchers = TestDispatcherProvider(dispatcher),
+            currentVersionCode = 21,
+            currentVersionName = "1.0.21",
+            currentSdkInt = 34,
+            expectedPackageName = "com.shareflow",
+            enableGitHubReleasesPrimary = true
+        )
+
+        val state = manager.checkForUpdates("")
+        assertTrue("Already-installed legacy release V1.0.21 must return UpToDate, got $state", state is CloudUpdateState.UpToDate)
+        val upToDate = state as CloudUpdateState.UpToDate
+        assertEquals(21, upToDate.currentVersionCode)
+        assertEquals("1.0.21", upToDate.currentVersionName)
+    }
+
+    @Test
+    fun `GitHub release lacking version_json asset falls back to official portal version_json for verified versionCode`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val releaseWithoutCode = githubReleaseJson(
+            tag = "v1.1.0",
+            releaseName = "ShareFlow v1.1.0",
+            body = "Performance & security release",
+            includeVersionJsonAsset = false
+        )
+
+        val manager = CloudUpdateManager(
+            context = context,
+            httpClient = createMockHttpClient(
+                releasesJson = releaseWithoutCode,
+                versionJson = sidecarVersionJson(versionCode = 23, versionName = "1.1.0")
+            ),
+            checksumVerifier = Sha256ChecksumVerifier(),
+            packageInspector = AndroidApkPackageSecurityInspector(context),
+            permissionManager = PermissionManager(context),
+            dispatchers = TestDispatcherProvider(dispatcher),
+            currentVersionCode = 21,
+            currentVersionName = "1.0.21",
+            currentSdkInt = 34,
+            expectedPackageName = "com.shareflow",
+            enableGitHubReleasesPrimary = true
+        )
+
+        val state = manager.checkForUpdates("")
+        assertTrue("Official portal version.json fallback must resolve UpdateAvailable, got $state", state is CloudUpdateState.UpdateAvailable)
+        val manifest = (state as CloudUpdateState.UpdateAvailable).manifest
+        assertEquals(23, manifest.versionCode)
+        assertEquals("1.1.0", manifest.versionName)
     }
 
     @Test

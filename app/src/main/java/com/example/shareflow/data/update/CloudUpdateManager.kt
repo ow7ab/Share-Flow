@@ -824,6 +824,31 @@ class CloudUpdateManager(
                 }
 
                 is GitHubManifestResolution.MissingVersionCode -> {
+                    val portalResolved = tryResolveFromFallbackManifestEndpoints()
+                    if (portalResolved != null) {
+                        return portalResolved
+                    }
+
+                    val normalizedLatest = GitHubReleasesParser.normalizeVersionName(latestStable.versionName)
+                    val normalizedInstalled = GitHubReleasesParser.normalizeVersionName(currentVersionName)
+                    if (normalizedLatest.isNotBlank() &&
+                        normalizedInstalled.isNotBlank() &&
+                        GitHubReleasesParser.compareSemanticVersions(normalizedLatest, normalizedInstalled) == 0
+                    ) {
+                        preferencesStore.recordCheckResult(
+                            epochMillis = clock.nowEpochMillis(),
+                            serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                            sourceLabel = GITHUB_SOURCE_LABEL
+                        )
+                        val upToDate = CloudUpdateState.UpToDate(
+                            currentVersionName = currentVersionName,
+                            currentVersionCode = currentVersionCode,
+                            portalUrl = latestStable.htmlUrl.ifBlank { OFFICIAL_RELEASES_PAGE_URL }
+                        )
+                        _state.value = upToDate
+                        return upToDate
+                    }
+
                     val err = CloudUpdateState.Error(
                         reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
                         detail = "Release ${latestStable.tagName} does not provide a readable numeric versionCode (version.json or Build number)."
@@ -854,6 +879,10 @@ class CloudUpdateManager(
                 }
 
                 is GitHubManifestResolution.MissingApkOrChecksum -> {
+                    val portalResolved = tryResolveFromFallbackManifestEndpoints()
+                    if (portalResolved != null) {
+                        return portalResolved
+                    }
                     val manifestErr = CloudUpdateState.Error(
                         reason = CloudUpdateErrorReason.INVALID_MANIFEST,
                         detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest."
@@ -914,6 +943,29 @@ class CloudUpdateManager(
         )
         _state.value = err
         return err
+    }
+
+    private suspend fun tryResolveFromFallbackManifestEndpoints(): CloudUpdateState? {
+        val fallbackCandidates = listOf(defaultManifestUrl, fallbackManifestUrl)
+            .map { it.trim() }
+            .distinct()
+            .filter { it.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+
+        for (candidateUrl in fallbackCandidates) {
+            val fallbackRes = httpClient.fetchManifestText(candidateUrl)
+            if (fallbackRes is AppResult.Success) {
+                val parsed = CloudUpdateValidator.parseManifestJson(fallbackRes.data)
+                if (parsed is AppResult.Success) {
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                        sourceLabel = GITHUB_SOURCE_LABEL
+                    )
+                    return evaluateResolvedManifest(parsed.data)
+                }
+            }
+        }
+        return null
     }
 
     private suspend fun finalizeManifestFetch(
