@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -27,6 +28,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.shareflow.core.designsystem.theme.ShareFlowDesign
+
+/**
+ * Provides the top status-bar inset consumed by `ShareFlowApp`'s root `Scaffold(safeDrawing)` so
+ * nested top bars (`SFTopBar`, `ShareFlowTopBar`, `FileSelectionActionBar`) always clear the
+ * status bar without overlapping system icons or double-padding when rendered standalone.
+ */
+val LocalShareFlowStatusBarTopInset = compositionLocalOf { 0.dp }
 
 /**
  * Share Flow 2.0 Top Bar (`SFTopBar`) — Samsung One UI minimal clarity + Liquid Glass back control.
@@ -42,11 +50,20 @@ fun SFTopBar(
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val spacing = ShareFlowDesign.spacing
+    val parentConsumedTopInset = LocalShareFlowStatusBarTopInset.current
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (applyStatusBarPadding) Modifier.statusBarsPadding() else Modifier)
+            .then(
+                if (!applyStatusBarPadding) {
+                    Modifier
+                } else if (parentConsumedTopInset > 0.dp) {
+                    Modifier.padding(top = parentConsumedTopInset)
+                } else {
+                    Modifier.statusBarsPadding()
+                }
+            )
             .padding(horizontal = spacing.md, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.sm)

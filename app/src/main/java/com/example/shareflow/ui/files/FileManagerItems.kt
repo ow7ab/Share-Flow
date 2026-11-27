@@ -102,6 +102,8 @@ fun FileSelectionActionBar(
 ) {
     val spacing = ShareFlowDesign.spacing
     val locale = ShareFlowDesign.locale
+    val parentConsumedTopInset =
+        com.example.shareflow.core.designsystem.components.LocalShareFlowStatusBarTopInset.current
 
     Surface(
         modifier = modifier
@@ -114,7 +116,13 @@ fun FileSelectionActionBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+                .then(
+                    if (parentConsumedTopInset > 0.dp) {
+                        Modifier.padding(top = parentConsumedTopInset)
+                    } else {
+                        Modifier.statusBarsPadding()
+                    }
+                )
         ) {
             Row(
                 modifier = Modifier

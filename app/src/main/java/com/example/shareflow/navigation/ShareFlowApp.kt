@@ -21,6 +21,7 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -398,14 +399,18 @@ fun ShareFlowApp(
                                                 bottom = if (showFloatingBottomBar) 0.dp else bottomInset
                                             )
                                     ) {
-                                        ShareFlowNavHost(
-                                            navController = navController,
-                                            onNavigateTopLevel = navigateTopLevelWithShow,
-                                            topLevelStatusBarClearance = statusBarTopInset,
-                                            topLevelBottomBarClearance = contentBottomClearance,
-                                            activeTransferCount = activeTransferCount,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                        CompositionLocalProvider(
+                                            com.example.shareflow.core.designsystem.components.LocalShareFlowStatusBarTopInset provides statusBarTopInset
+                                        ) {
+                                            ShareFlowNavHost(
+                                                navController = navController,
+                                                onNavigateTopLevel = navigateTopLevelWithShow,
+                                                topLevelStatusBarClearance = statusBarTopInset,
+                                                topLevelBottomBarClearance = contentBottomClearance,
+                                                activeTransferCount = activeTransferCount,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
                                     }
                                 }
 

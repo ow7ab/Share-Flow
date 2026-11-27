@@ -357,8 +357,8 @@ class ShareFlowFullAuditVerificationTest {
 
     @Test
     fun `v1_1_0 version upgrade and V1_1 tag normalization work seamlessly with versionCode precedence`() {
-        assertEquals(24, BuildConfig.VERSION_CODE)
-        assertEquals("1.1.1", BuildConfig.VERSION_NAME)
+        assertEquals(25, BuildConfig.VERSION_CODE)
+        assertEquals("1.1.2", BuildConfig.VERSION_NAME)
         assertEquals("1.1.0", GitHubReleasesParser.normalizeVersionName("V1.1"))
         assertEquals("1.1.0", GitHubReleasesParser.normalizeVersionName("v1.1"))
         assertEquals("1.1.0", GitHubReleasesParser.normalizeVersionName("v1.1.0"))

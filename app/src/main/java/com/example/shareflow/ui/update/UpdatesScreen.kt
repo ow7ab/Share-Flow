@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
@@ -497,7 +498,8 @@ fun UpdatesScreenContent(
                         onDownloadOrResume = onDownloadOrResume,
                         onPauseDownload = onPauseDownload,
                         onCancelDownload = onCancelDownload,
-                        onInstallVerifiedUpdate = onInstallVerifiedUpdate
+                        onInstallVerifiedUpdate = onInstallVerifiedUpdate,
+                        onOpenExternalReleaseUrl = onOpenExternalReleaseUrl
                     )
                 }
 
@@ -571,7 +573,8 @@ private fun ActiveUpdateStateCard(
     onDownloadOrResume: (CloudUpdateManifest) -> Unit,
     onPauseDownload: () -> Unit,
     onCancelDownload: () -> Unit,
-    onInstallVerifiedUpdate: (String) -> Unit
+    onInstallVerifiedUpdate: (String) -> Unit,
+    onOpenExternalReleaseUrl: (String) -> Unit
 ) {
     val spacing = ShareFlowDesign.spacing
     val semantic = ShareFlowDesign.semanticColors
@@ -1024,6 +1027,15 @@ private fun ActiveUpdateStateCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("updates_retry_button")
+                    )
+                    SecondaryActionButton(
+                        text = stringResource(R.string.settings_update_open_portal_action),
+                        onClick = { onOpenExternalReleaseUrl(CloudUpdateManager.OFFICIAL_RELEASES_PAGE_URL) },
+                        outlined = true,
+                        leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("updates_open_portal_button")
                     )
                 }
             }
