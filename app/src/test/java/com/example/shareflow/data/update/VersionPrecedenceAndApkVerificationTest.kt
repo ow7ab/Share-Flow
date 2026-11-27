@@ -433,6 +433,7 @@ class VersionPrecedenceAndApkVerificationTest {
             )
         )
 
+        val prefs = InMemoryUpdatePreferencesStore()
         val manager = CloudUpdateManager(
             context = context,
             httpClient = createMockHttpClient(releasesJson = releaseWithoutCode, versionJson = null),
@@ -444,12 +445,57 @@ class VersionPrecedenceAndApkVerificationTest {
             currentVersionName = "1.0.19",
             currentSdkInt = 34,
             expectedPackageName = "com.shareflow",
-            enableGitHubReleasesPrimary = true
+            enableGitHubReleasesPrimary = true,
+            preferencesStore = prefs
         )
 
         val state = manager.checkForUpdates("")
         assertTrue("Missing versionCode must surface UNREADABLE_VERSION_METADATA, got $state", state is CloudUpdateState.Error)
         assertEquals(CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA, (state as CloudUpdateState.Error).reason)
+        assertEquals(
+            "HTTP 200 GitHub response must report serverStatus=CONNECTED instead of misleading Connection Issue",
+            UpdateServerConnectionStatus.CONNECTED,
+            prefs.getSnapshot().serverStatus
+        )
+    }
+
+    @Test
+    fun `GitHub release with parenthesized or snake_case or Arabic build number resolves versionCode cleanly`() = runTest {
+        assertEquals(24, GitHubReleasesParser.extractVersionCodeFromText("ShareFlow V1.1.1 (24)"))
+        assertEquals(24, GitHubReleasesParser.extractVersionCodeFromText("version_code: 24"))
+        assertEquals(24, GitHubReleasesParser.extractVersionCodeFromText("رقم البناء: 24"))
+        assertEquals(24, GitHubReleasesParser.extractVersionCodeFromText("كود الإصدار: 24"))
+        assertNull(GitHubReleasesParser.extractVersionCodeFromText("V1.1.1 release notes without build number"))
+
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val manualRelease = githubReleaseJson(
+            tag = "V1.1.1",
+            releaseName = "ShareFlow V1.1.1 (24)",
+            body = "Manual test release",
+            includeVersionJsonAsset = false
+        )
+        val prefs = InMemoryUpdatePreferencesStore()
+        val manager = CloudUpdateManager(
+            context = context,
+            httpClient = createMockHttpClient(releasesJson = manualRelease, versionJson = null),
+            checksumVerifier = Sha256ChecksumVerifier(),
+            packageInspector = AndroidApkPackageSecurityInspector(context),
+            permissionManager = PermissionManager(context),
+            dispatchers = TestDispatcherProvider(dispatcher),
+            currentVersionCode = 23,
+            currentVersionName = "1.1.0",
+            currentSdkInt = 34,
+            expectedPackageName = "com.shareflow",
+            enableGitHubReleasesPrimary = true,
+            preferencesStore = prefs
+        )
+
+        val state = manager.checkForUpdates("")
+        assertTrue("Expected UpdateAvailable for V1.1.1 (24), got $state", state is CloudUpdateState.UpdateAvailable)
+        val manifest = (state as CloudUpdateState.UpdateAvailable).manifest
+        assertEquals(24, manifest.versionCode)
+        assertEquals("1.1.1", manifest.versionName)
+        assertEquals(UpdateServerConnectionStatus.CONNECTED, prefs.getSnapshot().serverStatus)
     }
 
     @Test

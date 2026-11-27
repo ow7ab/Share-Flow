@@ -75,6 +75,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -114,6 +115,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun UpdatesScreen(
     onNavigateBack: () -> Unit,
+    topBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val container = LocalAppContainer.current
@@ -174,9 +176,13 @@ fun UpdatesScreen(
         hasNotificationsPermission = hasNotificationsPermission,
         snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
+        topBarClearance = topBarClearance,
         onCheckForUpdates = {
             activeJob?.cancel()
             activeJob = scope.launch {
+                if (diagnostics.fcmSubscriptionState != FcmSubscriptionState.SUBSCRIBED) {
+                    runCatching { container.fcmUpdateTopicCoordinator.ensureSubscribed() }
+                }
                 runCatching { container.cloudUpdateManager.checkForUpdates("") }
                     .onFailure { if (it is CancellationException) throw it }
             }
@@ -249,6 +255,7 @@ fun UpdatesScreenContent(
     onAutoCheckChanged: (Boolean) -> Unit,
     onRequestNotificationPermission: () -> Unit,
     onOpenExternalReleaseUrl: (String) -> Unit,
+    topBarClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val spacing = ShareFlowDesign.spacing
@@ -310,12 +317,18 @@ fun UpdatesScreenContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(spacing.md)
             ) {
-                // Top Bar with transparent status bar support
+                // Top Bar with transparent status bar support (respects parent Scaffold's consumed inset)
                 item(key = "updates_top_bar") {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .statusBarsPadding()
+                            .then(
+                                if (topBarClearance > 0.dp) {
+                                    Modifier.padding(top = topBarClearance)
+                                } else {
+                                    Modifier.statusBarsPadding()
+                                }
+                            )
                             .padding(top = spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(spacing.xs)

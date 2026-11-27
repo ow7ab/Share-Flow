@@ -97,8 +97,11 @@ object GitHubReleasesParser {
     private val SHA256_HEX_REGEX = Regex("^[0-9a-fA-F]{64}$")
     private val SHA256_INLINE_REGEX = Regex("""(?:sha256[:=\s]+)?([0-9a-fA-F]{64})""", RegexOption.IGNORE_CASE)
     private val VERSION_CODE_INLINE_REGEX = Regex(
-        """(?:versionCode|build(?:\s+number)?|البناء)\s*[:=#]?\s*(\d{1,9})""",
+        """(?:version[_\s-]?code|build(?:\s+number)?|رقم\s+البناء|كود\s+الإصدار|البناء)\s*[:=#-]?\s*(\d{1,9})""",
         RegexOption.IGNORE_CASE
+    )
+    private val SEMVER_PAREN_BUILD_REGEX = Regex(
+        """[vV]?\d+\.\d+(?:\.\d+)?\s*\(\s*(\d{1,9})\s*\)"""
     )
     private val SEMVER_EXTRACT_REGEX = Regex("""[vV]?(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?""")
 
@@ -401,8 +404,12 @@ object GitHubReleasesParser {
 
     fun extractVersionCodeFromText(text: String): Int? {
         if (text.isBlank()) return null
-        val match = VERSION_CODE_INLINE_REGEX.find(text) ?: return null
-        return match.groupValues[1].toIntOrNull()?.takeIf { it > 0 }
+        val explicitMatch = VERSION_CODE_INLINE_REGEX.find(text)
+        if (explicitMatch != null) {
+            return explicitMatch.groupValues[1].toIntOrNull()?.takeIf { it > 0 }
+        }
+        val parenBuildMatch = SEMVER_PAREN_BUILD_REGEX.find(text)
+        return parenBuildMatch?.groupValues?.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 }
     }
 
     private fun extractDigestHex(digest: String): String? {

@@ -844,7 +844,8 @@ private fun ShareFlowNavHost(
         }
         composable(route = ShareFlowRoutes.UPDATES) {
             com.example.shareflow.ui.update.UpdatesScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                topBarClearance = topLevelStatusBarClearance
             )
         }
 

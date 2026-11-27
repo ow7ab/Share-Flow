@@ -870,7 +870,7 @@ class CloudUpdateManager(
                     val normalizedInstalled = GitHubReleasesParser.normalizeVersionName(currentVersionName)
                     if (normalizedLatest.isNotBlank() &&
                         normalizedInstalled.isNotBlank() &&
-                        GitHubReleasesParser.compareSemanticVersions(normalizedLatest, normalizedInstalled) == 0
+                        GitHubReleasesParser.compareSemanticVersions(normalizedLatest, normalizedInstalled) <= 0
                     ) {
                         preferencesStore.recordCheckResult(
                             epochMillis = clock.nowEpochMillis(),
@@ -890,9 +890,11 @@ class CloudUpdateManager(
                         reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
                         detail = "Release ${latestStable.tagName} does not provide a readable numeric versionCode (version.json or Build number)."
                     )
+                    // GitHub Releases API responded HTTP 200 successfully; keep server status CONNECTED
+                    // so metadata validation errors are never misreported as a network connection issue.
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
-                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
                         sourceLabel = GITHUB_SOURCE_LABEL,
                         errorSummary = err.detail
                     )
@@ -907,7 +909,7 @@ class CloudUpdateManager(
                     )
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
-                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
                         sourceLabel = GITHUB_SOURCE_LABEL,
                         errorSummary = err.detail
                     )
@@ -926,7 +928,7 @@ class CloudUpdateManager(
                     )
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
-                        serverStatus = UpdateServerConnectionStatus.ERROR,
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
                         sourceLabel = GITHUB_SOURCE_LABEL,
                         errorSummary = manifestErr.detail
                     )

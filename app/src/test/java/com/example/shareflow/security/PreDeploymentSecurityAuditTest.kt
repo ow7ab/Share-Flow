@@ -179,8 +179,9 @@ class PreDeploymentSecurityAuditTest {
             Uri.parse("content://$selfAuthority/shareflow_updates/shareflow-v24.apk"),
             Uri.parse("content://$selfAuthority/shareflow_qr_shares/qr.apk"),
             Uri.parse("content://$selfAuthority/shareflow_apk_exports/export.apk"),
-            Uri.parse("content://$selfAuthority/received_files/../databases/shareflow.db"),
-            Uri.parse("content://$selfAuthority/received_files/notes.txt"),
+            Uri.parse("content://$selfAuthority/shareflow_received_external/../databases/shareflow.db"),
+            Uri.parse("content://$selfAuthority/shareflow_received_internal/notes.txt"),
+            Uri.parse("content://$selfAuthority/received_files/unknown_root.apk"),
             Uri.parse("content://$selfAuthority/")
         )
         forbiddenSelfUris.forEach { maliciousUri ->
@@ -190,7 +191,7 @@ class PreDeploymentSecurityAuditTest {
             )
         }
 
-        // Legitimate paths: external provider content:// and confined received_files/*.apk
+        // Legitimate paths: external provider content:// and confined shareflow_received_*/*.apk
         assertTrue(
             ApkInstallerIntentHelper.isAllowedContentUri(
                 context,
@@ -200,7 +201,13 @@ class PreDeploymentSecurityAuditTest {
         assertTrue(
             ApkInstallerIntentHelper.isAllowedContentUri(
                 context,
-                Uri.parse("content://$selfAuthority/received_files/legit_app.apk")
+                Uri.parse("content://$selfAuthority/shareflow_received_external/legit_app.apk")
+            )
+        )
+        assertTrue(
+            ApkInstallerIntentHelper.isAllowedContentUri(
+                context,
+                Uri.parse("content://$selfAuthority/shareflow_received_internal/legit_app.apk")
             )
         )
 

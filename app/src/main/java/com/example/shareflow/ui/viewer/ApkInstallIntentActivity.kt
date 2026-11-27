@@ -263,7 +263,8 @@ object ApkInstallerIntentHelper {
      * Guards against untrusted external callers feeding ShareFlow's own FileProvider URIs
      * pointing to internal cache/export/update paths (confused-deputy file disclosure).
      * External content providers (Files, Downloads, messaging apps) remain allowed, while
-     * self-authority URIs are strictly confined to `received_files/` without traversal segments.
+     * self-authority URIs are strictly confined to the received-file FileProvider roots
+     * declared in `shareflow_file_paths.xml` without traversal segments.
      */
     internal fun isAllowedContentUri(context: Context, uri: Uri): Boolean {
         if (!uri.scheme.equals("content", ignoreCase = true)) return false
@@ -278,11 +279,16 @@ object ApkInstallerIntentHelper {
         if (pathSegments.any { seg -> seg.isBlank() || seg == "." || seg == ".." || seg.contains('\\') || seg.contains('\u0000') }) {
             return false
         }
-        if (pathSegments.first() != "received_files") {
+        if (pathSegments.first() !in ALLOWED_SELF_FILEPROVIDER_ROOTS) {
             return false
         }
         return pathSegments.last().endsWith(".apk", ignoreCase = true)
     }
+
+    private val ALLOWED_SELF_FILEPROVIDER_ROOTS = setOf(
+        "shareflow_received_external",
+        "shareflow_received_internal"
+    )
 
     internal fun canForwardToExternalSystemInstaller(stagedApk: StagedIncomingApk?): Boolean =
         stagedApk != null && stagedApk.stagedFile.exists() && stagedApk.stagedFile.isFile
