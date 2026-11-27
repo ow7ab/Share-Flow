@@ -115,6 +115,63 @@ class OkHttpCloudUpdateHttpClient(
         lastFailure ?: AppResult.Failure(AppError.Network("Unable to reach update server."))
     }
 
+    override suspend fun fetchByteRange(
+        url: String,
+        startByte: Long?,
+        endByte: Long?,
+        suffixBytes: Long?
+    ): AppResult<RemoteByteRangeResponse> = withContext(dispatchers.io) {
+        if (!CloudUpdateValidator.isValidPublicHttpsUrl(url)) {
+            return@withContext AppResult.Failure(
+                AppError.Security("Only public HTTPS URLs are permitted.")
+            )
+        }
+        if (isDefinitelyOffline()) {
+            return@withContext AppResult.Failure(
+                AppError.Network(
+                    message = "No active internet connection.",
+                    cause = UpdateNetworkException(
+                        kind = UpdateNetworkFailureKind.NO_INTERNET,
+                        message = "No active internet connection."
+                    )
+                )
+            )
+        }
+
+        val rangeHeader = when {
+            suffixBytes != null && suffixBytes > 0L -> "bytes=-$suffixBytes"
+            startByte != null && startByte >= 0L && endByte != null && endByte >= startByte ->
+                "bytes=$startByte-$endByte"
+            startByte != null && startByte >= 0L -> "bytes=$startByte-"
+            else -> return@withContext AppResult.Failure(
+                AppError.Validation("Invalid HTTP Range parameters.")
+            )
+        }
+
+        var attempt = 0
+        var lastFailure: AppResult.Failure? = null
+
+        while (attempt < maxRetryAttempts) {
+            currentCoroutineContext().ensureActive()
+            attempt++
+            val result = executeValidatedByteRange(url = url, rangeHeader = rangeHeader, requestedStart = startByte)
+            if (result is AppResult.Success) {
+                return@withContext result
+            }
+            lastFailure = result as AppResult.Failure
+            val networkEx = result.error.cause as? UpdateNetworkException
+            val shouldRetry = attempt < maxRetryAttempts && isRetryableFailure(networkEx, result.error)
+            if (!shouldRetry) {
+                return@withContext result
+            }
+            val delayMs = computeBackoffMs(attempt, networkEx?.retryAfterSeconds)
+            Log.d(TAG, "Transient byte-range probe error (attempt $attempt/$maxRetryAttempts), retrying in ${delayMs}ms")
+            delay(delayMs)
+        }
+
+        lastFailure ?: AppResult.Failure(AppError.Network("Unable to probe remote APK metadata."))
+    }
+
     override suspend fun downloadApkToFile(
         apkUrl: String,
         destinationFile: File,
@@ -366,6 +423,78 @@ class OkHttpCloudUpdateHttpClient(
         }
     }
 
+    private fun executeValidatedByteRange(
+        url: String,
+        rangeHeader: String,
+        requestedStart: Long?
+    ): AppResult<RemoteByteRangeResponse> {
+        val headers = mapOf(
+            "Range" to rangeHeader,
+            "Accept" to "*/*",
+            "Accept-Encoding" to "identity",
+            "Cache-Control" to "no-cache"
+        )
+        val openRes = openValidatedResponse(url, headers)
+        val response = when (openRes) {
+            is AppResult.Success -> openRes.data
+            is AppResult.Failure -> return openRes
+        }
+        return response.use { resp ->
+            val code = resp.code
+            if (code != 206 && code != 200) {
+                return mapHttpErrorResponse(resp)
+            }
+            val body = resp.body ?: return AppResult.Failure(
+                AppError.Network("Remote APK byte-range probe returned an empty body.")
+            )
+            try {
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(8192)
+                var total = 0
+                body.byteStream().use { input ->
+                    while (true) {
+                        val read = input.read(buf)
+                        if (read <= 0) break
+                        total += read
+                        if (total > MAX_RANGE_RESPONSE_BYTES) {
+                            return AppResult.Failure(
+                                AppError.Validation("Remote APK metadata probe exceeded $MAX_RANGE_RESPONSE_BYTES byte safety cap.")
+                            )
+                        }
+                        out.write(buf, 0, read)
+                    }
+                }
+                val bytes = out.toByteArray()
+                val contentRange = resp.header("Content-Range")
+                val totalLength = if (code == 206) {
+                    parseTotalFromContentRange(contentRange)
+                } else {
+                    resp.header("Content-Length")?.toLongOrNull()?.takeIf { it > 0L } ?: bytes.size.toLong()
+                }
+                val resolvedStart = if (code == 206) {
+                    parseRangeStartFromContentRange(contentRange)
+                        ?: requestedStart
+                        ?: totalLength?.let { (it - bytes.size.toLong()).coerceAtLeast(0L) }
+                        ?: 0L
+                } else {
+                    0L
+                }
+                AppResult.Success(
+                    RemoteByteRangeResponse(
+                        bytes = bytes,
+                        totalLength = totalLength,
+                        rangeStart = resolvedStart,
+                        isPartialContent = code == 206
+                    )
+                )
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                classifyThrowableFailure(t)
+            }
+        }
+    }
+
     private fun openValidatedResponse(
         initialUrl: String,
         headers: Map<String, String>
@@ -546,6 +675,15 @@ class OkHttpCloudUpdateHttpClient(
         return contentRange.substring(slashIndex + 1).trim().toLongOrNull()?.takeIf { it > 0L }
     }
 
+    private fun parseRangeStartFromContentRange(contentRange: String?): Long? {
+        if (contentRange.isNullOrBlank()) return null
+        // Format: "bytes 12345-67890/99999"
+        val cleaned = contentRange.trim().removePrefix("bytes").removePrefix("BYTES").trim()
+        val dashIdx = cleaned.indexOf('-')
+        if (dashIdx <= 0) return null
+        return cleaned.substring(0, dashIdx).trim().toLongOrNull()?.takeIf { it >= 0L }
+    }
+
     private fun isDefinitelyOffline(): Boolean {
         val ctx = context ?: return false
         return runCatching {
@@ -561,6 +699,7 @@ class OkHttpCloudUpdateHttpClient(
         private const val TAG = "ShareFlowUpdateHttp"
         const val MAX_REDIRECTS = 6
         const val MAX_API_RESPONSE_BYTES = 512 * 1024
+        const val MAX_RANGE_RESPONSE_BYTES = 2 * 1024 * 1024 + 64 * 1024
         private const val DEFAULT_MAX_RETRIES = 3
         private const val DEFAULT_BASE_RETRY_DELAY_MS = 500L
         private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)

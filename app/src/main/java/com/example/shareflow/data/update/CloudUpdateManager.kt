@@ -38,7 +38,16 @@ data class CloudUpdateManifest(
     val portalUrl: String? = null,
     val publishedAt: String = "",
     val signingCertSha256: String? = null
-)
+) {
+    /** Unified canonical alias for [apkDownloadUrl]. */
+    val downloadUrl: String get() = apkDownloadUrl
+
+    /** Unified canonical alias for [mandatory]. */
+    val isMandatory: Boolean get() = mandatory
+
+    /** Unified release notes accessor (English with Arabic fallback). */
+    val releaseNotes: String get() = releaseNotesEn.ifBlank { releaseNotesAr }
+}
 
 sealed class CloudUpdateState {
     data object Idle : CloudUpdateState()
@@ -194,6 +203,21 @@ interface CloudUpdateHttpClient {
         destinationFile: File,
         onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit
     ): AppResult<File>
+
+    /**
+     * Fetches an HTTP `Range` slice from a remote binary asset (e.g. `Share-Flow.apk`) so
+     * [RemoteApkManifestReader] can decode authentic `AndroidManifest.xml` version metadata
+     * without downloading the full APK. Default returns an unsupported failure so lightweight
+     * unit-test fakes remain source-compatible.
+     */
+    suspend fun fetchByteRange(
+        url: String,
+        startByte: Long? = null,
+        endByte: Long? = null,
+        suffixBytes: Long? = null
+    ): AppResult<RemoteByteRangeResponse> = AppResult.Failure(
+        AppError.Network("HTTP byte-range probing is unavailable on this client.")
+    )
 }
 
 interface ApkPackageSecurityInspector {
@@ -329,18 +353,24 @@ object CloudUpdateValidator {
         }
         return runCatching {
             val json = JSONObject(trimmed)
-            val versionCode = json.optInt("versionCode", -1)
-            if (versionCode <= 0) {
-                return AppResult.Failure(AppError.Validation("Manifest missing valid positive versionCode."))
+            val versionCode = parsePositiveIntField(json, "versionCode")
+            if (versionCode == null || versionCode <= 0) {
+                return AppResult.Failure(AppError.Validation("Manifest missing valid positive integer versionCode."))
             }
-            val versionName = json.optString("versionName", "").trim()
-            if (versionName.isBlank() || versionName.length > 32 || versionName.any { it.isISOControl() }) {
+            val rawVersionName = json.optString("versionName", "").trim()
+            if (rawVersionName.isBlank() || rawVersionName.length > 32 || rawVersionName.any { it.isISOControl() }) {
                 return AppResult.Failure(AppError.Validation("Manifest missing valid versionName."))
             }
-            val apkDownloadUrl = json.optString("apkDownloadUrl", "").trim()
-                .ifEmpty { json.optString("apkUrl", "").trim() }
+            val versionName = GitHubReleasesParser.normalizeVersionName(rawVersionName)
+                .ifBlank { rawVersionName }
+            val apkDownloadUrl = listOf(
+                json.optString("downloadUrl", "").trim(),
+                json.optString("apkDownloadUrl", "").trim(),
+                json.optString("apkUrl", "").trim(),
+                json.optString("latestApkDownloadUrl", "").trim()
+            ).firstOrNull { it.isNotEmpty() }.orEmpty()
             if (!isValidPublicHttpsUrl(apkDownloadUrl)) {
-                return AppResult.Failure(AppError.Security("Manifest apkDownloadUrl/apkUrl must be a valid public HTTPS URL."))
+                return AppResult.Failure(AppError.Security("Manifest downloadUrl/apkDownloadUrl/apkUrl must be a valid public HTTPS URL."))
             }
             val sha256 = json.optString("sha256", "").trim().lowercase()
             if (!SHA256_REGEX.matches(sha256)) {
@@ -351,7 +381,10 @@ object CloudUpdateValidator {
                 return AppResult.Failure(AppError.Validation("Manifest fileSizeBytes is out of safe bounds."))
             }
             val minSdk = json.optInt("minSupportedAndroidSdk", 24).coerceAtLeast(21)
-            val mandatory = json.optBoolean("mandatory", false)
+            val mandatory = when {
+                json.has("isMandatory") && !json.isNull("isMandatory") -> json.optBoolean("isMandatory", false)
+                else -> json.optBoolean("mandatory", false)
+            }
             val genericReleaseNotes = parseReleaseNotesField(json)
             val releaseNotesAr = json.optString("releaseNotesAr", "").trim().ifEmpty { genericReleaseNotes }.take(2000)
             val releaseNotesEn = json.optString("releaseNotesEn", "").trim().ifEmpty { genericReleaseNotes }.take(2000)
@@ -379,6 +412,28 @@ object CloudUpdateValidator {
             )
         }.getOrElse { err ->
             AppResult.Failure(AppError.Validation("Invalid update manifest JSON: ${err.message ?: "parse error"}"))
+        }
+    }
+
+    private fun parsePositiveIntField(json: JSONObject, key: String): Int? {
+        if (!json.has(key) || json.isNull(key)) return null
+        val raw = json.opt(key) ?: return null
+        return when (raw) {
+            is Int -> raw.takeIf { it > 0 }
+            is Long -> if (raw in 1L..Int.MAX_VALUE.toLong()) raw.toInt() else null
+            is Number -> {
+                val asDouble = raw.toDouble()
+                if (asDouble.isFinite() && asDouble == asDouble.toLong().toDouble() &&
+                    asDouble >= 1.0 && asDouble <= Int.MAX_VALUE.toDouble()
+                ) {
+                    asDouble.toInt()
+                } else {
+                    null
+                }
+            }
+            is String -> raw.trim().takeIf { it.all(Char::isDigit) && it.isNotEmpty() }
+                ?.toIntOrNull()?.takeIf { it > 0 }
+            else -> null
         }
     }
 
@@ -795,8 +850,20 @@ class CloudUpdateManager(
         return finalizeManifestFetch(fetchRes, sourceLabel = OFFICIAL_PORTAL_HOST)
     }
 
+    private data class PrimaryManifestCandidate(
+        val manifest: CloudUpdateManifest,
+        val sourceLabel: String
+    )
+
     private suspend fun checkViaGitHubReleasesWithFallback(): CloudUpdateState {
         _state.value = CloudUpdateState.Checking
+        val diagnostics = mutableListOf<String>()
+
+        // 1) Unified version.json primary resolution (independent of GitHub REST API rate limits)
+        val primaryManifest = fetchBestUnifiedVersionJson(diagnostics)
+
+        // 2) Query GitHub Releases API (ow7ab/Share-Flow) for release history, brand-new releases
+        //    whose static portal version.json may still be syncing, and sidecar validation.
         val apiListUrl = buildReleasesListUrl(githubReleasesApiUrl)
         val listFetch = if (CloudUpdateValidator.isValidPublicHttpsUrl(apiListUrl)) {
             httpClient.fetchManifestText(apiListUrl)
@@ -810,6 +877,14 @@ class CloudUpdateManager(
 
             val latestStable = releases.firstOrNull { !it.isDraft && !it.isPrerelease }
             if (latestStable == null) {
+                if (primaryManifest != null) {
+                    preferencesStore.recordCheckResult(
+                        epochMillis = clock.nowEpochMillis(),
+                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                        sourceLabel = primaryManifest.sourceLabel
+                    )
+                    return evaluateResolvedManifest(primaryManifest.manifest)
+                }
                 preferencesStore.recordCheckResult(
                     epochMillis = clock.nowEpochMillis(),
                     serverStatus = UpdateServerConnectionStatus.CONNECTED,
@@ -824,15 +899,32 @@ class CloudUpdateManager(
                 return upToDate
             }
 
-            // Enrich with version.json or .sha256 sidecar if attached to the release
-            val sidecarManifest = latestStable.versionJsonAssetUrl
+            // Prefer release-attached version.json when present; otherwise reuse unified primary
+            // version.json only if its normalized versionName matches latestStable (never let a
+            // stale portal version.json masquerade as a newer GitHub Release).
+            var sidecarManifest: CloudUpdateManifest? = null
+            val releaseVersionJsonUrl = latestStable.versionJsonAssetUrl
                 ?.takeIf { CloudUpdateValidator.isValidPublicHttpsUrl(it) }
-                ?.let { url ->
-                    val raw = httpClient.fetchManifestText(url)
-                    if (raw is AppResult.Success) {
-                        (CloudUpdateValidator.parseManifestJson(raw.data) as? AppResult.Success)?.data
-                    } else null
+            if (releaseVersionJsonUrl != null) {
+                when (val raw = httpClient.fetchManifestText(releaseVersionJsonUrl)) {
+                    is AppResult.Success -> {
+                        when (val parsed = CloudUpdateValidator.parseManifestJson(raw.data)) {
+                            is AppResult.Success -> sidecarManifest = parsed.data
+                            is AppResult.Failure -> diagnostics.add("Release version.json invalid: ${parsed.error.message}")
+                        }
+                    }
+                    is AppResult.Failure -> diagnostics.add("Release version.json unavailable: ${raw.error.message}")
                 }
+            } else if (primaryManifest != null) {
+                val normPrimary = GitHubReleasesParser.normalizeVersionName(primaryManifest.manifest.versionName)
+                val normLatest = GitHubReleasesParser.normalizeVersionName(latestStable.versionName)
+                if (normPrimary.isNotBlank() &&
+                    normLatest.isNotBlank() &&
+                    normPrimary.equals(normLatest, ignoreCase = true)
+                ) {
+                    sidecarManifest = primaryManifest.manifest
+                }
+            }
 
             val sidecarShaText = if (sidecarManifest == null && latestStable.apkAsset?.sha256Digest == null) {
                 latestStable.sha256SidecarAssetUrl
@@ -844,26 +936,68 @@ class CloudUpdateManager(
                 null
             }
 
+            // If version.json did not supply versionCode and release body/title lacks an explicit
+            // numeric Build/versionCode, read the real binary AndroidManifest.xml straight from
+            // Share-Flow.apk via bounded HTTP Range requests (never fabricate from tag!).
+            val needsApkProbe = sidecarManifest == null &&
+                GitHubReleasesParser.extractVersionCodeFromText(latestStable.body) == null &&
+                GitHubReleasesParser.extractVersionCodeFromText(latestStable.name) == null
+
+            var remoteApkMetadata: RemoteApkManifestMetadata? = null
+            if (needsApkProbe) {
+                val apkUrl = latestStable.apkAsset?.browserDownloadUrl
+                if (!apkUrl.isNullOrBlank() && CloudUpdateValidator.isValidPublicHttpsUrl(apkUrl)) {
+                    when (val apkProbe = RemoteApkManifestReader.readFromUrl(apkUrl, httpClient)) {
+                        is RemoteApkManifestResult.Success -> {
+                            remoteApkMetadata = apkProbe.metadata
+                        }
+                        is RemoteApkManifestResult.Failure -> {
+                            diagnostics.add("APK manifest probe: ${apkProbe.detail}")
+                        }
+                    }
+                } else {
+                    diagnostics.add("Release ${latestStable.tagName} has no public HTTPS APK asset")
+                }
+            }
+
             when (
                 val resolution = GitHubReleasesParser.resolveCloudUpdateManifest(
                     release = latestStable,
                     sidecarManifest = sidecarManifest,
-                    sidecarSha256Text = sidecarShaText
+                    sidecarSha256Text = sidecarShaText,
+                    remoteApkMetadata = remoteApkMetadata,
+                    expectedPackageName = expectedPackageName
                 )
             ) {
                 is GitHubManifestResolution.Resolved -> {
+                    val resolvedSource = when {
+                        sidecarManifest != null -> VERSION_JSON_SOURCE_LABEL
+                        remoteApkMetadata != null -> APK_MANIFEST_SOURCE_LABEL
+                        else -> GITHUB_SOURCE_LABEL
+                    }
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
                         serverStatus = UpdateServerConnectionStatus.CONNECTED,
-                        sourceLabel = GITHUB_SOURCE_LABEL
+                        sourceLabel = resolvedSource
                     )
                     return evaluateResolvedManifest(resolution.manifest)
                 }
 
                 is GitHubManifestResolution.MissingVersionCode -> {
-                    val portalResolved = tryResolveFromFallbackManifestEndpoints()
-                    if (portalResolved != null) {
-                        return portalResolved
+                    if (primaryManifest != null &&
+                        GitHubReleasesParser.isRemoteReleaseNewer(
+                            remoteVersionCode = primaryManifest.manifest.versionCode,
+                            remoteVersionName = primaryManifest.manifest.versionName,
+                            installedVersionCode = currentVersionCode,
+                            installedVersionName = currentVersionName
+                        )
+                    ) {
+                        preferencesStore.recordCheckResult(
+                            epochMillis = clock.nowEpochMillis(),
+                            serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                            sourceLabel = primaryManifest.sourceLabel
+                        )
+                        return evaluateResolvedManifest(primaryManifest.manifest)
                     }
 
                     val normalizedLatest = GitHubReleasesParser.normalizeVersionName(latestStable.versionName)
@@ -886,12 +1020,12 @@ class CloudUpdateManager(
                         return upToDate
                     }
 
+                    val diagSuffix = formatDiagnosticSummary(diagnostics)
                     val err = CloudUpdateState.Error(
                         reason = CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA,
-                        detail = "Release ${latestStable.tagName} does not provide a readable numeric versionCode (version.json or Build number)."
+                        detail = "Release ${latestStable.tagName} does not provide a readable numeric versionCode (version.json, APK AndroidManifest.xml, or Build number)." +
+                            if (diagSuffix.isNotEmpty()) " [$diagSuffix]" else ""
                     )
-                    // GitHub Releases API responded HTTP 200 successfully; keep server status CONNECTED
-                    // so metadata validation errors are never misreported as a network connection issue.
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
                         serverStatus = UpdateServerConnectionStatus.CONNECTED,
@@ -918,13 +1052,19 @@ class CloudUpdateManager(
                 }
 
                 is GitHubManifestResolution.MissingApkOrChecksum -> {
-                    val portalResolved = tryResolveFromFallbackManifestEndpoints()
-                    if (portalResolved != null) {
-                        return portalResolved
+                    if (primaryManifest != null) {
+                        preferencesStore.recordCheckResult(
+                            epochMillis = clock.nowEpochMillis(),
+                            serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                            sourceLabel = primaryManifest.sourceLabel
+                        )
+                        return evaluateResolvedManifest(primaryManifest.manifest)
                     }
+                    val diagSuffix = formatDiagnosticSummary(diagnostics)
                     val manifestErr = CloudUpdateState.Error(
                         reason = CloudUpdateErrorReason.INVALID_MANIFEST,
-                        detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest."
+                        detail = "Release ${latestStable.tagName} is missing a verified APK asset or SHA-256 digest." +
+                            if (diagSuffix.isNotEmpty()) " [$diagSuffix]" else ""
                     )
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
@@ -937,6 +1077,14 @@ class CloudUpdateManager(
                 }
 
                 GitHubManifestResolution.SkippedNonStable -> {
+                    if (primaryManifest != null) {
+                        preferencesStore.recordCheckResult(
+                            epochMillis = clock.nowEpochMillis(),
+                            serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                            sourceLabel = primaryManifest.sourceLabel
+                        )
+                        return evaluateResolvedManifest(primaryManifest.manifest)
+                    }
                     preferencesStore.recordCheckResult(
                         epochMillis = clock.nowEpochMillis(),
                         serverStatus = UpdateServerConnectionStatus.CONNECTED,
@@ -953,59 +1101,83 @@ class CloudUpdateManager(
             }
         }
 
-        // GitHub API failed (e.g., rate-limited 403/429 or temporary 5xx) — try static fallback endpoints
-        val primaryError = (listFetch as AppResult.Failure).error
-        val fallbackCandidates = listOf(fallbackManifestUrl, defaultManifestUrl)
-            .map { it.trim() }
-            .distinct()
-            .filter { it.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(it) }
-
-        for (candidateUrl in fallbackCandidates) {
-            val fallbackRes = httpClient.fetchManifestText(candidateUrl)
-            if (fallbackRes is AppResult.Success) {
-                return finalizeManifestFetch(fallbackRes, sourceLabel = GITHUB_SOURCE_LABEL)
-            }
+        // 3) GitHub API failed (e.g., rate-limited 403/429, delay/timeout, or 5xx):
+        //    succeed immediately if unified version.json was already fetched cleanly!
+        if (primaryManifest != null) {
+            preferencesStore.recordCheckResult(
+                epochMillis = clock.nowEpochMillis(),
+                serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                sourceLabel = primaryManifest.sourceLabel
+            )
+            return evaluateResolvedManifest(primaryManifest.manifest)
         }
 
-        // All endpoints failed — map the root GitHub API failure accurately
+        // All sources failed — report root GitHub API cause + per-source diagnostics
+        val primaryError = (listFetch as AppResult.Failure).error
+        diagnostics.add("GitHub API: ${primaryError.message}")
         val errorReason = mapErrorToReason(primaryError)
         val serverStatus = mapReasonToServerStatus(errorReason)
+        val diagSummary = formatDiagnosticSummary(diagnostics)
+        val detailedError = if (diagSummary.isNotEmpty() && !primaryError.message.contains(diagSummary)) {
+            "${primaryError.message} [$diagSummary]"
+        } else {
+            primaryError.message
+        }
         preferencesStore.recordCheckResult(
             epochMillis = clock.nowEpochMillis(),
             serverStatus = serverStatus,
             sourceLabel = GITHUB_SOURCE_LABEL,
-            errorSummary = primaryError.message
+            errorSummary = detailedError
         )
         val err = CloudUpdateState.Error(
             reason = errorReason,
-            detail = primaryError.message
+            detail = detailedError
         )
         _state.value = err
         return err
     }
 
-    private suspend fun tryResolveFromFallbackManifestEndpoints(): CloudUpdateState? {
-        val fallbackCandidates = listOf(defaultManifestUrl, fallbackManifestUrl)
-            .map { it.trim() }
-            .distinct()
-            .filter { it.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+    private suspend fun fetchBestUnifiedVersionJson(
+        diagnostics: MutableList<String>
+    ): PrimaryManifestCandidate? {
+        val candidates = listOf(
+            fallbackManifestUrl.trim() to VERSION_JSON_SOURCE_LABEL,
+            defaultManifestUrl.trim() to VERSION_JSON_PORTAL_SOURCE_LABEL
+        )
+            .filter { (url, _) -> url.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(url) }
+            .distinctBy { (url, _) -> url.lowercase() }
 
-        for (candidateUrl in fallbackCandidates) {
-            val fallbackRes = httpClient.fetchManifestText(candidateUrl)
-            if (fallbackRes is AppResult.Success) {
-                val parsed = CloudUpdateValidator.parseManifestJson(fallbackRes.data)
-                if (parsed is AppResult.Success) {
-                    preferencesStore.recordCheckResult(
-                        epochMillis = clock.nowEpochMillis(),
-                        serverStatus = UpdateServerConnectionStatus.CONNECTED,
-                        sourceLabel = GITHUB_SOURCE_LABEL
-                    )
-                    return evaluateResolvedManifest(parsed.data)
+        var best: PrimaryManifestCandidate? = null
+        for ((url, label) in candidates) {
+            when (val res = httpClient.fetchManifestText(url)) {
+                is AppResult.Success -> {
+                    when (val parsed = CloudUpdateValidator.parseManifestJson(res.data)) {
+                        is AppResult.Success -> {
+                            val candidate = PrimaryManifestCandidate(parsed.data, label)
+                            if (best == null || candidate.manifest.versionCode > best.manifest.versionCode) {
+                                best = candidate
+                            }
+                        }
+                        is AppResult.Failure -> {
+                            diagnostics.add("$label invalid JSON: ${parsed.error.message}")
+                        }
+                    }
+                }
+                is AppResult.Failure -> {
+                    diagnostics.add("$label: ${res.error.message}")
                 }
             }
         }
-        return null
+        return best
     }
+
+    private fun formatDiagnosticSummary(entries: List<String>): String =
+        entries
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .joinToString(" | ")
+            .take(500)
 
     private suspend fun finalizeManifestFetch(
         fetchRes: AppResult<String>,
@@ -1181,6 +1353,16 @@ class CloudUpdateManager(
                     _state.value = err
                     return@withContext err
                 }
+            }
+
+            if (manifest.minSupportedAndroidSdk > currentSdkInt) {
+                val err = CloudUpdateState.Error(
+                    reason = CloudUpdateErrorReason.INCOMPATIBLE_DEVICE,
+                    detail = "This update requires Android API ${manifest.minSupportedAndroidSdk} or higher (device is API $currentSdkInt).",
+                    manifest = manifest
+                )
+                _state.value = err
+                return@withContext err
             }
 
             if (!CloudUpdateValidator.isValidPublicHttpsUrl(manifest.apkDownloadUrl)) {
@@ -1512,6 +1694,9 @@ class CloudUpdateManager(
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"
         const val GITHUB_SOURCE_LABEL = "GitHub Releases (ow7ab/Share-Flow)"
+        const val VERSION_JSON_SOURCE_LABEL = "version.json (ow7ab/Share-Flow)"
+        const val VERSION_JSON_PORTAL_SOURCE_LABEL = "version.json (ow7ab.github.io/Share-Flow)"
+        const val APK_MANIFEST_SOURCE_LABEL = "APK AndroidManifest.xml (ow7ab/Share-Flow)"
         const val OFFICIAL_RELEASES_PAGE_URL = "https://github.com/ow7ab/Share-Flow/releases"
         const val OFFICIAL_PORTAL_URL = "https://ow7ab.github.io/Share-Flow/"
         const val OFFICIAL_PORTAL_HOST = "github.com/ow7ab/Share-Flow"

@@ -402,6 +402,15 @@ jobs:
         if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Cache Robolectric Android runtime JARs (~/.m2)
+        if: ${{ steps.validate_config.outputs.should_release == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('**/gradle/libs.versions.toml', '**/app/build.gradle.kts') }}
+          restore-keys: |
+            robolectric-${{ runner.os }}-
+
       - name: Make Gradle Wrapper executable
         if: ${{ steps.validate_config.outputs.should_release == 'true' }}
         shell: bash
@@ -768,6 +777,11 @@ jobs:
             const assert = require("node:assert/strict");
             const portal = require("./docs/app.js");
             const raw = JSON.parse(fs.readFileSync(process.env.MANIFEST_PATH, "utf8"));
+            assert.ok(Number.isInteger(raw.versionCode) && raw.versionCode > 0, "versionCode must be positive int");
+            assert.ok(typeof raw.versionName === "string" && raw.versionName.length > 0, "versionName missing");
+            assert.ok(typeof raw.downloadUrl === "string" && raw.downloadUrl.startsWith("https://"), "downloadUrl missing");
+            assert.equal(typeof raw.isMandatory, "boolean", "isMandatory must be boolean");
+            assert.ok(Array.isArray(raw.releaseNotes) && raw.releaseNotes.length > 0, "releaseNotes missing");
             const parsed = portal.normalizeCustomManifest(raw);
             assert.equal(parsed.status, "ready", "Website parser rejected generated version.json!");
             assert.equal(parsed.data.sha256, raw.sha256);

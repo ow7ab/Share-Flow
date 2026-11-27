@@ -611,16 +611,19 @@
     const candidateUrl =
       typeof data.latestApkDownloadUrl === "string" && isSafeDirectApkUrl(data.latestApkDownloadUrl)
         ? data.latestApkDownloadUrl
-        : typeof data.apkDownloadUrl === "string" && isSafeDirectApkUrl(data.apkDownloadUrl)
-          ? data.apkDownloadUrl
-          : data.apkUrl;
+        : typeof data.downloadUrl === "string" && isSafeDirectApkUrl(data.downloadUrl)
+          ? data.downloadUrl
+          : typeof data.apkDownloadUrl === "string" && isSafeDirectApkUrl(data.apkDownloadUrl)
+            ? data.apkDownloadUrl
+            : data.apkUrl;
     if (!isSafeDirectApkUrl(candidateUrl)) {
       return { status: "unavailable", data: null, history: [] };
     }
-    const versionName =
+    const rawVersionName =
       typeof data.versionName === "string" && data.versionName.trim()
-        ? data.versionName.trim()
+        ? data.versionName.trim().replace(/^[vV]\s*/, "")
         : "latest";
+    const versionName = rawVersionName || "latest";
     const versionCode = Number(data.versionCode) > 0 ? Number(data.versionCode) : null;
     const label = versionCode ? `v${versionName} (Build ${versionCode})` : `v${versionName}`;
     const notesAr = typeof data.releaseNotesAr === "string" ? data.releaseNotesAr.trim() : "";
@@ -630,12 +633,16 @@
       : typeof data.releaseNotes === "string"
         ? data.releaseNotes.trim()
         : "";
+    const isMandatory = Boolean(
+      typeof data.isMandatory === "boolean" ? data.isMandatory : data.mandatory
+    );
     return {
       status: "ready",
       data: {
         versionLabel: label,
         tagName: typeof data.releaseTag === "string" ? data.releaseTag : "",
         buildNumber: versionCode,
+        isMandatory,
         prerelease: false,
         apkUrl: candidateUrl.trim(),
         fileSizeBytes: Number(data.fileSizeBytes) || 0,

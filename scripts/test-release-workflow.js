@@ -358,10 +358,12 @@ test("release_helpers build-manifest generates valid version.json accepted by do
     const manifest = JSON.parse(fs.readFileSync(manifestOut, "utf8"));
     assert.equal(manifest.versionCode, 13);
     assert.equal(manifest.versionName, "1.0.12");
+    assert.equal(manifest.downloadUrl, directUrl);
     assert.equal(manifest.apkUrl, latestUrl);
     assert.equal(manifest.apkDownloadUrl, directUrl);
     assert.equal(manifest.sha256, apkSha);
     assert.equal(manifest.signingCertSha256, certSha);
+    assert.equal(manifest.isMandatory, false);
     assert.equal(manifest.mandatory, false);
     assert.deepEqual(manifest.releaseNotes, ["أتمتة كاملة للإصدار", "تحسينات أمان التحديث"]);
 
@@ -369,8 +371,23 @@ test("release_helpers build-manifest generates valid version.json accepted by do
     const parsed = portal.normalizeCustomManifest(manifest);
     assert.equal(parsed.status, "ready");
     assert.equal(parsed.data.buildNumber, 13);
+    assert.equal(parsed.data.isMandatory, false);
     assert.equal(parsed.data.sha256, apkSha);
     assert.equal(parsed.data.apkUrl, latestUrl);
+
+    // Verify docs/app.js also handles canonical minimal unified schema (downloadUrl + isMandatory + V1.1.2)
+    const minimalParsed = portal.normalizeCustomManifest({
+      versionCode: 25,
+      versionName: "V1.1.2",
+      downloadUrl: "https://github.com/ow7ab/Share-Flow/releases/download/V1.1.2/Share-Flow.apk",
+      releaseNotes: "Unified update schema",
+      isMandatory: true,
+      sha256: apkSha,
+    });
+    assert.equal(minimalParsed.status, "ready");
+    assert.equal(minimalParsed.data.versionLabel, "v1.1.2 (Build 25)");
+    assert.equal(minimalParsed.data.buildNumber, 25);
+    assert.equal(minimalParsed.data.isMandatory, true);
 
     // Reject insecure HTTP or non-APK URL
     assert.throws(() =>

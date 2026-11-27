@@ -43,6 +43,9 @@ data class UpdateDetails(
     val signingCertSha256: String? = null,
     val isUpdateAvailable: Boolean = false
 ) {
+    val downloadUrl: String get() = apkDownloadUrl
+    val isMandatory: Boolean get() = mandatory
+
     fun localizedReleaseNotes(isArabic: Boolean): String = if (isArabic) {
         releaseNotesAr.ifBlank { releaseNotes.ifBlank { releaseNotesEn } }
     } else {
@@ -117,9 +120,9 @@ class UpdateManager(
     suspend fun checkForUpdate(respectSnooze: Boolean = false): AppResult<UpdateDetails> =
         withContext(dispatcher) {
             if (enableGitHubReleasesApi) {
-                val ghResult = checkViaGitHubReleases(respectSnooze)
-                if (ghResult != null) {
-                    return@withContext ghResult
+                val unifiedResult = checkViaUnifiedVersionJsonAndGitHub(respectSnooze)
+                if (unifiedResult != null) {
+                    return@withContext unifiedResult
                 }
             }
 
@@ -155,26 +158,60 @@ class UpdateManager(
             preferencesStore.recordCheckResult(
                 epochMillis = clock.nowEpochMillis(),
                 serverStatus = UpdateServerConnectionStatus.CONNECTED,
-                sourceLabel = CloudUpdateManager.GITHUB_SOURCE_LABEL
+                sourceLabel = CloudUpdateManager.VERSION_JSON_SOURCE_LABEL
             )
 
             finalizeDetails(manifest, respectSnooze)
         }
 
-    private suspend fun checkViaGitHubReleases(respectSnooze: Boolean): AppResult<UpdateDetails>? {
+    private suspend fun checkViaUnifiedVersionJsonAndGitHub(respectSnooze: Boolean): AppResult<UpdateDetails>? {
+        // 1) Try unified version.json endpoints first (immune to GitHub REST API rate limits)
+        val staticCandidates = listOf(fallbackManifestUrl.trim(), manifestUrl.trim())
+            .filter { it.isNotEmpty() && CloudUpdateValidator.isValidPublicHttpsUrl(it) }
+            .distinctBy { it.lowercase() }
+
+        var unifiedManifest: CloudUpdateManifest? = null
+        for (candidate in staticCandidates) {
+            val raw = (fetchTextWithOkHttp(candidate) as? AppResult.Success)?.data ?: continue
+            val parsed = (CloudUpdateValidator.parseManifestJson(raw) as? AppResult.Success)?.data ?: continue
+            if (unifiedManifest == null || parsed.versionCode > unifiedManifest.versionCode) {
+                unifiedManifest = parsed
+            }
+        }
+
+        // 2) Check GitHub Releases API in case a newer release was published before static version.json synced
         val listUrl = githubReleasesApiUrl.trim().trimEnd('/').let { base ->
             if (base.contains("?")) base else "$base?per_page=10"
         }
-        if (!CloudUpdateValidator.isValidPublicHttpsUrl(listUrl)) return null
+        val listResult = if (CloudUpdateValidator.isValidPublicHttpsUrl(listUrl)) {
+            fetchTextWithOkHttp(listUrl, maxBytes = OkHttpCloudUpdateHttpClient.MAX_API_RESPONSE_BYTES)
+        } else {
+            AppResult.Failure(AppError.Security("Invalid GitHub Releases API URL."))
+        }
 
-        val listResult = fetchTextWithOkHttp(listUrl, maxBytes = OkHttpCloudUpdateHttpClient.MAX_API_RESPONSE_BYTES)
         if (listResult !is AppResult.Success) {
-            return null // fall through to static version.json fallbacks
+            if (unifiedManifest != null) {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                    sourceLabel = CloudUpdateManager.VERSION_JSON_SOURCE_LABEL
+                )
+                return finalizeDetails(unifiedManifest, respectSnooze)
+            }
+            return null
         }
 
         val releases = GitHubReleasesParser.parseReleasesArray(listResult.data)
         val latestStable = releases.firstOrNull { !it.isDraft && !it.isPrerelease }
         if (latestStable == null) {
+            if (unifiedManifest != null) {
+                preferencesStore.recordCheckResult(
+                    epochMillis = clock.nowEpochMillis(),
+                    serverStatus = UpdateServerConnectionStatus.CONNECTED,
+                    sourceLabel = CloudUpdateManager.VERSION_JSON_SOURCE_LABEL
+                )
+                return finalizeDetails(unifiedManifest, respectSnooze)
+            }
             preferencesStore.recordCheckResult(
                 epochMillis = clock.nowEpochMillis(),
                 serverStatus = UpdateServerConnectionStatus.CONNECTED,
@@ -201,6 +238,11 @@ class UpdateManager(
                     (CloudUpdateValidator.parseManifestJson(raw) as? AppResult.Success)?.data
                 }
             }
+            ?: unifiedManifest?.takeIf { candidate ->
+                val normCandidate = GitHubReleasesParser.normalizeVersionName(candidate.versionName)
+                val normLatest = GitHubReleasesParser.normalizeVersionName(latestStable.versionName)
+                normCandidate.isNotBlank() && normCandidate.equals(normLatest, ignoreCase = true)
+            }
 
         val sidecarShaText = if (sidecarManifest == null && latestStable.apkAsset?.sha256Digest == null) {
             latestStable.sha256SidecarAssetUrl
@@ -210,21 +252,48 @@ class UpdateManager(
             null
         }
 
+        val needsApkProbe = sidecarManifest == null &&
+            GitHubReleasesParser.extractVersionCodeFromText(latestStable.body) == null &&
+            GitHubReleasesParser.extractVersionCodeFromText(latestStable.name) == null
+
+        val remoteApkMetadata = if (needsApkProbe && latestStable.apkAsset != null) {
+            val rangeClient = OkHttpCloudUpdateHttpClient(
+                dispatchers = object : com.example.shareflow.core.common.DispatcherProvider {
+                    override val io = dispatcher
+                    override val default = dispatcher
+                    override val main = dispatcher
+                },
+                okHttpClient = okHttpClient,
+                maxRetryAttempts = MAX_RETRIES
+            )
+            (RemoteApkManifestReader.readFromUrl(latestStable.apkAsset.browserDownloadUrl, rangeClient)
+                as? RemoteApkManifestResult.Success)?.metadata
+        } else {
+            null
+        }
+
         val manifest = when (
             val resolved = GitHubReleasesParser.resolveCloudUpdateManifest(
                 release = latestStable,
                 sidecarManifest = sidecarManifest,
-                sidecarSha256Text = sidecarShaText
+                sidecarSha256Text = sidecarShaText,
+                remoteApkMetadata = remoteApkMetadata,
+                expectedPackageName = BuildConfig.APPLICATION_ID
             )
         ) {
             is GitHubManifestResolution.Resolved -> resolved.manifest
-            else -> return null
+            else -> unifiedManifest ?: return null
         }
 
+        val sourceLabel = when {
+            sidecarManifest != null -> CloudUpdateManager.VERSION_JSON_SOURCE_LABEL
+            remoteApkMetadata != null -> CloudUpdateManager.APK_MANIFEST_SOURCE_LABEL
+            else -> CloudUpdateManager.GITHUB_SOURCE_LABEL
+        }
         preferencesStore.recordCheckResult(
             epochMillis = clock.nowEpochMillis(),
             serverStatus = UpdateServerConnectionStatus.CONNECTED,
-            sourceLabel = CloudUpdateManager.GITHUB_SOURCE_LABEL
+            sourceLabel = sourceLabel
         )
         return finalizeDetails(manifest, respectSnooze)
     }

@@ -101,9 +101,9 @@ object GitHubReleasesParser {
         RegexOption.IGNORE_CASE
     )
     private val SEMVER_PAREN_BUILD_REGEX = Regex(
-        """[vV]?\d+\.\d+(?:\.\d+)?\s*\(\s*(\d{1,9})\s*\)"""
+        """[vV]?\s*\d+\.\d+(?:\.\d+)?\s*\(\s*(\d{1,9})\s*\)"""
     )
-    private val SEMVER_EXTRACT_REGEX = Regex("""[vV]?(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?""")
+    private val SEMVER_EXTRACT_REGEX = Regex("""(?:release[-_\s]*)?[vV]?\s*(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?""", RegexOption.IGNORE_CASE)
 
     fun parseSingleRelease(rawJson: String): GitHubReleaseRecord? {
         val trimmed = rawJson.trim()
@@ -210,13 +210,19 @@ object GitHubReleasesParser {
 
     /**
      * Resolves a validated stable [GitHubReleaseRecord] into a [CloudUpdateManifest] using ONLY
-     * authentic declared `versionCode` metadata (`version.json` sidecar, or explicit `versionCode`
-     * / `Build` number in release notes or title). Never fabricates a synthetic `versionCode`.
+     * authentic `versionCode` metadata:
+     * 1. Unified `version.json` sidecar/manifest
+     * 2. Real binary `AndroidManifest.xml` extracted from the release's `Share-Flow.apk` ([remoteApkMetadata])
+     * 3. Explicit numeric `versionCode` / `Build` number in release notes or title
+     *
+     * Never fabricates or guesses a synthetic `versionCode` from a GitHub tag or release name.
      */
     fun resolveCloudUpdateManifest(
         release: GitHubReleaseRecord,
         sidecarManifest: CloudUpdateManifest? = null,
-        sidecarSha256Text: String? = null
+        sidecarSha256Text: String? = null,
+        remoteApkMetadata: RemoteApkManifestMetadata? = null,
+        expectedPackageName: String? = null
     ): GitHubManifestResolution {
         if (release.isDraft || release.isPrerelease) {
             return GitHubManifestResolution.SkippedNonStable
@@ -239,6 +245,33 @@ object GitHubReleasesParser {
             ?: extractSha256FromText(release.body)
             ?: return GitHubManifestResolution.MissingApkOrChecksum(release)
 
+        // Cross-check real APK binary manifest metadata whenever available
+        if (remoteApkMetadata != null) {
+            if (!expectedPackageName.isNullOrBlank() && remoteApkMetadata.packageName != expectedPackageName) {
+                return GitHubManifestResolution.MetadataConflict(
+                    release = release,
+                    detail = "Release ${release.tagName} APK package '${remoteApkMetadata.packageName}' does not match installed package '$expectedPackageName'."
+                )
+            }
+            if (sidecarManifest != null && sidecarManifest.versionCode != remoteApkMetadata.versionCode) {
+                return GitHubManifestResolution.MetadataConflict(
+                    release = release,
+                    detail = "Release ${release.tagName} version.json declares versionCode ${sidecarManifest.versionCode}, but Share-Flow.apk contains versionCode ${remoteApkMetadata.versionCode}."
+                )
+            }
+            val normApkName = normalizeVersionName(remoteApkMetadata.versionName)
+            val normReleaseName = normalizeVersionName(release.versionName)
+            if (normApkName.isNotBlank() &&
+                normReleaseName.isNotBlank() &&
+                !normApkName.equals(normReleaseName, ignoreCase = true)
+            ) {
+                return GitHubManifestResolution.MetadataConflict(
+                    release = release,
+                    detail = "GitHub release tag ${release.tagName} (v$normReleaseName) conflicts with Share-Flow.apk versionName v$normApkName (versionCode ${remoteApkMetadata.versionCode})."
+                )
+            }
+        }
+
         val sidecarVersionName = sidecarManifest?.versionName?.trim().orEmpty()
         if (sidecarVersionName.isNotBlank() && release.versionName.isNotBlank()) {
             val normalizedSidecar = normalizeVersionName(sidecarVersionName)
@@ -254,8 +287,14 @@ object GitHubReleasesParser {
             }
         }
 
-        val resolvedVersionName = sidecarVersionName.ifBlank { release.versionName }
+        val resolvedVersionName = normalizeVersionName(
+            sidecarVersionName
+                .ifBlank { remoteApkMetadata?.versionName.orEmpty() }
+                .ifBlank { release.versionName }
+        ).ifBlank { release.versionName }
+
         val resolvedVersionCode = sidecarManifest?.versionCode?.takeIf { it > 0 }
+            ?: remoteApkMetadata?.versionCode?.takeIf { it > 0 }
             ?: extractVersionCodeFromText(release.body)
             ?: extractVersionCodeFromText(release.name)
             ?: return GitHubManifestResolution.MissingVersionCode(release)
@@ -263,6 +302,10 @@ object GitHubReleasesParser {
         val resolvedSize = sidecarManifest?.fileSizeBytes?.takeIf { it > 0L }
             ?: apkAsset?.sizeBytes
             ?: 0L
+
+        val resolvedMinSdk = sidecarManifest?.minSupportedAndroidSdk
+            ?: remoteApkMetadata?.minSdkVersion?.coerceAtLeast(21)
+            ?: 24
 
         val notesAr = sidecarManifest?.releaseNotesAr?.ifBlank { release.body } ?: release.body
         val notesEn = sidecarManifest?.releaseNotesEn?.ifBlank { release.body } ?: release.body
@@ -274,7 +317,7 @@ object GitHubReleasesParser {
                 apkDownloadUrl = resolvedApkUrl,
                 sha256 = resolvedSha256.lowercase(),
                 fileSizeBytes = resolvedSize,
-                minSupportedAndroidSdk = sidecarManifest?.minSupportedAndroidSdk ?: 24,
+                minSupportedAndroidSdk = resolvedMinSdk,
                 mandatory = sidecarManifest?.mandatory ?: false,
                 releaseNotesAr = notesAr.take(2000),
                 releaseNotesEn = notesEn.take(2000),

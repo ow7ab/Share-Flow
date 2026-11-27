@@ -30,13 +30,12 @@ fun cloudUpdateErrorReasonStringRes(reason: CloudUpdateErrorReason): Int = when 
 }
 
 /**
- * Returns `true` when displaying the technical diagnostic detail line (containing actual vs expected
- * `versionCode` / `versionName` values) helps users and maintainers immediately identify a version
- * or metadata conflict.
+ * Returns `true` when displaying the structured technical diagnostic detail line helps users and
+ * maintainers identify the exact reason an update check, download, or APK verification failed
+ * (HTTP status, attempted sources, actual vs expected versionCode/versionName, or APK error).
  */
-fun shouldShowUpdateErrorDetail(reason: CloudUpdateErrorReason): Boolean = reason in setOf(
-    CloudUpdateErrorReason.DUPLICATE_VERSION_CONFLICT,
-    CloudUpdateErrorReason.VERSION_METADATA_MISMATCH,
-    CloudUpdateErrorReason.DOWNGRADE_BLOCKED,
-    CloudUpdateErrorReason.UNREADABLE_VERSION_METADATA
+fun shouldShowUpdateErrorDetail(reason: CloudUpdateErrorReason): Boolean = reason !in setOf(
+    CloudUpdateErrorReason.NO_INTERNET,
+    CloudUpdateErrorReason.INSTALL_PERMISSION_REQUIRED,
+    CloudUpdateErrorReason.INSTALL_LAUNCH_FAILED
 )

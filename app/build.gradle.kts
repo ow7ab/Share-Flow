@@ -103,8 +103,15 @@ android {
     unitTests {
       isIncludeAndroidResources = true
       all { test ->
-        test.maxHeapSize = "1024m"
-        test.forkEvery = 10L
+        test.maxHeapSize = "2048m"
+        test.forkEvery = 25L
+        test.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
+        test.testLogging {
+          events("failed", "skipped")
+          showExceptions = true
+          showCauses = true
+          showStackTraces = true
+        }
         listOf(
           "robolectric.offline",
           "robolectric.dependency.dir",

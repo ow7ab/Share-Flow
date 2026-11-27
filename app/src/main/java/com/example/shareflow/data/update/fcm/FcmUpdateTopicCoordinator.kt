@@ -8,6 +8,7 @@ import com.example.shareflow.data.update.UpdatePreferencesStore
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 /**
@@ -34,26 +35,29 @@ class FirebaseFcmTopicBackend(
 
     override suspend fun subscribeToTopic(topic: String): Boolean {
         if (!isFirebaseConfigured()) return false
-        return suspendCancellableCoroutine { cont ->
-            runCatching {
-                FirebaseMessaging.getInstance()
-                    .subscribeToTopic(topic)
-                    .addOnCompleteListener { task ->
-                        if (cont.isActive) {
-                            cont.resume(task.isSuccessful)
+        return withTimeoutOrNull(SUBSCRIBE_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                runCatching {
+                    FirebaseMessaging.getInstance()
+                        .subscribeToTopic(topic)
+                        .addOnCompleteListener { task ->
+                            if (cont.isActive) {
+                                cont.resume(task.isSuccessful)
+                            }
                         }
+                }.onFailure { err ->
+                    Log.w(TAG, "FCM topic subscription error: ${err.javaClass.simpleName}")
+                    if (cont.isActive) {
+                        cont.resume(false)
                     }
-            }.onFailure { err ->
-                Log.w(TAG, "FCM topic subscription error: ${err.javaClass.simpleName}")
-                if (cont.isActive) {
-                    cont.resume(false)
                 }
             }
-        }
+        } ?: false
     }
 
     companion object {
         private const val TAG = "ShareFlowFcmBackend"
+        private const val SUBSCRIBE_TIMEOUT_MS = 5_000L
     }
 }
 
