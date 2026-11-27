@@ -63,11 +63,13 @@ test("release.yml preserves name, unified triggers, concurrency, atomic draft->p
   // Final summary step
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
 
-  // Must use REST gh api instead of GraphQL gh repo view, sanitize GH_TOKEN, and handle HTTP 401 cleanly
+  // Must use REST gh api instead of GraphQL gh repo view, sanitize GH_TOKEN & KEYSTORE_SETUP_TOKEN, and fail fast on HTTP 401
   assert.doesNotMatch(yml, /\bgh repo view\b/, "Must use REST gh api repos/... instead of GraphQL gh repo view");
   assert.match(yml, /gh api "repos\/\$\{PUBLIC_REPO\}"/, "Expected REST gh api repository verification");
+  assert.match(yml, /gh api "repos\/\$\{SOURCE_REPO\}\/actions\/secrets\?per_page=100"/, "Expected fail-fast KEYSTORE_SETUP_TOKEN pre-check before JDK setup");
   assert.match(yml, /401\|Bad credentials/, "Expected explicit HTTP 401 Bad credentials diagnostic handling");
   assert.match(yml, /tr -d '\\r\\n'/, "Expected CR/LF sanitization for secrets/tokens");
+  assert.match(yml, /s\/\^\(Bearer\|token\)/, "Expected Bearer/token prefix sanitization for KEYSTORE_SETUP_TOKEN");
 
   // Sibling workflows must remain intact
   for (const wf of [
@@ -79,6 +81,10 @@ test("release.yml preserves name, unified triggers, concurrency, atomic draft->p
   ]) {
     assert.ok(fs.existsSync(path.join(ROOT_DIR, ".github/workflows", wf)), `Missing sibling workflow: ${wf}`);
   }
+
+  const ksYml = fs.readFileSync(path.join(ROOT_DIR, ".github/workflows/generate-release-keystore.yml"), "utf8");
+  assert.match(ksYml, /s\/\^\(Bearer\|token\)/, "Expected KEYSTORE_SETUP_TOKEN sanitization in generate-release-keystore.yml");
+  assert.match(ksYml, /401\|Bad credentials/, "Expected HTTP 401 diagnostic in generate-release-keystore.yml");
 });
 
 test("release_helpers validate-prebuild succeeds on current app/build.gradle.kts with lower previous versionCode", () => {

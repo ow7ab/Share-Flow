@@ -95,32 +95,13 @@ jobs:
             echo "Running in SAFE DRY-RUN mode: no GitHub Release or website manifest changes will be published."
           fi
 
-          # When triggered by a branch push to main (e.g. from Google AI Studio), only cut a release
-          # if app/build.gradle.kts changed AND the resulting versionName is not already published.
+          # When triggered by a branch push to main (e.g. from Google AI Studio), cut a release
+          # whenever the versionName in app/build.gradle.kts is not yet published in TARGET_REPO.
           if [ "$EVENT_NAME" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
             if [ "$ACTOR" = "shareflow-release-bot" ] || printf '%s' "$HEAD_COMMIT_MSG" | grep -Eqi '\[skip (ci|release)\]'; then
               echo "Skipping automatic release for bot or [skip release] commit."
               echo "should_release=false" >> "$GITHUB_OUTPUT"
               echo "skip_reason=Automated docs/bot commit ([skip release])" >> "$GITHUB_OUTPUT"
-              echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
-              echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
-              echo "dry_run=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            GRADLE_CHANGED="false"
-            if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
-              if git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" | grep -Fxq "app/build.gradle.kts"; then
-                GRADLE_CHANGED="true"
-              fi
-            else
-              GRADLE_CHANGED="true"
-            fi
-
-            if [ "$GRADLE_CHANGED" != "true" ]; then
-              echo "app/build.gradle.kts was not modified in this push to main; skipping automatic release."
-              echo "should_release=false" >> "$GITHUB_OUTPUT"
-              echo "skip_reason=No version bump in app/build.gradle.kts on main push" >> "$GITHUB_OUTPUT"
               echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
               echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
               echo "dry_run=false" >> "$GITHUB_OUTPUT"
@@ -156,8 +137,22 @@ jobs:
                 echo "dry_run=false" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
+            else
+              rm -f "$EXISTING_RELEASES_JSON"
+              # Fallback when GitHub API is transiently unavailable: only proceed if app/build.gradle.kts changed
+              if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+                if ! git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" | grep -Fxq "app/build.gradle.kts"; then
+                  echo "Could not query releases API and app/build.gradle.kts did not change; skipping automatic release."
+                  echo "should_release=false" >> "$GITHUB_OUTPUT"
+                  echo "skip_reason=No version bump in app/build.gradle.kts on main push" >> "$GITHUB_OUTPUT"
+                  echo "public_repo=${TARGET_REPO}" >> "$GITHUB_OUTPUT"
+                  echo "portal_url=${PORTAL_URL}" >> "$GITHUB_OUTPUT"
+                  echo "dry_run=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+              fi
             fi
-            echo "Detected new version '${RELEASE_TAG}' in app/build.gradle.kts on main push — proceeding with automated release."
+            echo "Detected unpublished version '${RELEASE_TAG}' in app/build.gradle.kts on main push — proceeding with automated release."
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             RELEASE_TAG=$(printf '%s' "$INPUT_TAG" | tr -d '[:space:]')
             if [ -z "$RELEASE_TAG" ]; then
@@ -171,11 +166,48 @@ jobs:
             RELEASE_TAG="$REF_NAME"
           fi
 
+          # Sanitize KEYSTORE_SETUP_TOKEN against copy/paste whitespace, CR/LF, surrounding quotes, or Bearer/token prefix
+          SETUP_TOKEN="$(printf '%s' "${SETUP_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/^["'"'"']+|["'"'"']+$//g; s/^(Bearer|token)[[:space:]]+//I')"
+
           # Safe first-time keystore bootstrap is allowed ONLY when ALL signing secrets & cert pin are absent AND KEYSTORE_SETUP_TOKEN is provided.
           BOOTSTRAP_KEYSTORE="false"
           if [ -z "$KEYSTORE_B64" ] && [ -z "$STORE_PW" ] && [ -z "$KEY_PW" ] && [ -z "$EXPECTED_CERT" ] && [ -n "$SETUP_TOKEN" ]; then
             BOOTSTRAP_KEYSTORE="true"
-            echo "First-time setup detected: permanent release signing secrets are absent and KEYSTORE_SETUP_TOKEN is configured. Will perform guarded one-time keystore bootstrap and save permanently to Repository Secrets."
+            echo "First-time setup detected: permanent release signing secrets are absent and KEYSTORE_SETUP_TOKEN is configured. Validating KEYSTORE_SETUP_TOKEN before build..."
+
+            SETUP_CHECK_ERR="${RUNNER_TEMP}/setup-token-check.err"
+            rm -f "$SETUP_CHECK_ERR"
+            if ! GH_TOKEN="$SETUP_TOKEN" gh api "repos/${SOURCE_REPO}/actions/secrets?per_page=100" >/dev/null 2>"$SETUP_CHECK_ERR"; then
+              ERR_MSG=$(tr '\n' ' ' < "$SETUP_CHECK_ERR" | sed -E 's/[[:space:]]+/ /g')
+              rm -f "$SETUP_CHECK_ERR"
+              {
+                echo "## Action Required: Refresh \`KEYSTORE_SETUP_TOKEN\` (HTTP 401/403)"
+                echo ""
+                echo "First-time permanent Android release keystore bootstrap could not authenticate to \`${SOURCE_REPO}\` Actions Secrets."
+                echo ""
+                echo "**GitHub API response:** \`${ERR_MSG}\`"
+                echo ""
+                echo "### Quick Fix (1 minute)"
+                echo "1. Open **[Create Fine-grained Personal Access Token](https://github.com/settings/personal-access-tokens/new)**."
+                echo "2. Under **Repository access**, choose **Only select repositories** → \`${SOURCE_REPO}\`."
+                echo "3. Under **Repository permissions**, set **Secrets** to **Read and write** (Metadata: Read-only is auto-selected)."
+                echo "4. Click **Generate token** and copy the full token (\`github_pat_...\`)."
+                echo "5. Open **[Repository Secrets](https://github.com/${SOURCE_REPO}/settings/secrets/actions)** → edit \`KEYSTORE_SETUP_TOKEN\` → paste the new token → **Update secret**."
+                echo "6. Click **Re-run all jobs** on this workflow. It will generate your permanent release keystore once, save all 5 signing secrets, delete \`KEYSTORE_SETUP_TOKEN\`, and publish \`${RELEASE_TAG}\` automatically."
+              } >> "$GITHUB_STEP_SUMMARY"
+
+              if printf '%s' "$ERR_MSG" | grep -Eqi '401|Bad credentials'; then
+                echo "::error::KEYSTORE_SETUP_TOKEN was rejected by GitHub (HTTP 401: Bad credentials). The saved token is expired, revoked, or malformed."
+              elif printf '%s' "$ERR_MSG" | grep -Eqi '403|404|Resource not accessible'; then
+                echo "::error::KEYSTORE_SETUP_TOKEN is valid but lacks permission 'Secrets: Read and write' on '${SOURCE_REPO}' (${ERR_MSG})."
+              else
+                echo "::error::KEYSTORE_SETUP_TOKEN failed validation against '${SOURCE_REPO}' Actions Secrets: ${ERR_MSG}"
+              fi
+              echo "::error::Update secret KEYSTORE_SETUP_TOKEN in https://github.com/${SOURCE_REPO}/settings/secrets/actions with a new Fine-grained PAT (Secrets: Read and write on ${SOURCE_REPO}), then click Re-run jobs."
+              exit 1
+            fi
+            rm -f "$SETUP_CHECK_ERR"
+            echo "Verified KEYSTORE_SETUP_TOKEN has Actions Secrets write access on '${SOURCE_REPO}'."
           fi
 
           MISSING=()
@@ -367,6 +399,10 @@ jobs:
           KEYSTORE_FILE="${RUNNER_TEMP}/shareflow-release-key.jks"
 
           if [ "$BOOTSTRAP_KEYSTORE" = "true" ]; then
+            # Sanitize KEYSTORE_SETUP_TOKEN against copy/paste whitespace, CR/LF, surrounding quotes, or Bearer/token prefix
+            GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/^["'"'"']+|["'"'"']+$//g; s/^(Bearer|token)[[:space:]]+//I')"
+            export GH_TOKEN
+
             echo "Running guarded one-time permanent release keystore bootstrap for '${SOURCE_REPO}'..."
             if ! EXISTING_SECRETS=$(gh secret list --app actions --repo "$SOURCE_REPO" --json name --jq '.[].name' 2>&1); then
               echo "::error::KEYSTORE_SETUP_TOKEN failed to access Actions Secrets on '${SOURCE_REPO}': ${EXISTING_SECRETS}"
