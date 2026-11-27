@@ -69,7 +69,9 @@ test("release.yml preserves name, unified triggers, concurrency, atomic draft->p
   assert.match(yml, /gh api "repos\/\$\{SOURCE_REPO\}\/actions\/secrets\?per_page=100"/, "Expected fail-fast KEYSTORE_SETUP_TOKEN pre-check before JDK setup");
   assert.match(yml, /401\|Bad credentials/, "Expected explicit HTTP 401 Bad credentials diagnostic handling");
   assert.match(yml, /tr -d '\\r\\n'/, "Expected CR/LF sanitization for secrets/tokens");
-  assert.match(yml, /s\/\^\(Bearer\|token\)/, "Expected Bearer/token prefix sanitization for KEYSTORE_SETUP_TOKEN");
+  assert.match(yml, /\(\?:Bearer\|token\)/, "Expected Bearer/token prefix sanitization for KEYSTORE_SETUP_TOKEN");
+  assert.match(yml, /\\u200b-\\u200f/, "Expected invisible Unicode RTL/zero-width sanitization for mobile copy/paste");
+  assert.match(yml, /TOKEN_DIAG/, "Expected non-sensitive token format/length diagnostic on failure");
 
   // Sibling workflows must remain intact
   for (const wf of [
@@ -83,7 +85,8 @@ test("release.yml preserves name, unified triggers, concurrency, atomic draft->p
   }
 
   const ksYml = fs.readFileSync(path.join(ROOT_DIR, ".github/workflows/generate-release-keystore.yml"), "utf8");
-  assert.match(ksYml, /s\/\^\(Bearer\|token\)/, "Expected KEYSTORE_SETUP_TOKEN sanitization in generate-release-keystore.yml");
+  assert.match(ksYml, /\(\?:Bearer\|token\)/, "Expected KEYSTORE_SETUP_TOKEN sanitization in generate-release-keystore.yml");
+  assert.match(ksYml, /\\u200b-\\u200f/, "Expected Unicode bidi/zero-width sanitization in generate-release-keystore.yml");
   assert.match(ksYml, /401\|Bad credentials/, "Expected HTTP 401 diagnostic in generate-release-keystore.yml");
 });
 

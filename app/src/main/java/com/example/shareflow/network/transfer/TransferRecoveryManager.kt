@@ -203,6 +203,13 @@ class TransferRecoveryManager(
     ): Pair<Int, Long> {
         val existingSession = transferRepository.getSessionById(sessionId) ?: return 0 to 0L
         if (!existingSession.peer.deviceId.equals(peer.deviceId, ignoreCase = true)) return 0 to 0L
+        val expectedFp = existingSession.peer.publicKeyFingerprint
+        val actualFp = peer.publicKeyFingerprint
+        if (!expectedFp.isNullOrBlank() && !actualFp.isNullOrBlank() &&
+            !expectedFp.equals(actualFp, ignoreCase = true)
+        ) {
+            return 0 to 0L
+        }
         if (existingSession.chunkSizeBytes != chunkSizeBytes) return 0 to 0L
 
         val existingItem: TransferItem = existingSession.transferItems

@@ -628,17 +628,21 @@ class SmartConnectionCoordinator(
 
                 outer@ for (attempt in 0 until 2) {
                     for (host in candidateHosts) {
+                        var created: Socket? = null
                         val candidateSocket = runCatching {
-                            val created = if (boundHandle != null) {
+                            val socketToConnect = if (boundHandle != null) {
                                 senderWifiConnector.createBoundTcpSocket(boundHandle)
                             } else {
                                 Socket()
                             }
-                            created.connect(
+                            created = socketToConnect
+                            socketToConnect.connect(
                                 InetSocketAddress(host, endpoint.port),
                                 TransferProtocol.SOCKET_CONNECT_TIMEOUT_MS
                             )
-                            created
+                            socketToConnect
+                        }.onFailure {
+                            runCatching { created?.close() }
                         }
                         if (candidateSocket.isSuccess) {
                             connectedSocket = candidateSocket.getOrNull()
@@ -848,7 +852,16 @@ class SmartConnectionCoordinator(
 
     fun shutdown() {
         expiryWatcherJob?.cancel()
+        runCatching {
+            kotlinx.coroutines.runBlocking(dispatchers.io) {
+                kotlinx.coroutines.withTimeoutOrNull(1_500L) {
+                    runCatching { sessionDiscovery.stopSessionAdvertising() }
+                    runCatching { receiverHotspotController.stopHotspot() }
+                }
+            }
+        }
         runCatching { senderWifiConnector.releaseNetwork() }
+        activeBoundNetwork = null
         baseCoordinator.clearSmartListeners()
         scope.cancel()
     }

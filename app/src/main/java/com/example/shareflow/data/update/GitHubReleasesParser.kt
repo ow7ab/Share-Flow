@@ -100,7 +100,7 @@ object GitHubReleasesParser {
         """(?:versionCode|build(?:\s+number)?|البناء)\s*[:=#]?\s*(\d{1,9})""",
         RegexOption.IGNORE_CASE
     )
-    private val SEMVER_EXTRACT_REGEX = Regex("""[vV]?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?""")
+    private val SEMVER_EXTRACT_REGEX = Regex("""[vV]?(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?""")
 
     fun parseSingleRelease(rawJson: String): GitHubReleaseRecord? {
         val trimmed = rawJson.trim()
@@ -319,12 +319,14 @@ object GitHubReleasesParser {
 
     fun normalizeVersionName(tagName: String, releaseName: String = ""): String {
         val fromTag = SEMVER_EXTRACT_REGEX.find(tagName)?.let { match ->
-            "${match.groupValues[1]}.${match.groupValues[2]}.${match.groupValues[3]}"
+            val patch = match.groupValues[3].ifBlank { "0" }
+            "${match.groupValues[1]}.${match.groupValues[2]}.$patch"
         }
         if (!fromTag.isNullOrBlank()) return fromTag
 
         val fromName = SEMVER_EXTRACT_REGEX.find(releaseName)?.let { match ->
-            "${match.groupValues[1]}.${match.groupValues[2]}.${match.groupValues[3]}"
+            val patch = match.groupValues[3].ifBlank { "0" }
+            "${match.groupValues[1]}.${match.groupValues[2]}.$patch"
         }
         if (!fromName.isNullOrBlank()) return fromName
 
@@ -415,7 +417,7 @@ object GitHubReleasesParser {
             return intArrayOf(
                 match.groupValues[1].toIntOrNull() ?: 0,
                 match.groupValues[2].toIntOrNull() ?: 0,
-                match.groupValues[3].toIntOrNull() ?: 0
+                match.groupValues[3].ifBlank { "0" }.toIntOrNull() ?: 0
             )
         }
         val pieces = raw.trim().removePrefix("v").removePrefix("V").split('.')

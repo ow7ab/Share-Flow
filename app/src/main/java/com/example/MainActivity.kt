@@ -18,8 +18,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import android.content.Intent
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.shareflow.core.di.LocalAppContainer
 import com.example.shareflow.data.update.fcm.ShareFlowUpdateNotificationManager
 import com.example.shareflow.domain.model.ThemeMode
@@ -105,7 +105,7 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            val externalRoute by pendingNavigationRoute.collectAsState()
+            val externalRoute by pendingNavigationRoute.collectAsStateWithLifecycle()
             CompositionLocalProvider(LocalAppContainer provides appContainer) {
                 ShareFlowApp(
                     initialSettings = initialSettings,

@@ -423,7 +423,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
             connectionCoordinator = connectionCoordinator,
             transferRepository = transferRepository,
             transferQueue = TransferQueue(),
-            transferScheduler = TransferScheduler(dispatchers = dispatchers),
+            transferScheduler = TransferScheduler(
+                dispatchers = dispatchers,
+                maxConcurrentTransfers = 1
+            ),
             transferSender = TransferSender(
                 chunkProcessor = chunkProcessor,
                 verifier = transferVerifier,
@@ -443,7 +446,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
             destinationRootProvider = { ChunkProcessor.defaultReceiveRoot(appContext) },
             dispatchers = dispatchers,
             clock = clock,
-            requireExplicitOfferApproval = true
+            requireExplicitOfferApproval = true,
+            chunkProcessor = chunkProcessor
         )
     }
 

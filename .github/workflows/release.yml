@@ -166,8 +166,18 @@ jobs:
             RELEASE_TAG="$REF_NAME"
           fi
 
-          # Sanitize KEYSTORE_SETUP_TOKEN against copy/paste whitespace, CR/LF, surrounding quotes, or Bearer/token prefix
-          SETUP_TOKEN="$(printf '%s' "${SETUP_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/^["'"'"']+|["'"'"']+$//g; s/^(Bearer|token)[[:space:]]+//I')"
+          # Sanitize KEYSTORE_SETUP_TOKEN against mobile copy/paste whitespace, CR/LF, invisible RTL/zero-width Unicode marks, quotes, or Bearer/token prefix
+          SETUP_TOKEN="$(RAW_TOKEN="${SETUP_TOKEN:-}" python3 - <<'SAN_PYEOF'
+          import os, re
+          s = os.environ.get("RAW_TOKEN", "")
+          s = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\u00a0]", "", s)
+          s = s.strip().strip("\"'“”‘’")
+          s = re.sub(r"^(?:Bearer|token)\s+", "", s, flags=re.I)
+          s = s.strip().strip("\"'“”‘’")
+          s = re.sub(r"\s+", "", s)
+          print(s, end="")
+          SAN_PYEOF
+          )"
 
           # Safe first-time keystore bootstrap is allowed ONLY when ALL signing secrets & cert pin are absent AND KEYSTORE_SETUP_TOKEN is provided.
           BOOTSTRAP_KEYSTORE="false"
@@ -180,12 +190,27 @@ jobs:
             if ! GH_TOKEN="$SETUP_TOKEN" gh api "repos/${SOURCE_REPO}/actions/secrets?per_page=100" >/dev/null 2>"$SETUP_CHECK_ERR"; then
               ERR_MSG=$(tr '\n' ' ' < "$SETUP_CHECK_ERR" | sed -E 's/[[:space:]]+/ /g')
               rm -f "$SETUP_CHECK_ERR"
+              TOKEN_DIAG="$(CLEAN_TOKEN="$SETUP_TOKEN" python3 - <<'PYEOF'
+          import os
+          t = os.environ.get("CLEAN_TOKEN", "")
+          if t.startswith("github_pat_"):
+              fmt = "github_pat_ (Fine-grained PAT)"
+          elif t.startswith("ghp_"):
+              fmt = "ghp_ (Classic PAT)"
+          elif t.startswith(("gho_", "ghu_", "ghs_", "ghr_")):
+              fmt = "gh*_ (non-PAT token)"
+          else:
+              fmt = "UNRECOGNIZED (must start with github_pat_ or ghp_)"
+          print(f"format={fmt}, length={len(t)}", end="")
+          PYEOF
+              )"
               {
                 echo "## Action Required: Refresh \`KEYSTORE_SETUP_TOKEN\` (HTTP 401/403)"
                 echo ""
                 echo "First-time permanent Android release keystore bootstrap could not authenticate to \`${SOURCE_REPO}\` Actions Secrets."
                 echo ""
-                echo "**GitHub API response:** \`${ERR_MSG}\`"
+                echo "- **Token diagnostic (non-sensitive):** \`${TOKEN_DIAG}\`"
+                echo "- **GitHub API response:** \`${ERR_MSG}\`"
                 echo ""
                 echo "### Quick Fix (1 minute)"
                 echo "1. Open **[Create Fine-grained Personal Access Token](https://github.com/settings/personal-access-tokens/new)**."
@@ -197,13 +222,13 @@ jobs:
               } >> "$GITHUB_STEP_SUMMARY"
 
               if printf '%s' "$ERR_MSG" | grep -Eqi '401|Bad credentials'; then
-                echo "::error::KEYSTORE_SETUP_TOKEN was rejected by GitHub (HTTP 401: Bad credentials). The saved token is expired, revoked, or malformed."
+                echo "::error::KEYSTORE_SETUP_TOKEN was rejected by GitHub (HTTP 401: Bad credentials). Diagnostic: ${TOKEN_DIAG}. The saved token is expired, revoked, or not a valid GitHub PAT."
               elif printf '%s' "$ERR_MSG" | grep -Eqi '403|404|Resource not accessible'; then
-                echo "::error::KEYSTORE_SETUP_TOKEN is valid but lacks permission 'Secrets: Read and write' on '${SOURCE_REPO}' (${ERR_MSG})."
+                echo "::error::KEYSTORE_SETUP_TOKEN is valid (${TOKEN_DIAG}) but lacks permission 'Secrets: Read and write' on '${SOURCE_REPO}' (${ERR_MSG})."
               else
-                echo "::error::KEYSTORE_SETUP_TOKEN failed validation against '${SOURCE_REPO}' Actions Secrets: ${ERR_MSG}"
+                echo "::error::KEYSTORE_SETUP_TOKEN failed validation (${TOKEN_DIAG}) against '${SOURCE_REPO}' Actions Secrets: ${ERR_MSG}"
               fi
-              echo "::error::Update secret KEYSTORE_SETUP_TOKEN in https://github.com/${SOURCE_REPO}/settings/secrets/actions with a new Fine-grained PAT (Secrets: Read and write on ${SOURCE_REPO}), then click Re-run jobs."
+              echo "::error::Update secret KEYSTORE_SETUP_TOKEN in https://github.com/${SOURCE_REPO}/settings/secrets/actions with a fresh Fine-grained PAT (Secrets: Read and write on ${SOURCE_REPO}), then click Re-run jobs."
               exit 1
             fi
             rm -f "$SETUP_CHECK_ERR"
@@ -399,8 +424,18 @@ jobs:
           KEYSTORE_FILE="${RUNNER_TEMP}/shareflow-release-key.jks"
 
           if [ "$BOOTSTRAP_KEYSTORE" = "true" ]; then
-            # Sanitize KEYSTORE_SETUP_TOKEN against copy/paste whitespace, CR/LF, surrounding quotes, or Bearer/token prefix
-            GH_TOKEN="$(printf '%s' "${GH_TOKEN:-}" | tr -d '\r\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/^["'"'"']+|["'"'"']+$//g; s/^(Bearer|token)[[:space:]]+//I')"
+            # Sanitize KEYSTORE_SETUP_TOKEN against mobile copy/paste whitespace, CR/LF, invisible RTL/zero-width Unicode marks, quotes, or Bearer/token prefix
+            GH_TOKEN="$(RAW_TOKEN="${GH_TOKEN:-}" python3 - <<'SAN_PYEOF'
+          import os, re
+          s = os.environ.get("RAW_TOKEN", "")
+          s = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\u00a0]", "", s)
+          s = s.strip().strip("\"'“”‘’")
+          s = re.sub(r"^(?:Bearer|token)\s+", "", s, flags=re.I)
+          s = s.strip().strip("\"'“”‘’")
+          s = re.sub(r"\s+", "", s)
+          print(s, end="")
+          SAN_PYEOF
+            )"
             export GH_TOKEN
 
             echo "Running guarded one-time permanent release keystore bootstrap for '${SOURCE_REPO}'..."

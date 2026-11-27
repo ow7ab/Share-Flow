@@ -300,9 +300,12 @@ class LocalNetworkStrategy(
 
                 override fun onServiceInfoCallbackUnregistered() = Unit
             }
+            unregisterInfoCallback(mgr, serviceInfo.serviceName)
             activeInfoCallbacks[serviceInfo.serviceName] = callback
             runCatching {
                 mgr.registerServiceInfoCallback(serviceInfo, resolveExecutor, callback)
+            }.onFailure {
+                activeInfoCallbacks.remove(serviceInfo.serviceName, callback)
             }
         } else {
             resolveExecutor.execute {
@@ -369,7 +372,8 @@ class LocalNetworkStrategy(
             addresses.firstOrNull { !it.isLoopbackAddress }?.hostAddress?.let { return it }
         }
         @Suppress("DEPRECATION")
-        return info.host?.hostAddress
+        val legacyHost = info.host
+        return legacyHost?.takeIf { !it.isLoopbackAddress }?.hostAddress
     }
 
     private fun unregisterInfoCallback(mgr: NsdManager, serviceName: String) {

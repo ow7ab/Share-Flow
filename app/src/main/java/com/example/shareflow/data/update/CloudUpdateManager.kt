@@ -1118,6 +1118,7 @@ class CloudUpdateManager(
             }
 
             val updatesDir = File(appContext.cacheDir, UPDATES_CACHE_DIR).apply { mkdirs() }
+            cleanupStaleUpdateCacheFiles(updatesDir, keepVersionCode = manifest.versionCode)
             val targetFile = File(updatesDir, "shareflow-v${manifest.versionCode}.apk")
             val partFile = File(updatesDir, "${targetFile.name}.part")
             val canonicalBase = updatesDir.canonicalPath + File.separator
@@ -1398,6 +1399,24 @@ class CloudUpdateManager(
             CloudUpdateErrorReason.RATE_LIMITED -> UpdateServerConnectionStatus.RATE_LIMITED
             else -> UpdateServerConnectionStatus.ERROR
         }
+
+    internal fun cleanupStaleUpdateCacheFiles(updatesDir: File, keepVersionCode: Int): Int {
+        if (!updatesDir.exists() || !updatesDir.isDirectory) return 0
+        val keepApkName = "shareflow-v$keepVersionCode.apk"
+        val keepPartName = "$keepApkName.part"
+        var removed = 0
+        updatesDir.listFiles()?.forEach { child ->
+            if (!child.isFile) return@forEach
+            val name = child.name
+            if (name == keepApkName || name == keepPartName) return@forEach
+            if (name.startsWith("shareflow-v") && (name.endsWith(".apk") || name.endsWith(".apk.part"))) {
+                if (runCatching { child.delete() }.getOrDefault(false)) {
+                    removed++
+                }
+            }
+        }
+        return removed
+    }
 
     companion object {
         const val UPDATES_CACHE_DIR = "shareflow_updates"

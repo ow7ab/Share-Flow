@@ -161,16 +161,30 @@ object ApkInstallerIntentHelper {
         val canonicalReceiveRoot = runCatching { receiveRoot.canonicalFile }.getOrNull() ?: return null
         val rootPrefix = canonicalReceiveRoot.path.trimEnd(File.separatorChar) + File.separator
 
+        // Proactively clean up stale imported APK staging files older than 24 hours
+        cleanupStaleStagedApks(canonicalReceiveRoot)
+
         val stagedFile: File = if (scheme == "file") {
             val rawPath = incomingUri.path ?: return null
             val sourceFile = File(rawPath)
             if (!sourceFile.exists() || !sourceFile.isFile || sourceFile.length() <= 0L) return null
             val canonicalSource = runCatching { sourceFile.canonicalFile }.getOrNull() ?: return null
-            if (canonicalSource.path.startsWith(rootPrefix) &&
+
+            // Security boundary: NEVER read or stage files residing inside ShareFlow's private app
+            // directories (databases, SharedPreferences, DataStore, vault blobs, internal cache)
+            // unless the canonical path is strictly inside the designated ShareFlow receive root.
+            val isInsideReceiveRoot = canonicalSource.path.startsWith(rootPrefix)
+            if (!isInsideReceiveRoot && isInsidePrivateAppStorage(context, canonicalSource)) {
+                return null
+            }
+
+            if (isInsideReceiveRoot &&
                 canonicalSource.extension.equals("apk", ignoreCase = true)
             ) {
                 canonicalSource
             } else {
+                // Pre-validate APK archive structure BEFORE copying any external file into staging
+                if (!isValidApkZip(canonicalSource)) return null
                 copyStreamToConfinedStaging(
                     receiveRoot = canonicalReceiveRoot,
                     displayName = sourceFile.name,
@@ -190,7 +204,11 @@ object ApkInstallerIntentHelper {
         }
 
         if (!isValidApkZip(stagedFile)) {
-            runCatching { stagedFile.delete() }
+            if (!stagedFile.canonicalPath.startsWith(rootPrefix) ||
+                stagedFile.parentFile?.name == STAGING_SUBDIR
+            ) {
+                runCatching { stagedFile.delete() }
+            }
             return null
         }
 
@@ -218,6 +236,42 @@ object ApkInstallerIntentHelper {
             sizeBytes = stagedFile.length(),
             sha256 = sha256
         )
+    }
+
+    internal fun isInsidePrivateAppStorage(context: Context, canonicalFile: File): Boolean {
+        val candidatePath = canonicalFile.path
+        val privateRoots = buildList {
+            runCatching { context.filesDir?.canonicalFile }.getOrNull()?.let { add(it) }
+            runCatching { context.cacheDir?.canonicalFile }.getOrNull()?.let { add(it) }
+            runCatching { context.noBackupFilesDir?.canonicalFile }.getOrNull()?.let { add(it) }
+            runCatching { context.codeCacheDir?.canonicalFile }.getOrNull()?.let { add(it) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                runCatching { context.dataDir?.canonicalFile }.getOrNull()?.let { add(it) }
+            }
+            runCatching { context.filesDir?.parentFile?.canonicalFile }.getOrNull()?.let { add(it) }
+        }
+        return privateRoots.any { root ->
+            val prefix = root.path.trimEnd(File.separatorChar) + File.separator
+            candidatePath == root.path || candidatePath.startsWith(prefix)
+        }
+    }
+
+    internal fun cleanupStaleStagedApks(
+        receiveRoot: File,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+        maxAgeMillis: Long = STALE_STAGING_MAX_AGE_MS
+    ): Int {
+        val stagingDir = File(receiveRoot, STAGING_SUBDIR)
+        if (!stagingDir.exists() || !stagingDir.isDirectory) return 0
+        var removed = 0
+        stagingDir.listFiles()?.forEach { child ->
+            if (child.isFile && (nowEpochMillis - child.lastModified()) > maxAgeMillis) {
+                if (runCatching { child.delete() }.getOrDefault(false)) {
+                    removed++
+                }
+            }
+        }
+        return removed
     }
 
     private fun copyStreamToConfinedStaging(
@@ -280,6 +334,7 @@ object ApkInstallerIntentHelper {
     }.getOrDefault(false)
 
     private const val STAGING_SUBDIR = "external_apk_imports"
+    private const val STALE_STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1000L
 }
 
 data class StagedIncomingApk(

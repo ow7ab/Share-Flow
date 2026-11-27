@@ -421,6 +421,45 @@ class ChunkProcessor(
         }
     }
 
+    /**
+     * Sweeps orphaned `.part` staging directories under `.shareflow_staging` that do NOT belong
+     * to any active or resumable Room session and whose files are older than [minAgeMillis].
+     * Protects all active/resumable sessions so valid resume checkpoints are never touched.
+     */
+    fun cleanupOrphanedStagingDirs(
+        destinationRoot: File,
+        protectedSessionIds: Set<String>,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+        minAgeMillis: Long = ORPHAN_STAGING_MIN_AGE_MS
+    ): Int {
+        val stagingRoot = File(destinationRoot, ".shareflow_staging")
+        if (!stagingRoot.exists() || !stagingRoot.isDirectory) return 0
+        val protectedSanitized = protectedSessionIds.map { sanitizeStagingSegment(it) }.toSet()
+        var deletedFiles = 0
+        stagingRoot.listFiles()?.forEach { sessionDir ->
+            if (!sessionDir.isDirectory) return@forEach
+            if (sessionDir.name in protectedSanitized) return@forEach
+            val children = sessionDir.listFiles().orEmpty()
+            var allStaleOrDeleted = true
+            for (child in children) {
+                val ageMs = (nowEpochMillis - child.lastModified()).coerceAtLeast(0L)
+                if (child.isFile && ageMs >= minAgeMillis) {
+                    if (runCatching { child.delete() }.getOrDefault(false)) {
+                        deletedFiles++
+                    } else {
+                        allStaleOrDeleted = false
+                    }
+                } else {
+                    allStaleOrDeleted = false
+                }
+            }
+            if (allStaleOrDeleted) {
+                runCatching { sessionDir.delete() }
+            }
+        }
+        return deletedFiles
+    }
+
     private fun sanitizeStagingSegment(raw: String): String =
         raw.replace(Regex("[^A-Za-z0-9_-]"), "_").ifBlank { "staging_item" }.take(96)
 
@@ -459,6 +498,10 @@ class ChunkProcessor(
 
     companion object {
         private const val MAX_DUPLICATE_ATTEMPTS = 10_000
+        const val ORPHAN_STAGING_MIN_AGE_MS = 60L * 60L * 1000L // 1 hour safety window
+
+        private val chunkSha256ThreadLocal: ThreadLocal<MessageDigest> =
+            ThreadLocal.withInitial { MessageDigest.getInstance("SHA-256") }
 
         fun calculateTotalChunks(fileSizeBytes: Long, chunkSizeBytes: Int): Int {
             if (fileSizeBytes <= 0L) return 0
@@ -466,8 +509,11 @@ class ChunkProcessor(
             return ((fileSizeBytes + cs - 1L) / cs).toInt()
         }
 
-        fun computeChunkSha256(data: ByteArray): ByteArray =
-            MessageDigest.getInstance("SHA-256").digest(data)
+        fun computeChunkSha256(data: ByteArray): ByteArray {
+            val digest = chunkSha256ThreadLocal.get() ?: MessageDigest.getInstance("SHA-256")
+            digest.reset()
+            return digest.digest(data)
+        }
 
         fun verifyChunkSha256(data: ByteArray, expectedDigest: ByteArray): Boolean {
             if (expectedDigest.size != 32) return false

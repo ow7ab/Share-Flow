@@ -193,18 +193,35 @@ class TransferReceiver(
             updatedAtEpochMillis = now
         )
 
+        var lastProgressEmitEpochMs = 0L
+
         fun publish(
             state: TransferState = currentSession.state,
             error: String? = currentSession.errorMessage,
             isResumable: Boolean = currentSession.isResumable,
             completedAt: Long? = currentSession.completedAtEpochMillis
         ) {
+            val emitNow = clock.nowEpochMillis()
+            val isSteadyProgressTick = state == TransferState.TRANSFERRING &&
+                currentSession.state == TransferState.TRANSFERRING &&
+                error == currentSession.errorMessage &&
+                isResumable == currentSession.isResumable &&
+                completedAt == currentSession.completedAtEpochMillis
+            val remaining = mutableItems.sumOf { (it.fileSizeBytes - it.bytesTransferred).coerceAtLeast(0L) }
+            if (isSteadyProgressTick &&
+                remaining > 0L &&
+                lastProgressEmitEpochMs > 0L &&
+                (emitNow - lastProgressEmitEpochMs) < PROGRESS_EMIT_INTERVAL_MS
+            ) {
+                return
+            }
+            lastProgressEmitEpochMs = emitNow
+
             val speed = if (state == TransferState.TRANSFERRING) {
                 speedTracker.currentSpeedBytesPerSec()
             } else {
                 0L
             }
-            val remaining = mutableItems.sumOf { (it.fileSizeBytes - it.bytesTransferred).coerceAtLeast(0L) }
             val eta = if (state == TransferState.TRANSFERRING) {
                 speedTracker.estimateRemainingSeconds(remaining)
             } else {
@@ -217,7 +234,7 @@ class TransferReceiver(
                 estimatedRemainingSeconds = eta,
                 errorMessage = error,
                 isResumable = isResumable,
-                updatedAtEpochMillis = clock.nowEpochMillis(),
+                updatedAtEpochMillis = emitNow,
                 completedAtEpochMillis = completedAt
             )
             progressListener.onSessionUpdated(currentSession)
@@ -349,7 +366,11 @@ class TransferReceiver(
 
                         when (writeRes) {
                             is AppResult.Failure -> {
-                                sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "CORRUPT_CHUNK", windowCredits)
+                                val ackFailRes = sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, item.bytesTransferred, false, "CORRUPT_CHUNK", windowCredits)
+                                if (ackFailRes is AppResult.Failure) {
+                                    closeAllStagingHandles()
+                                    return interruptSession(currentSession, mutableItems, "Lost connection sending chunk NACK", publishImmediate)
+                                }
                             }
 
                             is AppResult.Success -> {
@@ -393,7 +414,11 @@ class TransferReceiver(
                                     isResumable = true,
                                     completedAt = null
                                 )
-                                sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, writtenBytes, true, "", windowCredits)
+                                val ackRes = sendChunkAck(channel, pkt.itemId, pkt.chunkIndex, writtenBytes, true, "", windowCredits)
+                                if (ackRes is AppResult.Failure) {
+                                    closeAllStagingHandles()
+                                    return interruptSession(currentSession, mutableItems, "Lost connection sending chunk ACK", publishImmediate)
+                                }
                             }
                         }
                     }
@@ -718,21 +743,19 @@ class TransferReceiver(
         accepted: Boolean,
         errorCode: String,
         windowCredits: Int
-    ) {
-        channel.sendEncryptedFrame(
-            EncryptedPeerChannel.FRAME_TRANSFER_CHUNK_ACK,
-            TransferWireProtocol.encodeChunkAck(
-                TransferWireProtocol.ChunkAckPacket(
-                    itemId = itemId,
-                    chunkIndex = chunkIndex,
-                    bytesReceived = bytesReceived,
-                    accepted = accepted,
-                    errorCode = errorCode,
-                    windowCredits = windowCredits
-                )
+    ): AppResult<Unit> = channel.sendEncryptedFrame(
+        EncryptedPeerChannel.FRAME_TRANSFER_CHUNK_ACK,
+        TransferWireProtocol.encodeChunkAck(
+            TransferWireProtocol.ChunkAckPacket(
+                itemId = itemId,
+                chunkIndex = chunkIndex,
+                bytesReceived = bytesReceived,
+                accepted = accepted,
+                errorCode = errorCode,
+                windowCredits = windowCredits
             )
         )
-    }
+    )
 
     private fun sendFileVerified(
         channel: EncryptedPeerChannel,
@@ -863,5 +886,6 @@ class TransferReceiver(
         private const val PAUSED_WAIT_TIMEOUT_MS = 10 * 60 * 1_000
         private const val MAX_IN_FLIGHT_WINDOW_BYTES = 256 * 1024
         private const val CHECKPOINT_INTERVAL_CHUNKS = 8
+        private const val PROGRESS_EMIT_INTERVAL_MS = 100L
     }
 }

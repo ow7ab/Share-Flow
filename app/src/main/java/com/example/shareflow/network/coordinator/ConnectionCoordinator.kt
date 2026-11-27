@@ -660,30 +660,33 @@ class DefaultConnectionCoordinator(
         when (result) {
             is AppResult.Success -> {
                 val channel = result.data
-                activeChannel?.close()
-                activeChannel = channel
-                if (shouldRememberTrusted) {
-                    trustedDeviceRepository.saveTrustedDevice(
-                        channel.remotePeer.copy(isTrusted = true)
+                val connectedState = connectionMutex.withLock {
+                    activeChannel?.close()
+                    activeChannel = channel
+                    if (shouldRememberTrusted) {
+                        trustedDeviceRepository.saveTrustedDevice(
+                            channel.remotePeer.copy(isTrusted = true)
+                        )
+                    }
+                    val connectedPeer = channel.remotePeer.copy(
+                        isTrusted = shouldRememberTrusted || isCryptographicallyTrusted(
+                            channel.remotePeer.deviceId,
+                            channel.remotePeer.publicKeyFingerprint
+                        ),
+                        connectionStatus = PeerConnectionStatus.CONNECTED
                     )
+                    updatePeerStatus(connectedPeer.deviceId, PeerConnectionStatus.CONNECTED)
+                    val state = ConnectionState.Connected(
+                        peer = connectedPeer,
+                        sessionId = channel.sessionId,
+                        sasVerificationCode = channel.sasVerificationCode,
+                        isEncrypted = true,
+                        transport = connectedPeer.connectionType,
+                        isInitiator = false
+                    )
+                    _connectionState.value = state
+                    state
                 }
-                val connectedPeer = channel.remotePeer.copy(
-                    isTrusted = shouldRememberTrusted || isCryptographicallyTrusted(
-                        channel.remotePeer.deviceId,
-                        channel.remotePeer.publicKeyFingerprint
-                    ),
-                    connectionStatus = PeerConnectionStatus.CONNECTED
-                )
-                updatePeerStatus(connectedPeer.deviceId, PeerConnectionStatus.CONNECTED)
-                val connectedState = ConnectionState.Connected(
-                    peer = connectedPeer,
-                    sessionId = channel.sessionId,
-                    sasVerificationCode = channel.sasVerificationCode,
-                    isEncrypted = true,
-                    transport = connectedPeer.connectionType,
-                    isInitiator = false
-                )
-                _connectionState.value = connectedState
                 smartHandshakeCompleteListener?.invoke(AppResult.Success(connectedState))
             }
 

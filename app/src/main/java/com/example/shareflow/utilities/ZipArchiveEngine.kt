@@ -211,20 +211,30 @@ class ZipArchiveEngine(
                     val entry = zis.nextEntry ?: break
                     entryCount++
                     if (entryCount > MAX_EXTRACT_ENTRIES) {
+                        cleanupExtractedFiles(extractedPaths)
                         return@withContext AppResult.Failure(
                             AppError.Security("Archive exceeds maximum safe entry count ($MAX_EXTRACT_ENTRIES).")
                         )
                     }
 
                     if (!isSafeRelativeZipPath(entry.name)) {
+                        cleanupExtractedFiles(extractedPaths)
                         return@withContext AppResult.Failure(
                             AppError.Security("Blocked unsafe ZIP path traversal entry: ${entry.name}")
+                        )
+                    }
+
+                    if (entry.size > maxExtractedBytes || (entry.size > 0L && totalExtractedBytes + entry.size > maxExtractedBytes)) {
+                        cleanupExtractedFiles(extractedPaths)
+                        return@withContext AppResult.Failure(
+                            AppError.Security("Archive entry declares size exceeding safe extraction limit.")
                         )
                     }
 
                     val outFile = File(destinationDirectory, entry.name)
                     val canonicalOut = outFile.canonicalPath
                     if (!canonicalOut.startsWith(canonicalDestRoot + File.separator) && canonicalOut != canonicalDestRoot) {
+                        cleanupExtractedFiles(extractedPaths)
                         return@withContext AppResult.Failure(
                             AppError.Security("Blocked ZIP entry escaping extraction directory: ${entry.name}")
                         )
@@ -246,6 +256,7 @@ class ZipArchiveEngine(
                                         totalExtractedBytes += read.toLong()
                                         if (totalExtractedBytes > maxExtractedBytes) {
                                             runCatching { outFile.delete() }
+                                            cleanupExtractedFiles(extractedPaths)
                                             return@withContext AppResult.Failure(
                                                 AppError.Security("Archive exceeds safe extraction size limit.")
                                             )
@@ -278,6 +289,12 @@ class ZipArchiveEngine(
             throw ce
         } catch (t: Throwable) {
             AppResult.Failure(AppError.Storage("ZIP extraction failed: ${t.message ?: t.javaClass.simpleName}", t))
+        }
+    }
+
+    private fun cleanupExtractedFiles(paths: List<String>) {
+        paths.asReversed().forEach { path ->
+            runCatching { File(path).delete() }
         }
     }
 

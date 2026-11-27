@@ -16,8 +16,8 @@ android {
     applicationId = "com.shareflow"
     minSdk = 24
     targetSdk = 36
-    versionCode = 22
-    versionName = "1.0.22"
+    versionCode = 23
+    versionName = "1.1.0"
 
     buildConfigField(
       "String",
@@ -99,7 +99,23 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all { test ->
+        listOf(
+          "robolectric.offline",
+          "robolectric.dependency.dir",
+          "robolectric.dependency.repo.url",
+          "robolectric.dependency.repo.id"
+        ).forEach { key ->
+          providers.systemProperty(key).orNull?.let { value ->
+            test.systemProperty(key, value)
+          }
+        }
+      }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true

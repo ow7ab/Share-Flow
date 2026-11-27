@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Production orchestrator for the ShareFlow File Transfer Engine.
@@ -53,9 +55,11 @@ class TransferManager(
     private val destinationRootProvider: () -> File,
     private val dispatchers: DispatcherProvider,
     private val clock: Clock = SystemClock(),
-    private val requireExplicitOfferApproval: Boolean = false
+    private val requireExplicitOfferApproval: Boolean = false,
+    private val chunkProcessor: ChunkProcessor? = null
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatchers.io)
+    private val sendStartMutex = Mutex()
     private val controlHandles = ConcurrentHashMap<String, TransferControlHandle>()
     private val liveSessionsById = MutableStateFlow<Map<String, TransferSession>>(emptyMap())
 
@@ -106,6 +110,16 @@ class TransferManager(
     init {
         scope.launch {
             _recoveryReports.value = recoveryManager.inspectAndRecoverInterruptedSessions()
+            val protectedIds = runCatching {
+                transferRepository.getIncompleteSessions().map { it.sessionId }.toSet()
+            }.getOrDefault(emptySet())
+            runCatching {
+                chunkProcessor?.cleanupOrphanedStagingDirs(
+                    destinationRoot = destinationRootProvider(),
+                    protectedSessionIds = protectedIds,
+                    nowEpochMillis = clock.nowEpochMillis()
+                )
+            }
         }
         observeConnectionCoordinator()
     }
@@ -126,14 +140,28 @@ class TransferManager(
     suspend fun startSendingOnActiveConnection(
         sources: List<TransferSourceItem>,
         config: TransferConfig = TransferConfig()
-    ): AppResult<TransferSession> {
-        if (sources.isEmpty()) {
-            return AppResult.Failure(AppError.Validation("Select at least one file or folder to send"))
+    ): AppResult<TransferSession> = sendStartMutex.withLock {
+        val deduplicatedSources = sources.distinctBy { src ->
+            "${src.uriString}|${TransferWireProtocol.sanitizeRelativePath(src.relativePath)}|${src.fileName}"
+        }
+        if (deduplicatedSources.isEmpty()) {
+            return@withLock AppResult.Failure(AppError.Validation("Select at least one file or folder to send"))
         }
         val channel = connectionCoordinator.activeChannel
-            ?: return AppResult.Failure(AppError.Network("No active encrypted peer connection"))
+            ?: return@withLock AppResult.Failure(AppError.Network("No active encrypted peer connection"))
         if (!channel.isOpen) {
-            return AppResult.Failure(AppError.Network("Peer connection is closed; reconnect to send files"))
+            return@withLock AppResult.Failure(AppError.Network("Peer connection is closed; reconnect to send files"))
+        }
+
+        val incomingBatchSignature = computeSourceBatchSignature(deduplicatedSources)
+        val duplicateActiveSession = liveSessionsById.value.values.firstOrNull { existing ->
+            existing.direction == TransferDirection.SENT &&
+                existing.state.isActive &&
+                existing.peer.deviceId.equals(channel.remotePeer.deviceId, ignoreCase = true) &&
+                computeSessionBatchSignature(existing) == incomingBatchSignature
+        }
+        if (duplicateActiveSession != null) {
+            return@withLock AppResult.Success(duplicateActiveSession)
         }
 
         val sessionId = "tx_${UUID.randomUUID().toString().replace("-", "").take(16)}"
@@ -142,7 +170,7 @@ class TransferManager(
 
         val batch = TransferQueue.QueuedTransferBatch(
             batchId = sessionId,
-            items = sources,
+            items = deduplicatedSources,
             enqueuedAtEpochMillis = now
         )
         transferQueue.enqueue(batch)
@@ -199,7 +227,7 @@ class TransferManager(
             }
         }
 
-        return AppResult.Success(session)
+        AppResult.Success(session)
     }
 
     /**
@@ -328,9 +356,16 @@ class TransferManager(
                 if (item.state == TransferState.COMPLETED) {
                     item
                 } else {
-                    item.copy(state = TransferState.CANCELLED, errorMessage = "Cancelled", isRecoverable = false)
+                    chunkProcessor?.cleanupTempFile(item.tempFilePath)
+                    item.copy(
+                        state = TransferState.CANCELLED,
+                        tempFilePath = null,
+                        errorMessage = "Cancelled",
+                        isRecoverable = false
+                    )
                 }
             }
+            chunkProcessor?.cleanupSessionStagingDirIfEmpty(destinationRootProvider(), sessionId)
             val cancelled = persisted.copy(
                 state = TransferState.CANCELLED,
                 transferItems = updatedItems,
@@ -463,6 +498,16 @@ class TransferManager(
         transferScheduler.shutdown()
         scope.cancel()
     }
+
+    private fun computeSourceBatchSignature(sources: List<TransferSourceItem>): List<String> =
+        sources.map { src ->
+            "${src.uriString}|${TransferWireProtocol.sanitizeRelativePath(src.relativePath)}|${src.fileName}|${src.fileSizeBytes.coerceAtLeast(0L)}"
+        }.sorted()
+
+    private fun computeSessionBatchSignature(session: TransferSession): List<String> =
+        session.transferItems.map { item ->
+            "${item.sourceUri.orEmpty()}|${item.relativePath}|${item.fileName}|${item.fileSizeBytes.coerceAtLeast(0L)}"
+        }.sorted()
 
     companion object {
         private const val MAX_IN_MEMORY_LIVE_SESSIONS = 24

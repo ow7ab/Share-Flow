@@ -377,6 +377,15 @@ class VaultManager(
             val config = vaultConfigDao.getConfig()
                 ?: return@withContext AppResult.Failure(AppError.NotFound("Private Vault is not initialized."))
 
+            val now = clock.nowEpochMillis()
+            if (config.lockoutUntilEpochMillis > now) {
+                val waitSec = ((config.lockoutUntilEpochMillis - now + 999L) / 1000L).coerceAtLeast(1L)
+                refreshStatusLocked()
+                return@withContext AppResult.Failure(
+                    AppError.Security("Too many failed attempts. Try again in ${waitSec}s.")
+                )
+            }
+
             val curChars = currentPin.toCharArray()
             val curMaterial = cryptoEngine.derivePinMaterial(
                 curChars,
@@ -386,7 +395,30 @@ class VaultManager(
             Arrays.fill(curChars, '\u0000')
             if (!cryptoEngine.constantTimeEquals(curMaterial.verifier, b64Decode(config.pinVerifierB64))) {
                 curMaterial.zeroize()
-                return@withContext AppResult.Failure(AppError.Security("Current PIN is incorrect."))
+                val newFailed = config.failedAttempts + 1
+                val lockoutUntil = if (newFailed >= MAX_ATTEMPTS_BEFORE_LOCKOUT) {
+                    val multiplier = 1L shl (newFailed - MAX_ATTEMPTS_BEFORE_LOCKOUT).coerceAtMost(5)
+                    now + (BASE_LOCKOUT_SECONDS * multiplier * 1000L)
+                } else {
+                    0L
+                }
+                vaultConfigDao.upsertConfig(
+                    config.copy(
+                        failedAttempts = newFailed,
+                        lockoutUntilEpochMillis = lockoutUntil,
+                        updatedAtEpochMillis = now
+                    )
+                )
+                refreshStatusLocked()
+                return@withContext AppResult.Failure(
+                    AppError.Security(
+                        if (lockoutUntil > now) {
+                            "Current PIN is incorrect. Vault temporarily locked after $newFailed failed attempts."
+                        } else {
+                            "Current PIN is incorrect."
+                        }
+                    )
+                )
             }
 
             val vmkRes = cryptoEngine.decryptAes256Gcm(
@@ -452,6 +484,15 @@ class VaultManager(
                 val config = vaultConfigDao.getConfig()
                     ?: return@withContext AppResult.Failure(AppError.NotFound("Private Vault is not initialized."))
 
+                val now = clock.nowEpochMillis()
+                if (config.lockoutUntilEpochMillis > now) {
+                    val waitSec = ((config.lockoutUntilEpochMillis - now + 999L) / 1000L).coerceAtLeast(1L)
+                    refreshStatusLocked()
+                    return@withContext AppResult.Failure(
+                        AppError.Security("Too many failed attempts. Try again in ${waitSec}s.")
+                    )
+                }
+
                 val recoveryKek = cryptoEngine.deriveRecoveryKek(
                     recoveryKey = recoveryKey,
                     salt = b64Decode(config.recoverySaltB64),
@@ -467,7 +508,30 @@ class VaultManager(
                 )
                 Arrays.fill(recoveryKek, 0)
                 if (vmkRes is AppResult.Failure) {
-                    return@withContext AppResult.Failure(AppError.Security("Invalid Recovery Key."))
+                    val newFailed = config.failedAttempts + 1
+                    val lockoutUntil = if (newFailed >= MAX_ATTEMPTS_BEFORE_LOCKOUT) {
+                        val multiplier = 1L shl (newFailed - MAX_ATTEMPTS_BEFORE_LOCKOUT).coerceAtMost(5)
+                        now + (BASE_LOCKOUT_SECONDS * multiplier * 1000L)
+                    } else {
+                        0L
+                    }
+                    vaultConfigDao.upsertConfig(
+                        config.copy(
+                            failedAttempts = newFailed,
+                            lockoutUntilEpochMillis = lockoutUntil,
+                            updatedAtEpochMillis = now
+                        )
+                    )
+                    refreshStatusLocked()
+                    return@withContext AppResult.Failure(
+                        AppError.Security(
+                            if (lockoutUntil > now) {
+                                "Invalid Recovery Key. Vault temporarily locked after $newFailed failed attempts."
+                            } else {
+                                "Invalid Recovery Key."
+                            }
+                        )
+                    )
                 }
                 val vmk = (vmkRes as AppResult.Success).data
 
@@ -483,7 +547,7 @@ class VaultManager(
                 }
                 val wrappedPin = (wrappedPinRes as AppResult.Success).data
 
-                val now = clock.nowEpochMillis()
+                val completedAt = clock.nowEpochMillis()
                 vaultConfigDao.upsertConfig(
                     config.copy(
                         pinSaltB64 = b64Encode(newSalt),
@@ -493,12 +557,12 @@ class VaultManager(
                         wrappedVmkPinCtB64 = b64Encode(wrappedPin.cipherText),
                         failedAttempts = 0,
                         lockoutUntilEpochMillis = 0L,
-                        updatedAtEpochMillis = now
+                        updatedAtEpochMillis = completedAt
                     )
                 )
                 newMaterial.zeroize()
                 setUnlockedVmkLocked(vmk)
-                lastActivityEpochMillis = now
+                lastActivityEpochMillis = completedAt
                 refreshDecryptedItemsLocked()
                 refreshStatusLocked()
                 AppResult.Success(Unit)

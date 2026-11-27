@@ -79,19 +79,36 @@ class TransferSender(
             updatedAtEpochMillis = clock.nowEpochMillis()
         )
 
+        var lastProgressEmitEpochMs = 0L
+
         fun publish(
             state: TransferState = currentSession.state,
             error: String? = currentSession.errorMessage,
             isResumable: Boolean = currentSession.isResumable,
             completedAt: Long? = currentSession.completedAtEpochMillis
         ) {
+            val now = clock.nowEpochMillis()
+            val isSteadyProgressTick = state == TransferState.TRANSFERRING &&
+                currentSession.state == TransferState.TRANSFERRING &&
+                error == currentSession.errorMessage &&
+                isResumable == currentSession.isResumable &&
+                completedAt == currentSession.completedAtEpochMillis
+            val remainingBytes = mutableItems.sumOf { item ->
+                (item.fileSizeBytes - item.bytesTransferred).coerceAtLeast(0L)
+            }
+            if (isSteadyProgressTick &&
+                remainingBytes > 0L &&
+                lastProgressEmitEpochMs > 0L &&
+                (now - lastProgressEmitEpochMs) < PROGRESS_EMIT_INTERVAL_MS
+            ) {
+                return
+            }
+            lastProgressEmitEpochMs = now
+
             val speed = if (state == TransferState.TRANSFERRING) {
                 speedTracker.currentSpeedBytesPerSec()
             } else {
                 0L
-            }
-            val remainingBytes = mutableItems.sumOf { item ->
-                (item.fileSizeBytes - item.bytesTransferred).coerceAtLeast(0L)
             }
             val eta = if (state == TransferState.TRANSFERRING) {
                 speedTracker.estimateRemainingSeconds(remainingBytes)
@@ -105,7 +122,7 @@ class TransferSender(
                 estimatedRemainingSeconds = eta,
                 errorMessage = error,
                 isResumable = isResumable,
-                updatedAtEpochMillis = clock.nowEpochMillis(),
+                updatedAtEpochMillis = now,
                 completedAtEpochMillis = completedAt
             )
             progressListener.onSessionUpdated(currentSession)
@@ -777,5 +794,6 @@ class TransferSender(
         private const val TRANSFER_IO_TIMEOUT_MS = 30_000
         private const val MAX_IN_FLIGHT_WINDOW_BYTES = 256 * 1024
         private const val CHECKPOINT_INTERVAL_CHUNKS = 8
+        private const val PROGRESS_EMIT_INTERVAL_MS = 100L
     }
 }

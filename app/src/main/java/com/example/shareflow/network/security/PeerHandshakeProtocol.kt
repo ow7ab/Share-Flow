@@ -8,6 +8,8 @@ import com.example.shareflow.domain.model.ConnectionType
 import com.example.shareflow.domain.model.IncomingConnectionRequest
 import com.example.shareflow.domain.model.PeerDevice
 import com.example.shareflow.network.TransferProtocol
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -51,6 +53,8 @@ class EncryptedPeerChannel(
     private val expectedReceiveSequence = AtomicLong(0L)
     private val sendLock = Any()
     private val receiveLock = Any()
+    private val sendCipher: Cipher = Cipher.getInstance(GCM_TRANSFORMATION)
+    private val receiveCipher: Cipher = Cipher.getInstance(GCM_TRANSFORMATION)
 
     val isOpen: Boolean
         get() = !socket.isClosed && socket.isConnected
@@ -64,10 +68,9 @@ class EncryptedPeerChannel(
             val seq = sendSequence.getAndIncrement()
             val iv = buildIv(sendDirectionPrefix, seq)
             val aad = buildAad(sessionId, frameType, seq)
-            val cipher = Cipher.getInstance(GCM_TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, sendKey, GCMParameterSpec(GCM_TAG_BITS, iv))
-            cipher.updateAAD(aad)
-            val cipherText = cipher.doFinal(plaintext)
+            sendCipher.init(Cipher.ENCRYPT_MODE, sendKey, GCMParameterSpec(GCM_TAG_BITS, iv))
+            sendCipher.updateAAD(aad)
+            val cipherText = sendCipher.doFinal(plaintext)
 
             output.writeByte(frameType.toInt())
             output.writeLong(seq)
@@ -98,10 +101,9 @@ class EncryptedPeerChannel(
 
                 val iv = buildIv(receiveDirectionPrefix, seq)
                 val aad = buildAad(sessionId, frameType, seq)
-                val cipher = Cipher.getInstance(GCM_TRANSFORMATION)
-                cipher.init(Cipher.DECRYPT_MODE, receiveKey, GCMParameterSpec(GCM_TAG_BITS, iv))
-                cipher.updateAAD(aad)
-                val plain = cipher.doFinal(cipherText)
+                receiveCipher.init(Cipher.DECRYPT_MODE, receiveKey, GCMParameterSpec(GCM_TAG_BITS, iv))
+                receiveCipher.updateAAD(aad)
+                val plain = receiveCipher.doFinal(cipherText)
                 expectedReceiveSequence.incrementAndGet()
                 DecryptedFrame(frameType = frameType, sequence = seq, payload = plain)
             }
@@ -214,8 +216,9 @@ class PeerHandshakeProtocol(
     ): AppResult<EncryptedPeerChannel> {
         return try {
             socket.soTimeout = TransferProtocol.SOCKET_READ_TIMEOUT_MS
-            val output = DataOutputStream(socket.getOutputStream())
-            val input = DataInputStream(socket.getInputStream())
+            tuneTransferSocket(socket)
+            val output = DataOutputStream(BufferedOutputStream(socket.getOutputStream(), SOCKET_STREAM_BUFFER_BYTES))
+            val input = DataInputStream(BufferedInputStream(socket.getInputStream(), SOCKET_STREAM_BUFFER_BYTES))
 
             val localIdentity = identityManager.getLocalIdentity()
             val ecdhPair = generateEphemeralEcdhKeyPair()
@@ -394,8 +397,9 @@ class PeerHandshakeProtocol(
     ): AppResult<EncryptedPeerChannel> {
         return try {
             socket.soTimeout = TransferProtocol.SOCKET_READ_TIMEOUT_MS
-            val input = DataInputStream(socket.getInputStream())
-            val output = DataOutputStream(socket.getOutputStream())
+            tuneTransferSocket(socket)
+            val input = DataInputStream(BufferedInputStream(socket.getInputStream(), SOCKET_STREAM_BUFFER_BYTES))
+            val output = DataOutputStream(BufferedOutputStream(socket.getOutputStream(), SOCKET_STREAM_BUFFER_BYTES))
 
             val clientRaw = readWireMessage(input)
                 ?: return rejectAndFail(output, socket, "Empty connection request")
@@ -695,8 +699,16 @@ class PeerHandshakeProtocol(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
+    private fun tuneTransferSocket(socket: Socket) {
+        runCatching { socket.tcpNoDelay = true }
+        runCatching { socket.sendBufferSize = SOCKET_TCP_BUFFER_BYTES }
+        runCatching { socket.receiveBufferSize = SOCKET_TCP_BUFFER_BYTES }
+    }
+
     companion object {
         private val CLIENT_TO_SERVER_IV_PREFIX = byteArrayOf(0x43, 0x32, 0x53, 0x02)
         private val SERVER_TO_CLIENT_IV_PREFIX = byteArrayOf(0x53, 0x32, 0x43, 0x02)
+        private const val SOCKET_STREAM_BUFFER_BYTES = 64 * 1024
+        private const val SOCKET_TCP_BUFFER_BYTES = 256 * 1024
     }
 }
