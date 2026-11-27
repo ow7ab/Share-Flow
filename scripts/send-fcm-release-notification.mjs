@@ -47,7 +47,7 @@ export function isValidPublicHttpsUrl(rawUrl) {
   if (parsed.protocol !== "https:") return false;
   if (parsed.username || parsed.password) return false;
   const host = (parsed.hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
-  if (!host || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")) {
+  if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) {
     return false;
   }
   if (isPrivateOrLoopbackHost(host)) return false;
@@ -55,21 +55,32 @@ export function isValidPublicHttpsUrl(rawUrl) {
 }
 
 function isPrivateOrLoopbackHost(host) {
-  if (host === "::1" || host === "::" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) {
-    return true;
-  }
-  if (host.startsWith("::ffff:")) {
-    return isPrivateOrLoopbackHost(host.slice("::ffff:".length));
+  if (host.includes(":")) {
+    if (
+      host === "::1" ||
+      host === "::" ||
+      host.startsWith("fc") ||
+      host.startsWith("fd") ||
+      host.startsWith("ff") ||
+      /^fe[89ab]/.test(host)
+    ) {
+      return true;
+    }
+    if (host.startsWith("::ffff:")) {
+      return isPrivateOrLoopbackHost(host.slice("::ffff:".length));
+    }
   }
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!ipv4Match) return false;
   const parts = ipv4Match.slice(1).map((n) => Number(n));
   if (parts.some((n) => n < 0 || n > 255)) return true;
-  const [a, b] = parts;
-  if (a === 10 || a === 127 || a === 0) return true;
+  const [a, b, c] = parts;
+  if (a === 10 || a === 127 || a === 0 || a >= 224) return true;
   if (a === 169 && b === 254) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 0 && c === 0) return true;
   if (a === 192 && b === 168) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
   if (a === 100 && b >= 64 && b <= 127) return true;
   return false;
 }

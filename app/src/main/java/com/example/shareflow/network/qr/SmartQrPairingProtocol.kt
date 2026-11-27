@@ -138,6 +138,12 @@ class SmartQrPairingProtocol(
                 "QR code or pairing code is empty"
             )
         }
+        if (trimmed.length > MAX_QR_INPUT_LENGTH) {
+            return SmartQrParseResult.Rejected(
+                SmartConnectionErrorCode.INVALID_QR,
+                "QR code or pairing code exceeds maximum allowed length"
+            )
+        }
 
         val resolvedUri = if (trimmed.startsWith(MANUAL_CODE_PREFIX, ignoreCase = true)) {
             val encodedPart = trimmed.substring(MANUAL_CODE_PREFIX.length).trim()
@@ -149,6 +155,12 @@ class SmartQrPairingProtocol(
             )
         } else {
             trimmed
+        }
+        if (resolvedUri.length > MAX_QR_INPUT_LENGTH) {
+            return SmartQrParseResult.Rejected(
+                SmartConnectionErrorCode.INVALID_QR,
+                "Decoded pairing URI exceeds maximum allowed length"
+            )
         }
 
         if (!resolvedUri.startsWith("$PAIRING_URI_PREFIX?")) {
@@ -181,15 +193,16 @@ class SmartQrPairingProtocol(
             )
         }
 
-        val sessionId = params["sid"]?.takeIf { it.length >= 16 }
+        val sessionId = params["sid"]?.takeIf { it.length in 16..128 && it.none(Char::isISOControl) }
             ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Invalid session ID")
-        val deviceId = params["did"]?.takeIf { it.length >= 12 }
+        val deviceId = params["did"]?.takeIf { it.length in 12..128 && it.none(Char::isISOControl) }
             ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Invalid device ID")
-        val displayName = params["name"]?.takeIf { it.isNotBlank() } ?: "ShareFlow Device"
-        val fingerprint = params["fp"]?.takeIf { it.length == 64 }?.lowercase()
+        val displayName = params["name"]?.takeIf { it.isNotBlank() && it.length <= 64 && it.none(Char::isISOControl) }
+            ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Invalid display name")
+        val fingerprint = params["fp"]?.takeIf { it.length == 64 && it.all { ch -> ch in '0'..'9' || ch in 'a'..'f' || ch in 'A'..'F' } }?.lowercase()
             ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Invalid device fingerprint")
-        val serviceName = params["svc"]?.takeIf { it.isNotBlank() }
-            ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Missing service name")
+        val serviceName = params["svc"]?.takeIf { it.isNotBlank() && it.length <= 64 && it.none(Char::isISOControl) }
+            ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Missing or invalid service name")
         val servicePort = params["port"]?.toIntOrNull()?.takeIf { it in 1024..65535 }
             ?: return SmartQrParseResult.Rejected(SmartConnectionErrorCode.INVALID_QR, "Invalid service port")
         val pairingToken = params["tok"]?.takeIf { it.length >= 16 }
@@ -371,6 +384,7 @@ class SmartQrPairingProtocol(
         private const val MIN_TTL_MILLIS = 15_000L
         private const val MAX_TTL_MILLIS = 600_000L
         private const val REPLAY_RETENTION_MS = 900_000L
+        const val MAX_QR_INPUT_LENGTH = 4096
 
         fun isSmartV3Payload(rawInput: String): Boolean {
             val trimmed = rawInput.trim()

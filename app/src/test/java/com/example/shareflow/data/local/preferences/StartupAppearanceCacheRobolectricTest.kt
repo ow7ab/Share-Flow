@@ -2,6 +2,7 @@ package com.example.shareflow.data.local.preferences
 
 import android.content.Context
 import android.graphics.drawable.ColorDrawable
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import com.example.MainActivity
@@ -39,6 +40,9 @@ class StartupAppearanceCacheRobolectricTest {
 
     @get:Rule
     val tempFolder = TemporaryFolder()
+
+    @get:Rule
+    val composeTestRule = createEmptyComposeRule()
 
     private lateinit var context: Context
 

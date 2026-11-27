@@ -170,6 +170,9 @@ class PairingTokenManager(
 
     fun parseFromUri(rawUri: String): AppResult<PairingPayload> {
         val trimmed = rawUri.trim()
+        if (trimmed.length > MAX_QR_INPUT_LENGTH) {
+            return AppResult.Failure(AppError.Validation("Pairing QR payload exceeds maximum allowed length"))
+        }
         if (!trimmed.startsWith("$PAIRING_URI_PREFIX?")) {
             return AppResult.Failure(AppError.Validation("Not a valid ShareFlow pairing QR code"))
         }
@@ -179,11 +182,15 @@ class PairingTokenManager(
         }
 
         val params = LinkedHashMap<String, String>()
-        queryPart.split('&').forEach { pair ->
+        for (pair in queryPart.split('&')) {
             val idx = pair.indexOf('=')
             if (idx > 0) {
-                val key = urlDecode(pair.substring(0, idx))
-                val value = urlDecode(pair.substring(idx + 1))
+                val key = runCatching { urlDecode(pair.substring(0, idx)) }.getOrElse {
+                    return AppResult.Failure(AppError.Validation("Malformed URL encoding in pairing QR code"))
+                }
+                val value = runCatching { urlDecode(pair.substring(idx + 1)) }.getOrElse {
+                    return AppResult.Failure(AppError.Validation("Malformed URL encoding in pairing QR code"))
+                }
                 params[key] = value
             }
         }
@@ -194,19 +201,23 @@ class PairingTokenManager(
             return AppResult.Failure(AppError.NotSupported("Unsupported ShareFlow QR version $version"))
         }
 
-        val sessionId = params["sid"]?.takeIf { it.length >= 16 }
+        val sessionId = params["sid"]?.takeIf { it.length in 16..128 && it.none(Char::isISOControl) }
             ?: return AppResult.Failure(AppError.Validation("Missing or invalid session ID in QR code"))
-        val deviceId = params["did"]?.takeIf { it.length >= 12 }
+        val deviceId = params["did"]?.takeIf { it.length in 12..128 && it.none(Char::isISOControl) }
             ?: return AppResult.Failure(AppError.Validation("Missing device identifier in QR code"))
-        val fingerprint = params["fp"]?.takeIf { it.length == 64 }
+        val fingerprint = params["fp"]?.takeIf { it.length == 64 && it.all { ch -> ch in '0'..'9' || ch in 'a'..'f' || ch in 'A'..'F' } }
             ?: return AppResult.Failure(AppError.Validation("Missing cryptographic device fingerprint in QR code"))
-        val token = params["tok"]?.takeIf { it.length >= 16 }
+        val token = params["tok"]?.takeIf { it.length in 16..128 && it.none(Char::isISOControl) }
             ?: return AppResult.Failure(AppError.Validation("Missing pairing token in QR code"))
         val createdAt = params["iat"]?.toLongOrNull() ?: 0L
         val expiresAt = params["exp"]?.toLongOrNull()
             ?: return AppResult.Failure(AppError.Validation("Missing token expiry in QR code"))
-        val name = params["name"]?.takeIf { it.isNotBlank() } ?: "ShareFlow Device"
-        val host = params["host"]?.takeIf { it.isNotBlank() }
+        val name = params["name"]?.filterNot(Char::isISOControl)?.trim()?.take(64)?.takeIf { it.isNotBlank() }
+            ?: "ShareFlow Device"
+        val host = params["host"]?.trim()?.takeIf { it.isNotBlank() }
+        if (host != null && (host.length > 253 || host.any { it.isISOControl() || it.isWhitespace() })) {
+            return AppResult.Failure(AppError.Validation("Invalid host address in pairing QR code"))
+        }
         val port = params["port"]?.toIntOrNull()?.takeIf { it in 1024..65535 }
             ?: return AppResult.Failure(AppError.Validation("Invalid port in pairing QR code"))
         val mode = params["mode"]?.let { raw ->
@@ -261,6 +272,7 @@ class PairingTokenManager(
         private const val MIN_TTL_MILLIS = 15_000L
         private const val MAX_TTL_MILLIS = 600_000L
         private const val MAX_ACTIVE_TOKENS = 16
+        const val MAX_QR_INPUT_LENGTH = 4096
 
         fun computeTokenProof(
             pairingToken: String,

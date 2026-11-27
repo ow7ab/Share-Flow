@@ -292,6 +292,15 @@ class VaultManager(
             val config = vaultConfigDao.getConfig()
                 ?: return@withContext AppResult.Failure(AppError.NotFound("Private Vault is not initialized."))
 
+            val nowBeforeUnwrap = clock.nowEpochMillis()
+            if (config.lockoutUntilEpochMillis > nowBeforeUnwrap) {
+                val waitSec = ((config.lockoutUntilEpochMillis - nowBeforeUnwrap + 999L) / 1000L).coerceAtLeast(1L)
+                refreshStatusLocked()
+                return@withContext AppResult.Failure(
+                    AppError.Security("Too many failed attempts. Try again in ${waitSec}s.")
+                )
+            }
+
             val ksIv = config.wrappedVmkKeystoreIvB64
             val ksCt = config.wrappedVmkKeystoreCtB64
             if (!config.biometricEnabled || ksIv.isNullOrBlank() || ksCt.isNullOrBlank()) {
@@ -817,7 +826,10 @@ class VaultManager(
                 val dek = (dekRes as AppResult.Success).data
                 try {
                     val out = ByteArrayOutputStream(meta.originalSizeBytes.toInt().coerceAtLeast(64))
-                    val blobFile = File(vaultBlobDirProvider(), entity.encryptedFileName)
+                    val blobFile = resolveConfinedBlobFile(entity.encryptedFileName)
+                        ?: return@withContext AppResult.Failure(
+                            AppError.Security("Blocked unsafe vault blob path.")
+                        )
                     val decRes = cryptoEngine.decryptStreamVerified(
                         itemId = entity.id,
                         dek = dek,
@@ -858,7 +870,10 @@ class VaultManager(
             if (dekRes is AppResult.Failure) return@withContext dekRes
             val dek = (dekRes as AppResult.Success).data
             try {
-                val blobFile = File(vaultBlobDirProvider(), entity.encryptedFileName)
+                val blobFile = resolveConfinedBlobFile(entity.encryptedFileName)
+                    ?: return@withContext AppResult.Failure(
+                        AppError.Security("Blocked unsafe vault blob path.")
+                    )
                 val decRes = openOutputStream().use { out ->
                     cryptoEngine.decryptStreamVerified(
                         itemId = entity.id,
@@ -891,7 +906,10 @@ class VaultManager(
             }
             val entity = vaultItemDao.findById(itemId)
                 ?: return@withContext AppResult.Failure(AppError.NotFound("Vault item not found."))
-            val blobFile = File(vaultBlobDirProvider(), entity.encryptedFileName)
+            val blobFile = resolveConfinedBlobFile(entity.encryptedFileName)
+                ?: return@withContext AppResult.Failure(
+                    AppError.Security("Blocked unsafe vault blob path.")
+                )
             cryptoEngine.secureDeleteFile(blobFile)
             vaultItemDao.deleteById(itemId)
             lastActivityEpochMillis = clock.nowEpochMillis()
@@ -902,7 +920,25 @@ class VaultManager(
     }
 
     fun getEncryptedBlobFile(blobFileName: String): File =
-        File(vaultBlobDirProvider(), blobFileName)
+        resolveConfinedBlobFile(blobFileName)
+            ?: throw SecurityException("Unsafe vault blob filename rejected.")
+
+    private fun resolveConfinedBlobFile(blobFileName: String): File? {
+        val trimmed = blobFileName.trim()
+        if (trimmed.isEmpty() ||
+            trimmed.length > 128 ||
+            trimmed.contains('/') ||
+            trimmed.contains('\\') ||
+            trimmed.contains("..") ||
+            trimmed.contains('\u0000')
+        ) {
+            return null
+        }
+        val root = runCatching { vaultBlobDirProvider().canonicalFile }.getOrNull() ?: return null
+        val rootPrefix = root.path.trimEnd(File.separatorChar) + File.separator
+        val candidate = runCatching { File(root, trimmed).canonicalFile }.getOrNull() ?: return null
+        return candidate.takeIf { it.path.startsWith(rootPrefix) }
+    }
 
     private fun unwrapItemDek(vmk: ByteArray, entity: VaultItemEntity): AppResult<ByteArray> {
         if (entity.wrappedDekB64.isBlank() || entity.dekIvB64.isBlank()) {

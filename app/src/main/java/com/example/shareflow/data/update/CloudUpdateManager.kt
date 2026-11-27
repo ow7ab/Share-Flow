@@ -290,9 +290,36 @@ object CloudUpdateValidator {
         if (httpUrl.username.isNotEmpty() || httpUrl.password.isNotEmpty()) return false
         val host = httpUrl.host.lowercase().trim()
         if (host.isBlank() || !host.contains('.')) return false
-        if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false
+        if (host == "localhost" ||
+            host.endsWith(".localhost") ||
+            host.endsWith(".local") ||
+            host.endsWith(".internal") ||
+            host.endsWith(".home.arpa")
+        ) {
+            return false
+        }
         if (isPrivateOrLoopbackHost(host)) return false
         return true
+    }
+
+    /**
+     * Strict allowlist for push-triggered (FCM) ShareFlow APK download URLs:
+     * must pass [isValidPublicHttpsUrl], point to an `.apk` resource, and belong to
+     * ShareFlow's official GitHub Releases / GitHub Pages distribution origins.
+     */
+    fun isOfficialShareFlowReleaseApkUrl(raw: String): Boolean {
+        if (!isValidPublicHttpsUrl(raw)) return false
+        val httpUrl = raw.trim().toHttpUrlOrNull() ?: return false
+        val host = httpUrl.host.lowercase()
+        val path = httpUrl.encodedPath.lowercase()
+        if (!path.endsWith(".apk")) return false
+        return when (host) {
+            "github.com" -> path.startsWith("/ow7ab/share-flow/releases/")
+            "ow7ab.github.io" -> path.startsWith("/share-flow/")
+            "objects.githubusercontent.com",
+            "release-assets.githubusercontent.com" -> true
+            else -> false
+        }
     }
 
     fun parseManifestJson(rawJson: String): AppResult<CloudUpdateManifest> {
@@ -376,26 +403,36 @@ object CloudUpdateValidator {
     }
 
     private fun isPrivateOrLoopbackHost(host: String): Boolean {
-        val clean = host.removePrefix("[").removeSuffix("]")
-        if (clean == "::1" || clean == "::" ||
-            clean.startsWith("::ffff:") ||
-            clean.startsWith("fe80:") ||
-            clean.startsWith("fc") ||
-            clean.startsWith("fd")
-        ) {
-            return true
+        val clean = host.removePrefix("[").removeSuffix("]").lowercase()
+        if (clean.contains(':')) {
+            if (clean == "::1" || clean == "::" ||
+                clean.startsWith("::ffff:") ||
+                clean.startsWith("fc") ||
+                clean.startsWith("fd") ||
+                clean.startsWith("ff") ||
+                clean.startsWith("fe8") ||
+                clean.startsWith("fe9") ||
+                clean.startsWith("fea") ||
+                clean.startsWith("feb")
+            ) {
+                return true
+            }
         }
         val ipv4Parts = clean.split('.')
         if (ipv4Parts.size == 4 && ipv4Parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } == true }) {
             val a = ipv4Parts[0].toInt()
             val b = ipv4Parts[1].toInt()
+            val c = ipv4Parts[2].toInt()
             return a == 10 ||
                 a == 127 ||
                 a == 0 ||
+                a >= 224 ||
                 (a == 100 && b in 64..127) ||
                 (a == 169 && b == 254) ||
                 (a == 172 && b in 16..31) ||
-                (a == 192 && b == 168)
+                (a == 192 && b == 0 && c == 0) ||
+                (a == 192 && b == 168) ||
+                (a == 198 && b in 18..19)
         }
         return false
     }

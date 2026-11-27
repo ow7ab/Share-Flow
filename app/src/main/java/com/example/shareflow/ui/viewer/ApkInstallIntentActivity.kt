@@ -192,6 +192,9 @@ object ApkInstallerIntentHelper {
                 ) ?: return null
             }
         } else {
+            if (!isAllowedContentUri(context, incomingUri)) {
+                return null
+            }
             val inspected = runCatching {
                 SafDocumentInspector.inspectUris(context, listOf(incomingUri)).firstOrNull()
             }.getOrNull()
@@ -255,6 +258,34 @@ object ApkInstallerIntentHelper {
             candidatePath == root.path || candidatePath.startsWith(prefix)
         }
     }
+
+    /**
+     * Guards against untrusted external callers feeding ShareFlow's own FileProvider URIs
+     * pointing to internal cache/export/update paths (confused-deputy file disclosure).
+     * External content providers (Files, Downloads, messaging apps) remain allowed, while
+     * self-authority URIs are strictly confined to `received_files/` without traversal segments.
+     */
+    internal fun isAllowedContentUri(context: Context, uri: Uri): Boolean {
+        if (!uri.scheme.equals("content", ignoreCase = true)) return false
+        val authority = uri.authority?.trim().orEmpty()
+        if (authority.isEmpty()) return false
+        val selfAuthority = "${context.packageName}.fileprovider"
+        if (!authority.equals(selfAuthority, ignoreCase = true)) {
+            return true
+        }
+        val pathSegments = uri.pathSegments.orEmpty()
+        if (pathSegments.size < 2) return false
+        if (pathSegments.any { seg -> seg.isBlank() || seg == "." || seg == ".." || seg.contains('\\') || seg.contains('\u0000') }) {
+            return false
+        }
+        if (pathSegments.first() != "received_files") {
+            return false
+        }
+        return pathSegments.last().endsWith(".apk", ignoreCase = true)
+    }
+
+    internal fun canForwardToExternalSystemInstaller(stagedApk: StagedIncomingApk?): Boolean =
+        stagedApk != null && stagedApk.stagedFile.exists() && stagedApk.stagedFile.isFile
 
     internal fun cleanupStaleStagedApks(
         receiveRoot: File,
@@ -511,18 +542,11 @@ internal fun ApkInstallIntentScreen(
     }
 
     fun launchExternalSystemInstaller(file: File?) {
-        val intent = if (file != null) {
-            container.applicationInstallationManager.createSystemInstallerFallbackIntent(file)
-        } else {
-            null
-        } ?: incomingUri?.let { uri ->
-            ApkInstallerIntentHelper.targetExternalSystemInstaller(
-                context,
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, AndroidAppSharingRepository.APK_MIME_TYPE)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
+        // Security boundary: NEVER forward an unvalidated raw incomingUri externally with
+        // FLAG_GRANT_READ_URI_PERMISSION. Only a staged, validated APK file inside ShareFlow's
+        // confined receive root may be wrapped in a scoped FileProvider Intent.
+        val intent = file?.let { validatedFile ->
+            container.applicationInstallationManager.createSystemInstallerFallbackIntent(validatedFile)
         }
         val launched = intent != null && runCatching {
             context.startActivity(intent)
@@ -641,7 +665,7 @@ internal fun ApkInstallIntentScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(spacing.xs)
                         ) {
-                            if (currentStaged != null || incomingUri != null) {
+                            if (ApkInstallerIntentHelper.canForwardToExternalSystemInstaller(currentStaged)) {
                                 SecondaryActionButton(
                                     text = stringResource(R.string.receive_app_install_fallback_action),
                                     onClick = { launchExternalSystemInstaller(currentStaged?.stagedFile) },

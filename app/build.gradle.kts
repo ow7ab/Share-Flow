@@ -16,8 +16,8 @@ android {
     applicationId = "com.shareflow"
     minSdk = 24
     targetSdk = 36
-    versionCode = 23
-    versionName = "1.1.0"
+    versionCode = 24
+    versionName = "1.1.1"
 
     buildConfigField(
       "String",
@@ -103,7 +103,7 @@ android {
     unitTests {
       isIncludeAndroidResources = true
       all { test ->
-        test.maxHeapSize = "2048m"
+        test.maxHeapSize = "1024m"
         test.forkEvery = 10L
         listOf(
           "robolectric.offline",

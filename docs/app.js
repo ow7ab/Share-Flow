@@ -350,16 +350,25 @@
 
   function isPrivateOrLoopbackHost(hostname) {
     const clean = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
-    if (!clean || clean === "localhost" || clean.endsWith(".localhost") || clean.endsWith(".local")) {
+    if (
+      !clean ||
+      clean === "localhost" ||
+      clean.endsWith(".localhost") ||
+      clean.endsWith(".local") ||
+      clean.endsWith(".internal") ||
+      clean.endsWith(".home.arpa")
+    ) {
       return true;
     }
     if (
-      clean === "::1" ||
-      clean === "::" ||
-      clean.startsWith("::ffff:") ||
-      clean.startsWith("fe80:") ||
-      clean.startsWith("fc") ||
-      clean.startsWith("fd")
+      clean.includes(":") &&
+      (clean === "::1" ||
+        clean === "::" ||
+        clean.startsWith("::ffff:") ||
+        clean.startsWith("fc") ||
+        clean.startsWith("fd") ||
+        clean.startsWith("ff") ||
+        /^fe[89ab]/.test(clean))
     ) {
       return true;
     }
@@ -367,14 +376,18 @@
     if (parts.length === 4 && parts.every((p) => /^\d+$/.test(p) && Number(p) >= 0 && Number(p) <= 255)) {
       const a = Number(parts[0]);
       const b = Number(parts[1]);
+      const c = Number(parts[2]);
       return (
         a === 10 ||
         a === 127 ||
         a === 0 ||
+        a >= 224 ||
         (a === 100 && b >= 64 && b <= 127) ||
         (a === 169 && b === 254) ||
         (a === 172 && b >= 16 && b <= 31) ||
-        (a === 192 && b === 168)
+        (a === 192 && b === 0 && c === 0) ||
+        (a === 192 && b === 168) ||
+        (a === 198 && (b === 18 || b === 19))
       );
     }
     return false;

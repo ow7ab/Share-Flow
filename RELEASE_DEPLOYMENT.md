@@ -21,7 +21,7 @@
 - **هوية التطبيق المحفوظة دون أي تعديل:**
   - `namespace`: `com.example`
   - `applicationId`: `com.shareflow`
-  - `versionName`: `1.1.0` | `versionCode`: `23`
+  - `versionName`: `1.1.1` | `versionCode`: `24`
   - `minSdk`: `24` | `targetSdk`: `36`
 
 ---
@@ -62,8 +62,8 @@
 1. **الدفع التلقائي من Google AI Studio إلى `main`:** عند تعديل `app/build.gradle.kts` برقم `versionName` و`versionCode` جديدين غير منشورين بعد، يُنشئ سير العمل الإصدار تلقائياً. أما دفعات الشيفرة العادية التي لا تغيّر الإصدار فيتم تجاوزها بنجاح خلال ثوانٍ دون أخطاء.
 2. **دفع وسم دلالي (`vX.Y.Z`):**
    ```bash
-   git tag -a v1.1.0 -m "Share Flow v1.1.0 (Build 23)"
-   git push origin v1.1.0
+   git tag -a v1.1.1 -m "Share Flow v1.1.1 (Build 24)"
+   git push origin v1.1.1
    ```
 3. **التشغيل اليدوي (`workflow_dispatch`):** مع دعم `dry_run: true` للاختبار الآمن دون نشر.
 

@@ -166,6 +166,9 @@ test("isSafeDirectApkUrl accepts direct HTTPS APK URLs and rejects ZIPs, HTML pa
     portal.isSafeDirectApkUrl("https://cdn.shareflow.app/releases/Share-Flow.apk"),
     true
   );
+  // Public domains starting with "fc" or "fd" must NOT be misclassified as IPv6 ULAs
+  assert.equal(portal.isSafeDirectApkUrl("https://fdroid.org/repo/Share-Flow.apk"), true);
+  assert.equal(portal.isSafeDirectApkUrl("https://fcdn.example.com/Share-Flow.apk"), true);
 
   // Must strictly reject ZIPs, source archives, GitHub HTML pages, cleartext HTTP, private hosts, and XSS schemes
   assert.equal(portal.isSafeDirectApkUrl(`https://github.com/${PUBLIC_REPO}/archive/refs/heads/main.zip`), false);
@@ -174,7 +177,13 @@ test("isSafeDirectApkUrl accepts direct HTTPS APK URLs and rejects ZIPs, HTML pa
   assert.equal(portal.isSafeDirectApkUrl(`https://github.com/${PUBLIC_REPO}`), false);
   assert.equal(portal.isSafeDirectApkUrl(`http://github.com/${PUBLIC_REPO}/releases/latest/download/Share-Flow.apk`), false);
   assert.equal(portal.isSafeDirectApkUrl("https://localhost/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://metadata.google.internal/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://router.home.arpa/Share-Flow.apk"), false);
   assert.equal(portal.isSafeDirectApkUrl("https://192.168.1.10/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://224.0.0.1/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://198.18.0.1/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://[febf::1]/Share-Flow.apk"), false);
+  assert.equal(portal.isSafeDirectApkUrl("https://[fc00::1]/Share-Flow.apk"), false);
   assert.equal(portal.isSafeDirectApkUrl(`https://user:pass@github.com/${PUBLIC_REPO}/Share-Flow.apk`), false);
   assert.equal(portal.isSafeDirectApkUrl("javascript:alert(1)//.apk"), false);
 });

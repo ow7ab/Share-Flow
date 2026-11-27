@@ -304,6 +304,14 @@ class PeerHandshakeProtocol(
                 )
             }
 
+            // Verify cryptographic signature BEFORE recording nonce in replay cache so unauthenticated
+            // frames cannot pollute or evict legitimate entries from ReplayProtectionCache.
+            val fullTranscript = "$clientBody\n$serverBody".toByteArray(Charsets.UTF_8)
+            val serverSigBytes = AndroidDeviceIdentityManager.decodeBase64Url(serverSigB64)
+            if (!identityManager.verify(serverIdentityPubBytes, fullTranscript, serverSigBytes)) {
+                return AppResult.Failure(AppError.Security("Peer cryptographic signature verification failed"))
+            }
+
             when (replayCache.recordAndValidate(serverDeviceId, serverNonceB64, serverTimestampMs)) {
                 ReplayCheckResult.Accepted -> Unit
                 ReplayCheckResult.ReplayedNonce ->
@@ -312,12 +320,6 @@ class PeerHandshakeProtocol(
                     return AppResult.Failure(AppError.Security("Invalid handshake nonce from peer"))
                 is ReplayCheckResult.StaleTimestamp ->
                     return AppResult.Failure(AppError.Security("Stale handshake timestamp from peer"))
-            }
-
-            val fullTranscript = "$clientBody\n$serverBody".toByteArray(Charsets.UTF_8)
-            val serverSigBytes = AndroidDeviceIdentityManager.decodeBase64Url(serverSigB64)
-            if (!identityManager.verify(serverIdentityPubBytes, fullTranscript, serverSigBytes)) {
-                return AppResult.Failure(AppError.Security("Peer cryptographic signature verification failed"))
             }
 
             val serverNonce = AndroidDeviceIdentityManager.decodeBase64Url(serverNonceB64)
@@ -444,16 +446,8 @@ class PeerHandshakeProtocol(
                 return rejectAndFail(output, socket, "Client device identifier does not match public key")
             }
 
-            when (replayCache.recordAndValidate(clientDeviceId, clientNonceB64, clientTimestampMs)) {
-                ReplayCheckResult.Accepted -> Unit
-                ReplayCheckResult.ReplayedNonce ->
-                    return rejectAndFail(output, socket, "Replay attack detected: duplicate handshake nonce")
-                ReplayCheckResult.InvalidNonce ->
-                    return rejectAndFail(output, socket, "Invalid client handshake nonce")
-                is ReplayCheckResult.StaleTimestamp ->
-                    return rejectAndFail(output, socket, "Handshake timestamp outside allowed freshness window")
-            }
-
+            // Verify cryptographic signature BEFORE recording nonce in replay cache so unauthenticated
+            // attackers cannot pollute or evict legitimate entries from ReplayProtectionCache.
             val clientSigBytes = runCatching {
                 AndroidDeviceIdentityManager.decodeBase64Url(clientSigB64)
             }.getOrNull() ?: return rejectAndFail(output, socket, "Invalid client signature encoding")
@@ -465,6 +459,16 @@ class PeerHandshakeProtocol(
                 )
             ) {
                 return rejectAndFail(output, socket, "Client cryptographic signature verification failed")
+            }
+
+            when (replayCache.recordAndValidate(clientDeviceId, clientNonceB64, clientTimestampMs)) {
+                ReplayCheckResult.Accepted -> Unit
+                ReplayCheckResult.ReplayedNonce ->
+                    return rejectAndFail(output, socket, "Replay attack detected: duplicate handshake nonce")
+                ReplayCheckResult.InvalidNonce ->
+                    return rejectAndFail(output, socket, "Invalid client handshake nonce")
+                is ReplayCheckResult.StaleTimestamp ->
+                    return rejectAndFail(output, socket, "Handshake timestamp outside allowed freshness window")
             }
 
             val tokenCheck = pairingTokenManager.verifyAndConsumeTokenProof(

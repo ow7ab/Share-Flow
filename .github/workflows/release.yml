@@ -572,6 +572,7 @@ jobs:
 
       - name: Run full Android unit and Robolectric test suite
         if: ${{ steps.validate_config.outputs.should_release == 'true' }}
+        timeout-minutes: 25
         shell: bash
         working-directory: ${{ steps.locate_project.outputs.project_dir }}
         env:

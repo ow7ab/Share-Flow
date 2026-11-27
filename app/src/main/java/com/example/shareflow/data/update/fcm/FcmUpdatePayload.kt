@@ -70,7 +70,7 @@ data class FcmUpdatePayload(
             }
 
             val apkUrl = (data["apkUrl"] ?: data["apkDownloadUrl"])?.trim().orEmpty()
-            if (!CloudUpdateValidator.isValidPublicHttpsUrl(apkUrl)) {
+            if (!CloudUpdateValidator.isOfficialShareFlowReleaseApkUrl(apkUrl)) {
                 return null
             }
 
@@ -83,7 +83,7 @@ data class FcmUpdatePayload(
                 ?.takeIf { it in 0L..CloudUpdateValidator.MAX_APK_BYTES }
                 ?: 0L
 
-            val publishedAt = data["publishedAt"]?.trim()?.take(64).orEmpty()
+            val publishedAt = data["publishedAt"]?.trim()?.filterNot { it.isISOControl() }?.take(64).orEmpty()
             val genericNotes = data["releaseNotes"]?.trim()?.take(2000).orEmpty()
             val notesAr = data["releaseNotesAr"]?.trim()?.ifBlank { genericNotes }?.take(2000) ?: genericNotes
             val notesEn = data["releaseNotesEn"]?.trim()?.ifBlank { genericNotes }?.take(2000) ?: genericNotes
@@ -111,8 +111,10 @@ data class FcmUpdatePayload(
                 mandatory = mandatory,
                 signingCertSha256 = signingCert,
                 targetRoute = safeRoute,
-                notificationTitle = data["title"]?.trim()?.ifBlank { fallbackTitle } ?: fallbackTitle,
-                notificationBody = data["body"]?.trim()?.ifBlank { fallbackBody } ?: fallbackBody
+                notificationTitle = (data["title"]?.trim()?.ifBlank { fallbackTitle } ?: fallbackTitle)
+                    ?.filterNot { it.isISOControl() }?.take(120),
+                notificationBody = (data["body"]?.trim()?.ifBlank { fallbackBody } ?: fallbackBody)
+                    ?.filterNot { it.isISOControl() }?.take(400)
             )
         }
     }
