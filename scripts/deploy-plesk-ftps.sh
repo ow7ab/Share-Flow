@@ -127,7 +127,7 @@ fi
 
 EXTRA_MIRROR_EXCLUDES=""
 if [ ! -f "${STAGE_DOCS}/version.json" ]; then
-  EXTRA_MIRROR_EXCLUDES='--exclude-glob "version.json" --exclude-glob "latest-release.json"'
+  EXTRA_MIRROR_EXCLUDES="--exclude-glob version.json --exclude-glob latest-release.json"
 fi
 
 # Pass password via LFTP_PASSWORD env var (--env-password) so it never appears
@@ -135,27 +135,27 @@ fi
 export LFTP_PASSWORD="$PLESK_FTP_PASSWORD"
 unset PLESK_FTP_PASSWORD
 
-lftp -e "
-set cmd:fail-exit yes;
-set net:timeout 25;
-set net:max-retries 3;
-set net:reconnect-interval-base 5;
-set ftp:passive-mode yes;
-set ftp:ssl-allow yes;
-set ftp:ssl-force ${SSL_FORCE_SETTING};
-set ftp:ssl-protect-data ${SSL_FORCE_SETTING};
-set ssl:verify-certificate ${TLS_VERIFY_SETTING};
-open -u \"${PLESK_FTP_USER}\" --env-password \"ftp://${PLESK_FTP_HOST}:${PLESK_FTP_PORT}\";
-cd \"${PLESK_FTP_REMOTE_DIR}\";
+lftp <<LFTP_EOF
+set cmd:fail-exit yes
+set net:timeout 25
+set net:max-retries 3
+set net:reconnect-interval-base 5
+set ftp:passive-mode yes
+set ftp:ssl-allow yes
+set ftp:ssl-force ${SSL_FORCE_SETTING}
+set ftp:ssl-protect-data ${SSL_FORCE_SETTING}
+set ssl:verify-certificate ${TLS_VERIFY_SETTING}
+open --env-password -u ${PLESK_FTP_USER} ftp://${PLESK_FTP_HOST}:${PLESK_FTP_PORT}
+cd ${PLESK_FTP_REMOTE_DIR}
 mirror --reverse --delete --verbose --parallel=2 \
-  --exclude-glob \".well-known/\" --exclude-glob \".well-known/**\" \
-  --exclude-glob \"cgi-bin/\" --exclude-glob \"cgi-bin/**\" \
-  --exclude-glob \"error_docs/\" --exclude-glob \"error_docs/**\" \
-  --exclude-glob \"plesk-stat/\" --exclude-glob \"plesk-stat/**\" \
-  --exclude-glob \".htaccess\" \
+  --exclude-glob .well-known/ --exclude-glob .well-known/** \
+  --exclude-glob cgi-bin/ --exclude-glob cgi-bin/** \
+  --exclude-glob error_docs/ --exclude-glob error_docs/** \
+  --exclude-glob plesk-stat/ --exclude-glob plesk-stat/** \
+  --exclude-glob .htaccess \
   ${EXTRA_MIRROR_EXCLUDES} \
-  \"${STAGE_DOCS}\" \".\";
+  "${STAGE_DOCS}" .
 bye
-"
+LFTP_EOF
 
 echo "Successfully deployed verified Share Flow website to Sudani Plesk (${PLESK_FTP_HOST}:${PLESK_FTP_REMOTE_DIR})."
