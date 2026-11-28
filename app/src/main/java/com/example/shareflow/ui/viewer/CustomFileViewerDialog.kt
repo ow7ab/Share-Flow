@@ -1,4 +1,4 @@
-package com.example.shareflow.ui.viewer
+package com.shareflow.ui.viewer
 
 import android.content.Context
 import android.net.Uri
