@@ -20,7 +20,7 @@ test("deploy-plesk.yml and FTPS scripts enforce docs-only staging, --env-passwor
   assert.match(wf, /PLESK_FTP_PASSWORD:\s*\$\{\{\s*secrets\.PLESK_FTP_PASSWORD\s*\}\}/);
   assert.match(wf, /196\.1\.255\.37/);
   assert.match(wf, /\/httpdocs/);
-  assert.match(wf, /dry_run != true/);
+  assert.match(wf, /dry_run != 'true'/);
 
   const stageScript = fs.readFileSync(stageScriptPath, "utf8");
   assert.match(stageScript, /ALLOWED_REGEX=/);

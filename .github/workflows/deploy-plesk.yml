@@ -42,7 +42,7 @@ jobs:
           bash ./scripts/deploy-plesk-ftps.sh --dry-run
 
       - name: Install lftp for Explicit FTPS upload
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true }}
+        if: ${{ github.event_name != 'workflow_dispatch' || (inputs.dry_run != true && github.event.inputs.dry_run != 'true') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -51,7 +51,7 @@ jobs:
 
       - name: Deploy verified static docs/ to Sudani Plesk (/httpdocs)
         id: deploy_plesk
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true }}
+        if: ${{ github.event_name != 'workflow_dispatch' || (inputs.dry_run != true && github.event.inputs.dry_run != 'true') }}
         shell: bash
         env:
           PLESK_FTP_PASSWORD: ${{ secrets.PLESK_FTP_PASSWORD }}
@@ -70,7 +70,7 @@ jobs:
         shell: bash
         env:
           JOB_STATUS: ${{ job.status }}
-          IS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == true }}
+          IS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run == true || github.event.inputs.dry_run == 'true') }}
           FTP_HOST: ${{ vars.PLESK_FTP_HOST || '196.1.255.37' }}
           FTP_USER: ${{ vars.PLESK_FTP_USER || 'ow7ab' }}
           REMOTE_DIR: ${{ vars.PLESK_FTP_REMOTE_DIR || '/httpdocs' }}
