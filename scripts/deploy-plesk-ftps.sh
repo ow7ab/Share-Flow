@@ -115,6 +115,38 @@ if ! command -v lftp >/dev/null 2>&1; then
   exit 1
 fi
 
+# Zero-credential pre-flight diagnostic (control port reachability + FTP banner + AUTH TLS probe)
+if command -v python3 >/dev/null 2>&1; then
+  PLESK_FTP_HOST="$PLESK_FTP_HOST" PLESK_FTP_PORT="$PLESK_FTP_PORT" python3 - <<'PYEOF'
+import os, socket
+
+host = os.environ["PLESK_FTP_HOST"]
+port = int(os.environ["PLESK_FTP_PORT"])
+
+try:
+    plesk_ips = sorted({r[4][0] for r in socket.getaddrinfo("plesk.sudani.sd", None, socket.AF_INET)})
+    print(f"Resolved plesk.sudani.sd -> {', '.join(plesk_ips)}")
+except Exception as exc:
+    print(f"Could not resolve plesk.sudani.sd: {exc}")
+
+try:
+    with socket.create_connection((host, port), timeout=8) as sock:
+        sock.settimeout(8)
+        banner = sock.recv(512).decode("utf-8", errors="replace").strip()
+        print(f"FTP TCP connected to {host}:{port} -> banner: {banner!r}")
+        sock.sendall(b"AUTH TLS\r\n")
+        auth_resp = sock.recv(512).decode("utf-8", errors="replace").strip()
+        print(f"AUTH TLS response -> {auth_resp!r}")
+        try:
+            sock.sendall(b"QUIT\r\n")
+        except Exception:
+            pass
+except Exception as exc:
+    print(f"::error::FTP TCP/banner check failed for {host}:{port}: {exc}")
+    raise SystemExit(1)
+PYEOF
+fi
+
 SSL_FORCE_SETTING="yes"
 if [ "$PLESK_FTP_SSL_FORCE" = "false" ]; then
   SSL_FORCE_SETTING="no"
@@ -137,10 +169,11 @@ unset PLESK_FTP_PASSWORD
 
 lftp <<LFTP_EOF
 set cmd:fail-exit yes
-set net:timeout 25
-set net:max-retries 3
-set net:reconnect-interval-base 5
+set net:timeout 15
+set net:max-retries 2
+set net:reconnect-interval-base 3
 set ftp:passive-mode yes
+set ftp:fix-pasv-address yes
 set ftp:ssl-allow yes
 set ftp:ssl-force ${SSL_FORCE_SETTING}
 set ftp:ssl-protect-data ${SSL_FORCE_SETTING}
