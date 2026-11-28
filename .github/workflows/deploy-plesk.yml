@@ -1,0 +1,92 @@
+name: Deploy ShareFlow Website to Sudani Plesk (FTPS)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate docs/ staging and tests without uploading via FTPS"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: shareflow-plesk-website-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-plesk-website:
+    name: Validate & Deploy docs/ to Sudani Plesk (shareflows.org)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run portal tests and dry-run Plesk staging validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test ./scripts/test-portal.js
+          if [ -f "./scripts/test-release-workflow.js" ]; then
+            node --test ./scripts/test-release-workflow.js
+          fi
+          bash ./scripts/deploy-plesk-ftps.sh --dry-run
+
+      - name: Install lftp for Explicit FTPS upload
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lftp
+
+      - name: Deploy verified static docs/ to Sudani Plesk (/httpdocs)
+        id: deploy_plesk
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true }}
+        shell: bash
+        env:
+          PLESK_FTP_PASSWORD: ${{ secrets.PLESK_FTP_PASSWORD }}
+          PLESK_FTP_HOST: ${{ vars.PLESK_FTP_HOST || '196.1.255.37' }}
+          PLESK_FTP_USER: ${{ vars.PLESK_FTP_USER || 'ow7ab' }}
+          PLESK_FTP_PORT: ${{ vars.PLESK_FTP_PORT || '21' }}
+          PLESK_FTP_REMOTE_DIR: ${{ vars.PLESK_FTP_REMOTE_DIR || '/httpdocs' }}
+          PLESK_FTP_SSL_FORCE: ${{ vars.PLESK_FTP_SSL_FORCE || 'true' }}
+          PLESK_FTP_TLS_VERIFY: ${{ vars.PLESK_FTP_TLS_VERIFY || 'false' }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/deploy-plesk-ftps.sh
+
+      - name: Write Plesk deployment summary
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+          IS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == true }}
+          FTP_HOST: ${{ vars.PLESK_FTP_HOST || '196.1.255.37' }}
+          FTP_USER: ${{ vars.PLESK_FTP_USER || 'ow7ab' }}
+          REMOTE_DIR: ${{ vars.PLESK_FTP_REMOTE_DIR || '/httpdocs' }}
+        run: |
+          {
+            echo "## Share Flow -> Sudani Plesk Website Deployment"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| **Status** | \`${JOB_STATUS}\` |"
+            echo "| **Dry Run** | \`${IS_DRY_RUN}\` |"
+            echo "| **Target Domain** | https://shareflows.org |"
+            echo "| **Plesk FTP Host** | \`${FTP_HOST}\` |"
+            echo "| **FTP User** | \`${FTP_USER}\` |"
+            echo "| **Remote Directory** | \`${REMOTE_DIR}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

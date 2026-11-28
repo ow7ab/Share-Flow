@@ -43,6 +43,25 @@ jobs:
           set -euo pipefail
           node --test ./scripts/test-portal.js
           bash ./scripts/sync-public-docs.sh --dry-run
+          bash ./scripts/deploy-plesk-ftps.sh --dry-run
+
+      - name: Deploy verified static docs/ to Sudani Plesk (when configured)
+        shell: bash
+        env:
+          PLESK_FTP_PASSWORD: ${{ secrets.PLESK_FTP_PASSWORD }}
+          PLESK_FTP_HOST: ${{ vars.PLESK_FTP_HOST || '196.1.255.37' }}
+          PLESK_FTP_USER: ${{ vars.PLESK_FTP_USER || 'ow7ab' }}
+          PLESK_FTP_PORT: ${{ vars.PLESK_FTP_PORT || '21' }}
+          PLESK_FTP_REMOTE_DIR: ${{ vars.PLESK_FTP_REMOTE_DIR || '/httpdocs' }}
+          PLESK_FTP_SSL_FORCE: ${{ vars.PLESK_FTP_SSL_FORCE || 'true' }}
+          PLESK_FTP_TLS_VERIFY: ${{ vars.PLESK_FTP_TLS_VERIFY || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PLESK_FTP_PASSWORD" ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends lftp
+          fi
+          bash ./scripts/deploy-plesk-ftps.sh --skip-if-unconfigured
 
       - name: Clean temporary staging directory
         if: always()

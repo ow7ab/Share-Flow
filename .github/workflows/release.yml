@@ -578,6 +578,7 @@ jobs:
             node --test ./scripts/test-release-workflow.js
           fi
           bash ./scripts/sync-public-docs.sh --dry-run
+          bash ./scripts/deploy-plesk-ftps.sh --dry-run
 
       - name: Run full Android unit and Robolectric test suite
         if: ${{ steps.validate_config.outputs.should_release == 'true' }}
@@ -978,6 +979,28 @@ jobs:
           set -euo pipefail
           bash ./scripts/sync-public-docs.sh --local-update
 
+      - name: Deploy static docs/ website and version.json to Sudani Plesk (when configured)
+        id: deploy_plesk
+        if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.sync_public_website != false) }}
+        shell: bash
+        working-directory: ${{ steps.locate_project.outputs.project_dir }}
+        env:
+          PLESK_FTP_PASSWORD: ${{ secrets.PLESK_FTP_PASSWORD }}
+          PLESK_FTP_HOST: ${{ vars.PLESK_FTP_HOST || '196.1.255.37' }}
+          PLESK_FTP_USER: ${{ vars.PLESK_FTP_USER || 'ow7ab' }}
+          PLESK_FTP_PORT: ${{ vars.PLESK_FTP_PORT || '21' }}
+          PLESK_FTP_REMOTE_DIR: ${{ vars.PLESK_FTP_REMOTE_DIR || '/httpdocs' }}
+          PLESK_FTP_SSL_FORCE: ${{ vars.PLESK_FTP_SSL_FORCE || 'true' }}
+          PLESK_FTP_TLS_VERIFY: ${{ vars.PLESK_FTP_TLS_VERIFY || 'false' }}
+          LATEST_MANIFEST_FILE: ${{ steps.verify_outputs.outputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PLESK_FTP_PASSWORD" ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends lftp
+          fi
+          bash ./scripts/deploy-plesk-ftps.sh --skip-if-unconfigured
+
       - name: Restore FCM release notification dedupe cache
         if: ${{ steps.validate_config.outputs.should_release == 'true' && steps.validate_config.outputs.dry_run != 'true' }}
         uses: actions/cache@v4
@@ -1062,6 +1085,7 @@ jobs:
           DIRECT_APK_URL: ${{ steps.verify_outputs.outputs.direct_apk_url || '' }}
           LATEST_APK_URL: ${{ steps.verify_outputs.outputs.latest_apk_url || '' }}
           WEBSITE_OUTCOME: ${{ steps.sync_website.outcome || 'skipped' }}
+          PLESK_OUTCOME: ${{ steps.deploy_plesk.outcome || 'skipped' }}
           FCM_OUTCOME: ${{ steps.fcm_notify.outcome || 'skipped' }}
         run: |
           {
@@ -1095,6 +1119,7 @@ jobs:
               echo "| **GitHub Release** | ${RELEASE_URL} |"
             fi
             echo "| **Website & Manifest Update** | \`${WEBSITE_OUTCOME}\` |"
+            echo "| **Sudani Plesk FTPS Deploy** | \`${PLESK_OUTCOME}\` |"
             echo "| **FCM Push Notification** | \`${FCM_OUTCOME}\` |"
             echo "| **APK Size (bytes)** | \`${APK_SIZE}\` |"
             echo "| **APK SHA-256** | \`${APK_SHA256}\` |"
@@ -1127,6 +1152,7 @@ jobs:
           fi
           rm -rf "${RUNNER_TEMP}/shareflow-release-stage"
           rm -rf "${RUNNER_TEMP}/shareflow-public-docs-sync"
+          rm -rf "${RUNNER_TEMP}/shareflow-plesk-ftps-deploy"
           if [ -n "${{ steps.locate_project.outputs.project_dir }}" ]; then
             rm -f "${{ steps.locate_project.outputs.project_dir }}/debug.keystore"
           fi
