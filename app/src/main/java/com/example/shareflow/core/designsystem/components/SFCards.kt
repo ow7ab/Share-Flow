@@ -1,4 +1,4 @@
-package com.shareflow.core.designsystem.components
+package com.exampleshareflow.core.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
